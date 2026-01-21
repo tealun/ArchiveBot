@@ -15,7 +15,7 @@
 | 存储管理 | ✅ | 数据库 + Telegram频道存储 |
 | 标签系统 | ✅ | 自动标签 + 手动标签 + AI标签 |
 | 搜索引擎 | ✅ | FTS5全文搜索 + 高级搜索语法 |
-| AI功能 | ✅ | 本地Ollama + 云端API，自动摘要和标签 |
+| AI功能 | ✅ | 云端API（OpenAI/Claude/Qwen），自动摘要和标签 |
 | 多语言 | ✅ | 英语/简体中文/繁体中文 |
 | 命令系统 | ✅ | 8个核心命令 |
 
@@ -24,7 +24,7 @@
 - **归档记录**: 11条
 - **标签数量**: 40个
 - **支持类型**: 文本、链接、图片、视频、文档、音频、语音、动画、贴纸、联系人、位置
-- **AI状态**: 已启用（本地+云端混合方案）
+- **AI状态**: 已启用（云端API）
 - **存储**: SQLite数据库 + Telegram频道
 
 ### 技术栈
@@ -32,7 +32,7 @@
 - **语言**: Python 3.14.2
 - **框架**: python-telegram-bot 21.x
 - **数据库**: SQLite (WAL模式 + FTS5)
-- **AI**: httpx (本地Ollama + OpenAI/Claude/Qwen API)
+- **AI**: httpx (OpenAI/Claude/Qwen API)
 - **配置**: PyYAML
 
 ### 下一步计划
@@ -422,32 +422,25 @@ def search(keyword):
 - 简体中文（zh-CN）
 - 繁体中文（zh-TW）
 
-✅ **AI功能（额外完成）** - 已完成
-- 本地AI支持（Ollama）
+✅ **AI功能（云端API）** - 已完成
 - 云端API支持（OpenAI/Claude/Qwen）
 - 自动标签生成
 - 自动摘要生成
-- 混合方案（本地优先，云端备用）
+- HTTP直连（仅需httpx，轻量级）
 
 ---
 
-### 3.3 AI功能实现（额外完成）✅
+### 3.3 AI功能实现✅
 
 在MVP基础上，已实现AI智能增强功能：
 
-#### 混合AI方案（本地 + 云端）
+#### 云端API方案
 
 **架构设计**：
-- **本地AI**：Ollama集成（llama2, mistral, qwen等模型）
-  - 优势：完全免费、隐私保护、无网络依赖
-  - 适用：日常归档、敏感内容
-  
 - **云端API**：OpenAI/Claude/Qwen HTTP直连
-  - 优势：效果更好、速度更快
-  - 适用：重要内容、复杂分析
+  - 优势：效果好、速度快、无需本地资源
   - 注意：仅HTTP调用，无SDK依赖（仅需httpx，2MB vs 150MB）
-
-- **智能切换**：优先使用本地AI，失败自动切换云端
+  - 支持：OpenAI GPT-4/3.5、Claude、通义千问
 
 **已实现功能**：
 
@@ -472,20 +465,17 @@ ai:
   auto_summarize: true
   auto_generate_tags: true
   
-  local:
-    enabled: true  # 启用本地AI
-    base_url: http://localhost:11434
-    model: llama2
-  
   api:
-    provider: openai
+    provider: openai  # 或 claude, qwen
     api_key: 'sk-xxx'
     model: gpt-3.5-turbo
+    max_tokens: 500
+    timeout: 30
 ```
 
 **使用统计**（当前生产环境）：
-- 11个归档记录
-- 40个标签（包含AI生成的标签）
+- 27个归档记录
+- 66个标签（包含AI生成的标签）
 - AI功能已启用并正常工作
 
 ---
@@ -634,7 +624,6 @@ ai:
 
 **任务清单**：
 - [x] AI API 集成（OpenAI/Claude/Qwen）
-- [x] 本地AI集成（Ollama）
 - [x] 文章摘要生成
 - [x] 关键信息提取
 - [x] 自动标签生成
