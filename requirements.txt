@@ -1,22 +1,22 @@
 # ArchiveBot Dependencies
 
 # Telegram Bot Framework
-python-telegram-bot[all]==21.0.1
+python-telegram-bot[all]
 
 # Configuration
-PyYAML==6.0.1
+PyYAML
 
 # File handling
-python-magic==0.4.27
-python-magic-bin==0.4.14; sys_platform == 'win32'
+python-magic
+python-magic-bin; sys_platform == 'win32'
 
 # Logging
-colorlog==6.8.2
+colorlog
 
 # Date and time
-python-dateutil==2.9.0
+python-dateutil
 
 # Link metadata extraction
-httpx>=0.27.0
-beautifulsoup4>=4.12.0
-lxml>=5.0.0
+httpx
+beautifulsoup4
+lxml
