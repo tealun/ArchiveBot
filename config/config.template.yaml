@@ -19,11 +19,10 @@ ai:
   
   # Cloud API configuration
   api:
-    provider: openai  # openai, claude, gemini, etc.
+    provider: openai  # openai, claude, gemini, grok, etc.
     api_key: ''  # Your API key
-    model: gpt-3.5-turbo
-    max_tokens: 1000
-    timeout: 30
+    api_url: ''  # Custom API URL (optional, for Grok: https://api.x.ai/v1/chat/completions)
+    model: gpt-3.5-turbo  # gpt-3.5-turbo, gpt-4, grok-beta, etc.
     max_tokens: 1000
     timeout: 30
 

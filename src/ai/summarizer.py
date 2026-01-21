@@ -15,8 +15,9 @@ class AIProvider(ABC):
     async def categorize(self, content: str) -> str: pass
 
 class OpenAIProvider(AIProvider):
-    def __init__(self, api_key, model="gpt-3.5-turbo"):
+    def __init__(self, api_key, model="gpt-3.5-turbo", api_url=None):
         self.api_key, self.model = api_key, model
+        self.api_url = api_url or "https://api.openai.com/v1/chat/completions"
         try:
             import httpx
             self.client = httpx.AsyncClient(headers={"Authorization": f"Bearer {api_key}"}, timeout=30)
@@ -24,13 +25,13 @@ class OpenAIProvider(AIProvider):
         except: self.available = False
     
     async def summarize(self, content, max_tokens=500):
-        r = await self.client.post("https://api.openai.com/v1/chat/completions",
+        r = await self.client.post(self.api_url,
             json={"model": self.model, "messages": [{"role": "user", "content": f"总结：{content[:4000]}"}], "max_tokens": max_tokens})
         text = r.json()['choices'][0]['message']['content']
         return {'summary': text, 'key_points': [], 'tags': []}
     
     async def generate_tags(self, content, max_tags=5):
-        r = await self.client.post("https://api.openai.com/v1/chat/completions",
+        r = await self.client.post(self.api_url,
             json={"model": self.model, "messages": [{"role": "user", "content": f"为以下内容生成{max_tags}个中文标签（逗号分隔）：\n{content[:1000]}"}], "max_tokens": 50})
         tags_str = r.json()['choices'][0]['message']['content']
         return [t.strip().replace('#', '') for t in tags_str.split(',') if t.strip()][:max_tags]
@@ -49,12 +50,16 @@ class AISummarizer:
             return
         
         provider_type = api.get('provider', 'openai')
-        if provider_type == 'openai':
+        if provider_type in ['openai', 'grok']:
             try:
-                self.provider = OpenAIProvider(api['api_key'], api.get('model', 'gpt-3.5-turbo'))
-                logger.info(f"Using OpenAI API: {api.get('model', 'gpt-3.5-turbo')}")
+                self.provider = OpenAIProvider(
+                    api['api_key'], 
+                    api.get('model', 'gpt-3.5-turbo'),
+                    api.get('api_url')  # 支持自定义API URL
+                )
+                logger.info(f"Using {provider_type.upper()} API: {api.get('model', 'gpt-3.5-turbo')}")
             except Exception as e:
-                logger.error(f"Failed to initialize OpenAI provider: {e}")
+                logger.error(f"Failed to initialize {provider_type} provider: {e}")
     
     def is_available(self):
         """Check if AI provider is available"""
