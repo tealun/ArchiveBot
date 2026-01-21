@@ -53,3 +53,7 @@ logs/
 # Temporary files
 *.tmp
 *.bak
+
+# Internal documentation (not for public repo)
+docs/DEVELOPMENT.md
+docs/ARCHITECTURE.md
