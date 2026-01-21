@@ -1,0 +1,92 @@
+name: 自动部署到AWS EC2服务器
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'main.py'
+      - 'requirements.txt'
+      - 'config/**'
+      - '.github/workflows/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📦 检出代码
+      uses: actions/checkout@v3
+      
+    - name: 🔍 获取提交信息
+      id: commit
+      run: |
+        echo "message=$(git log -1 --pretty=%B | head -n 1)" >> $GITHUB_OUTPUT
+        echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
+        echo "sha=$(git log -1 --pretty=%h)" >> $GITHUB_OUTPUT
+    
+    - name: 🚀 部署到AWS EC2服务器
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        port: ${{ secrets.SERVER_PORT }}
+        timeout: 60s
+        command_timeout: 10m
+        script: |
+          echo "🔄 开始部署 ArchiveBot..."
+
+          # 进入项目目录
+          cd /www/wwwroot/archivebot
+
+          # 备份当前版本
+          echo "💾 备份当前版本..."
+          tar -czf backup_$(date +%Y%m%d_%H%M%S).tar.gz src/ main.py config/ 2>/dev/null || true
+
+          # 拉取最新代码
+          echo "📥 拉取最新代码..."
+          git fetch origin ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}
+
+          # 检查Python和pip版本
+          echo "🔍 检查Python环境..."
+          python3 --version
+          pip3 --version
+
+          # 安装/更新依赖
+          echo "📦 安装依赖..."
+          if pip3 install -r requirements.txt --break-system-packages; then
+            echo "✓ 依赖安装成功"
+          else
+            echo "⚠️ 使用备用方法安装依赖..."
+            pip3 install -r requirements.txt --user || pip3 install -r requirements.txt
+          fi
+
+          # 验证关键依赖
+          echo "🔍 验证关键依赖..."
+          python3 -c "import yaml; print('✓ PyYAML 已安装')" || echo "✗ PyYAML 缺失"
+          python3 -c "import telegram; print('✓ python-telegram-bot 已安装')" || echo "✗ python-telegram-bot 缺失"
+
+          echo ""
+          echo "✅ 代码部署完成! $(date)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📌 请在宝塔面板手动重启应用"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    - name: 📤 发送部署成功通知到Telegram
+      if: success()
+      run: |
+        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.ADMIN_TELEGRAM_ID }}" \
+          -d parse_mode="HTML" \
+          -d text="<b>✅ 部署成功</b>%0A%0A<b>📦 项目:</b> ArchiveBot%0A<b>🌿 分支:</b> ${{ github.ref_name }}%0A<b>📝 提交:</b> ${{ steps.commit.outputs.message }}%0A<b>👤 作者:</b> ${{ steps.commit.outputs.author }}%0A<b>🔖 SHA:</b> <code>${{ steps.commit.outputs.sha }}</code>%0A<b>🕐 时间:</b> $(date '+%Y-%m-%d %H:%M:%S')%0A%0A<b>⚠️ 请在宝塔面板手动重启应用</b>"
+    
+    - name: 📤 发送部署失败通知到Telegram
+      if: failure()
+      run: |
+        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.ADMIN_TELEGRAM_ID }}" \
+          -d parse_mode="HTML" \
+          -d text="<b>❌ 部署失败</b>%0A%0A<b>📦 项目:</b> ArchiveBot%0A<b>🌿 分支:</b> ${{ github.ref_name }}%0A<b>📝 提交:</b> ${{ steps.commit.outputs.message }}%0A<b>👤 作者:</b> ${{ steps.commit.outputs.author }}%0A<b>🔖 SHA:</b> <code>${{ steps.commit.outputs.sha }}</code>%0A<b>🕐 时间:</b> $(date '+%Y-%m-%d %H:%M:%S')%0A%0A<b>🔗 查看详情:</b> https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
