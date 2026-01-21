@@ -1,0 +1,54 @@
+# ArchiveBot Configuration Template
+# Copy this file to config.yaml and fill in your values
+
+bot:
+  token: "YOUR_BOT_TOKEN_HERE"  # From @BotFather
+  owner_id: 0  # Your Telegram ID from @userinfobot
+  language: "zh-CN"  # en, zh-CN, zh-TW
+  polling_interval: 1
+
+features:
+  auto_tag: true  # Auto type tags
+  enable_fts: true  # Full-text search
+  enable_ocr: false  # OCR for images
+
+ai:
+  enabled: false  # Enable AI features
+  auto_summarize: false  # Auto summarize new archives
+  auto_generate_tags: false  # Auto generate AI tags
+  
+  # Cloud API configuration
+  api:
+    provider: openai  # openai, claude, gemini, etc.
+    api_key: ''  # Your API key
+    model: gpt-3.5-turbo
+    max_tokens: 1000
+    timeout: 30
+    max_tokens: 1000
+    timeout: 30
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"
+  console: true
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+storage:
+  database:
+    path: "data/archive.db"
+  
+  telegram:
+    channel_id: 0  # Private channel ID (format: -1001234567890)
+    enabled: true
+  
+  cloud:
+    google_drive:
+      enabled: false
+      client_id: ""
+      client_secret: ""
+      folder_name: "ArchiveBot"
+    
+    aliyun:
+      enabled: false
+      refresh_token: ""
+      folder_name: "归档"

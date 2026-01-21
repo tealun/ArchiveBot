@@ -1,0 +1,55 @@
+{
+  "welcome": "👋 歡迎使用 ArchiveBot！\n\n我是您的個人內容歸檔助手，可以幫您：\n\n📦 歸檔各類內容（文字、圖片、影片、文件）\n🏷️ 自動標籤分類\n🔍 快速搜尋已歸檔內容\n💾 多級儲存策略\n\n傳送任何內容給我，或使用命令：\n\n/help - 檢視說明\n/search - 搜尋歸檔\n/tags - 檢視所有標籤\n/stats - 檢視統計\n/language - 切換語言\n\n讓我們開始吧！🚀",
+  
+  "help": "📖 說明\n\n<b>歸檔內容：</b>\n• 直接傳送任何內容給我\n• 使用 #標籤 格式新增標籤\n\n<b>命令：</b>\n/start - 初始化機器人\n/help - 檢視此說明\n/search &lt;關鍵詞&gt; - 搜尋歸檔\n/tags - 檢視所有標籤\n/stats - 檢視統計資訊\n/language - 切換語言\n\n<b>搜尋：</b>\n• 關鍵詞搜尋：/search python\n• 標籤搜尋：/search #技術\n• 組合搜尋：/search #技術 python\n\n<b>標籤：</b>\n自動標籤：#文字、#圖片、#影片、#文件、#連結\n手動標籤：傳送內容時新增 #你的標籤",
+  
+  "unauthorized": "⛔ 未授權\n\n抱歉，此機器人僅供私人使用。",
+  
+  "archive_success": "✅ 歸檔成功\n\n📝 類型: {content_type}\n🏷️ 標籤: {tags}\n💾 儲存: {storage_type}\n📌 來源: {source}\n🕐 時間: {time}",
+  "archive_success_with_size": "✅ 歸檔成功\n\n📝 類型: {content_type}\n📦 大小: {file_size}\n🏷️ 標籤: {tags}\n💾 儲存: {storage_type}\n📌 來源: {source}\n🕐 時間: {time}",
+  
+  "archive_failed": "❌ 歸檔失敗\n\n錯誤：{error}\n請重試。",
+  
+  "search_no_keyword": "請提供搜尋關鍵詞。\n\n範例：/search python",
+  
+  "search_no_results": "🔍 未找到結果\n\n關鍵詞：{keyword}\n\n嘗試其他關鍵詞或使用 /tags 檢視標籤列表",
+  
+  "search_results": "🔍 搜尋結果 ({count})\n\n關鍵詞：{keyword}\n\n{results}",
+  
+  "tags_empty": "暫無標籤。\n\n開始歸檔內容以建立標籤！",
+  
+  "tags_list": "🏷️ 所有標籤 ({count})\n\n{tags}",
+  
+  "stats": "📊 統計資訊\n\n📦 總歸檔數：{total_archives}\n🏷️ 總標籤數：{total_tags}\n💾 儲存使用：{storage_used}\n📅 最後歸檔：{last_archive}",
+  
+  "language_changed": "✅ 語言已切換為繁體中文",
+  
+  "language_select": "🌍 選擇語言：\n\n請選擇您偏好的語言：",
+  
+  "processing": "⏳ 處理中...",
+  
+  "error_occurred": "❌ 發生錯誤\n\n{error}\n\n請重試或聯絡管理員。",
+  
+  "rate_limit_exceeded": "⚠️ 請求過於頻繁\n\n請等待 {wait_time} 秒後再試。",
+  
+  "tag_text": "文字",
+  "tag_image": "圖片",
+  "tag_video": "影片",
+  "tag_document": "文件",
+  "tag_link": "連結",
+  "tag_audio": "音訊",
+  "tag_voice": "語音",
+  "tag_sticker": "貼紙",
+  "tag_animation": "動畫",
+  "tag_contact": "聯絡人",
+  "tag_location": "位置",
+  
+  "storage_database": "資料庫",
+  "storage_telegram": "Telegram 頻道",
+  "storage_cloud": "雲端儲存",
+  "storage_reference": "僅引用",
+  
+  "button_language_en": "English",
+  "button_language_zh_cn": "简体中文",
+  "button_language_zh_tw": "繁體中文"
+}

@@ -1,0 +1,53 @@
+{
+  "welcome": "👋 Welcome to ArchiveBot!\n\nI'm your personal content archiving assistant. I can help you:\n\n📦 Archive various content (text, images, videos, documents)\n🏷️ Automatically tag and categorize\n🔍 Quickly search archived content\n💾 Multi-level storage strategy\n\nSend me any content or use commands:\n\n/help - View help\n/search - Search archives\n/tags - View all tags\n/stats - View statistics\n/language - Change language\n\nLet's get started! 🚀",
+  
+  "help": "📖 Help\n\n<b>Archive Content:</b>\n• Send any content directly to me\n• Add tags using #tag format\n\n<b>Commands:</b>\n/start - Initialize bot\n/help - View this help\n/search &lt;keyword&gt; - Search archives\n/tags - View all tags\n/stats - View statistics\n/language - Change language\n\n<b>Search:</b>\n• Keyword search: /search python\n• Tag search: /search #tech\n• Combined search: /search #tech python\n\n<b>Tags:</b>\nAutomatic tags: #text, #image, #video, #document, #link\nManual tags: Add #your_tag when sending content",
+  
+  "unauthorized": "⛔ Unauthorized\n\nSorry, this bot is for private use only.",
+  
+  "archive_success": "✅ Archived successfully\n\n📝 Type: {content_type}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n� Source: {source}\n🕐 Time: {time}",  "archive_success_with_size": "✅ Archived successfully\n\n📝 Type: {content_type}\n📦 Size: {file_size}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n📌 Source: {source}\n🕐 Time: {time}",  
+  "archive_failed": "❌ Archive failed\n\nError: {error}\nPlease try again.",
+  
+  "search_no_keyword": "Please provide search keyword.\n\nExample: /search python",
+  
+  "search_no_results": "🔍 No results found\n\nKeyword: {keyword}\n\nTry other keywords or check tag list with /tags",
+  
+  "search_results": "🔍 Search Results ({count})\n\nKeyword: {keyword}\n\n{results}",
+  
+  "tags_empty": "No tags yet.\n\nStart archiving content to create tags!",
+  
+  "tags_list": "🏷️ All Tags ({count})\n\n{tags}",
+  
+  "stats": "📊 Statistics\n\n📦 Total Archives: {total_archives}\n🏷️ Total Tags: {total_tags}\n💾 Storage Used: {storage_used}\n📅 Last Archive: {last_archive}",
+  
+  "language_changed": "✅ Language changed to English",
+  
+  "language_select": "🌍 Select Language:\n\n Please choose your preferred language:",
+  
+  "processing": "⏳ Processing...",
+  
+  "error_occurred": "❌ An error occurred\n\n{error}\n\nPlease try again or contact administrator.",
+  
+  "rate_limit_exceeded": "⚠️ Rate limit exceeded\n\nPlease wait {wait_time} seconds before trying again.",
+  
+  "tag_text": "text",
+  "tag_image": "image",
+  "tag_video": "video",
+  "tag_document": "document",
+  "tag_link": "link",
+  "tag_audio": "audio",
+  "tag_voice": "voice",
+  "tag_sticker": "sticker",
+  "tag_animation": "animation",
+  "tag_contact": "contact",
+  "tag_location": "location",
+  
+  "storage_database": "Database",
+  "storage_telegram": "Telegram Channel",
+  "storage_cloud": "Cloud Storage",
+  "storage_reference": "Reference Only",
+  
+  "button_language_en": "English",
+  "button_language_zh_cn": "简体中文",
+  "button_language_zh_tw": "繁體中文"
+}
