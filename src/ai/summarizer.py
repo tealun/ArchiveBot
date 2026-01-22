@@ -38,7 +38,13 @@ class OpenAIProvider(AIProvider):
         self.api_url = api_url or "https://api.openai.com/v1/chat/completions"
         try:
             import httpx
-            self.client = httpx.AsyncClient(headers={"Authorization": f"Bearer {api_key}"}, timeout=30)
+            # 增加超时时间，添加重试配置
+            self.client = httpx.AsyncClient(
+                headers={"Authorization": f"Bearer {api_key}"}, 
+                timeout=httpx.Timeout(60.0, connect=10.0),  # 60秒总超时，10秒连接超时
+                limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                transport=httpx.AsyncHTTPTransport(retries=2)  # 自动重试2次
+            )
             self.available = True
         except: self.available = False
     
@@ -369,6 +375,237 @@ class AISummarizer:
         except Exception as e:
             logger.error(f"Batch generate tags error: {e}", exc_info=True)
             return [[] for _ in contents]
+    
+    async def generate_note_from_content(
+        self,
+        content: str,
+        content_type: str,
+        max_length: int = 250,
+        language: str = 'zh-CN'
+    ) -> str:
+        """
+        根据内容生成笔记
+        
+        Args:
+            content: 原始内容
+            content_type: 内容类型 (text/link/document)
+            max_length: 笔记最大长度
+            language: 语言
+            
+        Returns:
+            生成的笔记内容
+        """
+        if not self.is_available():
+            return ""
+        
+        try:
+            # 构建prompt
+            if language.startswith('zh'):
+                prompt = f"""请为以下{content_type}内容生成一份简洁的笔记（{max_length}字以内）。
+
+要求：
+1. 突出核心内容和关键信息
+2. 使用清晰简练的语言
+3. 适合快速回顾和检索
+4. 不要在末尾添加字数统计或任何元信息
+
+内容：
+{content[:3000]}
+
+请直接输出笔记文本。"""
+            else:
+                prompt = f"""Please generate a concise note (within {max_length} words) for the following {content_type} content.
+
+Requirements:
+1. Highlight core content and key information
+2. Use clear and concise language
+3. Suitable for quick review and search
+4. Do not add word count or any meta information at the end
+
+Content:
+{content[:3000]}
+
+Output the note text directly."""
+            
+            # 调用 API
+            r = await self.provider.client.post(
+                self.provider.api_url,
+                json={
+                    "model": self.provider.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 500
+                }
+            )
+            note_content = r.json()['choices'][0]['message']['content'].strip()
+            
+            logger.info(f"Generated note from content: {len(note_content)} chars")
+            return note_content
+            
+        except Exception as e:
+            logger.error(f"Generate note from content error: {e}", exc_info=True)
+            return ""
+    
+    async def generate_note_from_ai_analysis(
+        self,
+        ai_summary: str,
+        ai_key_points: List[str],
+        ai_category: str,
+        title: str,
+        language: str = 'zh-CN'
+    ) -> str:
+        """
+        根据AI分析结果整理文档笔记
+        
+        Args:
+            ai_summary: AI摘要
+            ai_key_points: AI关键点
+            ai_category: AI分类
+            title: 文档标题
+            language: 语言
+            
+        Returns:
+            整理的完整笔记
+        """
+        if not self.is_available():
+            return ""
+        
+        try:
+            # 构建prompt
+            key_points_text = '\n'.join([f"- {point}" for point in ai_key_points]) if ai_key_points else "无"
+            
+            if language.startswith('zh'):
+                prompt = f"""请根据以下AI分析内容，整理一份完整的文档笔记。
+
+文档标题：{title}
+分类：{ai_category}
+
+AI摘要：
+{ai_summary}
+
+关键点：
+{key_points_text}
+
+要求：
+1. 整合摘要和关键点信息
+2. 组织成结构清晰的笔记格式
+3. 便于理解和记忆
+4. 不要在末尾添加字数统计或任何元信息
+
+请直接输出笔记文本。"""
+            else:
+                prompt = f"""Please organize a complete document note based on the following AI analysis.
+
+Document Title: {title}
+Category: {ai_category}
+
+AI Summary:
+{ai_summary}
+
+Key Points:
+{key_points_text}
+
+Requirements:
+1. Integrate summary and key points
+2. Organize into clear note format
+3. Easy to understand and remember
+4. Do not add word count or any meta information at the end
+
+Output the note text directly."""
+            
+            # 调用 API
+            r = await self.provider.client.post(
+                self.provider.api_url,
+                json={
+                    "model": self.provider.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 1000
+                }
+            )
+            note_content = r.json()['choices'][0]['message']['content'].strip()
+            
+            logger.info(f"Generated note from AI analysis: {len(note_content)} chars")
+            return note_content
+            
+        except Exception as e:
+            logger.error(f"Generate note from AI analysis error: {e}", exc_info=True)
+            return ""
+    
+    async def generate_title_from_text(self, content: str, max_length: int = 32, language: str = 'zh-CN') -> str:
+        """
+        从文本内容生成标题
+        
+        Args:
+            content: 文本内容
+            max_length: 标题最大长度（字符数）
+            language: 语言代码
+            
+        Returns:
+            生成的标题
+        """
+        if not content or not content.strip():
+            return "无标题"
+        
+        try:
+            # 检测语言
+            detected_lang = detect_content_language(content)
+            
+            if language.startswith('zh') or detected_lang == 'zh':
+                prompt = f"""请为以下文本生成一个简洁准确的标题。
+
+要求：
+1. 标题长度不超过{max_length}个字符
+2. 准确概括文本核心内容
+3. 简洁明了，便于理解
+4. 不要使用引号或其他标点符号包裹标题
+5. 直接输出标题文本，不要任何解释
+
+文本内容：
+{content[:1000]}
+
+请直接输出标题："""
+            else:
+                prompt = f"""Generate a concise and accurate title for the following text.
+
+Requirements:
+1. Title length should not exceed {max_length} characters
+2. Accurately summarize the core content
+3. Clear and easy to understand
+4. Do not use quotes or other punctuation to wrap the title
+5. Output only the title text, no explanations
+
+Text content:
+{content[:1000]}
+
+Output the title directly:"""
+            
+            # 调用 API
+            r = await self.provider.client.post(
+                self.provider.api_url,
+                json={
+                    "model": self.provider.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 50
+                }
+            )
+            title = r.json()['choices'][0]['message']['content'].strip()
+            
+            # 移除可能的引号
+            title = title.strip('"\'""''')
+            
+            # 确保标题不超过最大长度
+            if len(title) > max_length:
+                title = title[:max_length-3] + "..."
+            
+            logger.info(f"Generated title from text: {title}")
+            return title
+            
+        except Exception as e:
+            logger.error(f"Generate title from text error: {e}", exc_info=True)
+            # 降级：返回截断的文本
+            fallback = content[:max_length].strip()
+            if len(content) > max_length:
+                fallback = fallback[:max_length-3] + "..."
+            return fallback
 
 _summarizer = None
 def get_ai_summarizer(config=None):

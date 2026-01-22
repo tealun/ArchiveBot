@@ -140,7 +140,7 @@
   "ai_status_auto_tags": "\n自动标签: {status}",
   "ai_status_enable_guide": "\n\n💡 *如何启用*\n1. 编辑 config/config.yaml\n2. 设置 ai.enabled: true\n3. 配置 ai.api.provider 和 ai.api.api_key\n4. 重启机器人\n\n支持的提供商：OpenAI, Claude, Qwen",
   
-  "pagination_page_of": "第{current}页/共5{total}页",
+  "pagination_page_of": "第{current}页/共{total}页",
   "button_previous_page": "⬅️ 上一页",
   "button_next_page": "➡️ 下一页",
   "button_back_to_tags": "🔙 返回标签列表",

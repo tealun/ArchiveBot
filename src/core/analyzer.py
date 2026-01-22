@@ -203,7 +203,8 @@ class ContentAnalyzer:
         return {
             'content_type': 'text',
             'title': text[:100] if len(text) > 100 else text,
-            'content': text
+            'content': text,
+            '_needs_ai_title': True  # 标记需要AI生成标题
         }
     
     @staticmethod

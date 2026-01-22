@@ -140,7 +140,7 @@
   "ai_status_auto_tags": "\n自動標籤: {status}",
   "ai_status_enable_guide": "\n\n💡 *如何啟用*\n1. 編輯 config/config.yaml\n2. 設定 ai.enabled: true\n3. 配置 ai.api.provider 和 ai.api.api_key\n4. 重啟機器人\n\n支援的提供商：OpenAI, Claude, Qwen",
   
-  "pagination_page_of": "第{current}頁/共5{total}頁",
+  "pagination_page_of": "第{current}頁/共{total}頁",
   "button_previous_page": "⬅️ 上一頁",
   "button_next_page": "➡️ 下一頁",
   "button_back_to_tags": "🔙 返回標籤列表",

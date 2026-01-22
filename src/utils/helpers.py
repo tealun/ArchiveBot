@@ -67,6 +67,41 @@ def extract_hashtags(text: str) -> List[str]:
     return unique_tags
 
 
+def should_create_note(content: str) -> tuple:
+    """
+    判断内容是否应该创建笔记以及笔记类型
+    
+    Args:
+        content: 输入内容
+        
+    Returns:
+        (is_short_note, note_type)
+        - is_short_note: True=直接作为笔记（不归档），False=归档并可能生成AI笔记
+        - note_type: 'short'（短文本）| 'long'（长文本）| 'none'（空内容）
+    """
+    if not content:
+        return False, 'none'
+    
+    # 检测中英文字符
+    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', content))
+    english_chars = len(re.findall(r'[a-zA-Z]', content))
+    
+    # 判断阈值
+    if chinese_chars > english_chars:
+        # 中文为主：250字符
+        threshold = 250
+    else:
+        # 英文为主：500字符
+        threshold = 500
+    
+    char_count = len(content)
+    
+    if char_count < threshold:
+        return True, 'short'  # 短文本，直接作为笔记
+    else:
+        return False, 'long'  # 长文本，需要归档并可能生成AI笔记
+
+
 def is_url(text: str) -> bool:
     """
     Check if text is a URL

@@ -60,6 +60,22 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_review_callback(update, context)
         elif callback_data.startswith('note:'):
             await handle_note_callback(update, context)
+        elif callback_data.startswith('note_add:'):
+            await handle_note_add_callback(update, context)
+        elif callback_data.startswith('note_edit:'):
+            await handle_note_edit_callback(update, context)
+        elif callback_data.startswith('note_modify:'):
+            await handle_note_modify_callback(update, context)
+        elif callback_data.startswith('note_append:'):
+            await handle_note_append_callback(update, context)
+        elif callback_data.startswith('note_share:'):
+            await handle_note_share_callback(update, context)
+        elif callback_data.startswith('note_delete:'):
+            await handle_note_delete_callback(update, context)
+        elif callback_data == 'note_close':
+            # 关闭笔记查看窗口
+            await query.message.delete()
+            await query.answer("已关闭")
         elif callback_data.startswith('fav:'):
             await handle_favorite_callback(update, context)
         elif callback_data.startswith('forward:'):
@@ -108,7 +124,6 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         # 格式化结果列表
         formatted_results = []
-        action_buttons = []  # 每条记录的操作按钮行
         
         # 获取数据库实例用于查询状态
         db_storage = context.bot_data.get('db_storage')
@@ -137,26 +152,15 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             has_notes = db.has_notes(archive_id) if db and archive_id else False
             is_favorite = db.is_favorite(archive_id) if db and archive_id else False
             
-            # 构建操作按钮（内联在文本中）
-            note_icon = "📝✓" if has_notes else "📝"
-            fav_icon = "❤️" if is_favorite else "🤍"
-            forward_icon = "↗️"
+            # 构建状态图标（按照要求的顺序）
+            fav_icon = "❤️ 已精选" if is_favorite else "🤍 未精选"
+            note_icon = "📝 √ 有笔记" if has_notes else "📝 无笔记"
             
-            # 结果文本：序号、emoji、标题换行后显示按钮和日期
-            result_text = f"{idx}. {emoji} {title_truncated}"
+            # 结果文本：一行显示状态
+            result_text = f"{idx}. {emoji} {title_truncated}\n   {fav_icon} | {note_icon} | 📅 {archived_at}"
             formatted_results.append(result_text)
-            
-            # 为每条记录创建一行操作按钮
-            if archive_id:
-                action_row = [
-                    InlineKeyboardButton(note_icon, callback_data=f"note:{archive_id}"),
-                    InlineKeyboardButton(fav_icon, callback_data=f"fav:{archive_id}"),
-                    InlineKeyboardButton(forward_icon, callback_data=f"forward:{archive_id}"),
-                    InlineKeyboardButton(f"📅 {archived_at}", callback_data="noop")
-                ]
-                action_buttons.append(action_row)
         
-        results_text = '\n\n'.join(formatted_results)
+        results_text = '\n───────────────────────────────────────\n'.join(formatted_results)
         
         # 获取总数
         has_more = search_result.get('count', 0) == page_size
@@ -164,11 +168,8 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         message = f"🏷️ 标签: #{tag_name}\n\n{results_text}"
         
-        # 构建按钮布局
+        # 构建按钮布局：只包含分页和返回按钮（无每条记录的操作按钮）
         keyboard = []
-        
-        # 添加每条记录的操作按钮
-        keyboard.extend(action_buttons)
         
         # 构建分页按钮 - 只在多页时显示
         total_pages = (total_count + page_size - 1) // page_size
@@ -452,21 +453,15 @@ async def handle_search_page_callback(update: Update, context: ContextTypes.DEFA
         # Get total count
         total_count = search_result.get('total_count', 0)
         
-        # Format results
-        result_text, results_with_ai = search_engine.format_results(search_result, with_links=True)
+        # 获取数据库实例
+        db_storage = context.bot_data.get('db_storage')
+        db = db_storage.db if db_storage else None
         
-        # Build keyboard
+        # Format results (第二个返回值现在是空列表)
+        result_text, _ = search_engine.format_results(search_result, with_links=True, db_instance=db)
+        
+        # Build keyboard: 只包含分页按钮（状态信息已内联在文本中）
         keyboard = []
-        
-        # AI解析按钮
-        if results_with_ai:
-            for item in results_with_ai:
-                # 计算全局索引（考虑分页偏移）
-                global_index = offset + item['index']
-                title_preview = truncate_text(item['title'], 12)
-                button_text = f"🤖 #{global_index}《{title_preview}》"
-                callback_data = f"ai_view:{item['id']}"
-                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
         # 分页按钮 - 只在多页时显示
         total_pages = (total_count + page_size - 1) // page_size
@@ -810,6 +805,19 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
                 # 使用HTML格式的链接（和搜索结果一致）
                 title_display = f"<a href='{file_link}'>{title}</a>"
             
+            # 获取数据库实例检查状态
+            db_storage = context.bot_data.get('db_storage')
+            db = db_storage.db if db_storage else None
+            
+            # 检查精选和笔记状态
+            is_favorite = db.is_favorite(archive_id) if db and archive_id else False
+            has_notes = db.has_notes(archive_id) if db and archive_id else False
+            
+            # 构建状态图标（按照统一格式）
+            fav_icon = "❤️ 已精选" if is_favorite else "🤍 未精选"
+            note_icon = "📝 √ 有笔记" if has_notes else "📝 无笔记"
+            status_line = f"{fav_icon} | {note_icon} | 📅 {created_at}"
+            
             lines.append(i18n.t(
                 'review_random',
                 id=archive_id,
@@ -817,6 +825,8 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
                 tags=tags_str,
                 created_at=created_at
             ))
+            # 添加状态行
+            lines.append(f"   {status_line}")
         
         # 添加返回按钮
         keyboard = [[
@@ -845,7 +855,7 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Handle note button click - 进入笔记模式并关联到指定归档
+    Handle note button click - 查看归档的关联笔记
     
     Callback data format: note:archive_id
     
@@ -859,26 +869,319 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         # 解析 callback data: note:archive_id
         archive_id = int(query.data.split(':')[1])
         
-        # 设置用户状态为笔记模式
-        context.user_data['note_mode'] = True
-        context.user_data['note_archive_id'] = archive_id
-        
-        # 发送提示消息
         i18n = get_i18n()
-        await query.answer(i18n.t('note_mode_archive_linked', archive_id=archive_id)[:200], show_alert=True)
+        note_manager = context.bot_data.get('note_manager')
         
-        # 发送详细提示到聊天
+        if not note_manager:
+            await query.answer("笔记管理器未初始化", show_alert=True)
+            logger.error("Note manager not initialized")
+            return
+        
+        # 获取该归档的所有笔记
+        notes = note_manager.get_notes(archive_id)
+        
+        if not notes:
+            # 没有笔记时，直接设置等待状态并提示用户输入
+            await query.answer("📝 请回复此消息输入笔记")
+            
+            # 设置等待状态
+            context.user_data['waiting_note_for_archive'] = archive_id
+            
+            # 发送提示消息
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"📝 归档 #{archive_id} 还没有笔记\n\n💬 请回复此消息输入笔记内容",
+                reply_to_message_id=query.message.message_id
+            )
+            logger.info(f"User waiting to add note for archive {archive_id}")
+            return
+        
+        # 构建笔记内容显示
+        notes_text = f"📝 归档 #{archive_id} 的笔记\n\n"
+        
+        # 显示最新的笔记（或所有笔记）
+        for idx, note in enumerate(notes, 1):
+            content = note['content']
+            notes_text += f"{content}\n"
+            if len(notes) > 1:
+                notes_text += f"\n📅 {note['created_at']}\n\n"
+        
+        if len(notes) == 1:
+            notes_text += f"\n📅 {notes[0]['created_at']}"
+        
+        # 添加操作按钮：编辑笔记 | 删除笔记 | 分享笔记
+        keyboard = [[
+            InlineKeyboardButton("✏️ 编辑笔记", callback_data=f"note_edit:{archive_id}:{notes[-1]['id']}"),
+            InlineKeyboardButton("🗑️ 删除笔记", callback_data=f"note_delete:{notes[-1]['id']}")
+        ]]
+        keyboard.append([InlineKeyboardButton("📤 分享笔记", callback_data=f"note_share:{archive_id}:{notes[-1]['id']}")])
+        keyboard.append([InlineKeyboardButton("✖️ 关闭", callback_data=f"note_close")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # 先answer，然后发送笔记内容
+        await query.answer()
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=i18n.t('note_mode_archive_linked', archive_id=archive_id),
-            parse_mode=ParseMode.HTML
+            text=notes_text,
+            reply_markup=reply_markup
         )
         
-        logger.info(f"User {update.effective_user.id} entered note mode for archive {archive_id}")
+        logger.info(f"Displayed {len(notes)} notes for archive {archive_id}")
         
     except Exception as e:
         logger.error(f"Error handling note callback: {e}", exc_info=True)
-        await query.answer(f"Error: {str(e)}", show_alert=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+async def handle_note_add_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle add note button click - 提示用户输入笔记内容
+    
+    Callback data format: note_add:archive_id
+    """
+    query = update.callback_query
+    
+    try:
+        archive_id = int(query.data.split(':')[1])
+        
+        # 设置用户状态，等待笔记输入
+        context.user_data['waiting_note_for_archive'] = archive_id
+        
+        await query.answer("📝 请回复此消息输入笔记")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"💬 请回复此消息输入笔记内容\n\n将为归档 #{archive_id} 添加笔记",
+            reply_to_message_id=query.message.message_id
+        )
+        
+        logger.info(f"User waiting to add note for archive {archive_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling note add callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+async def handle_note_edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle edit note button click - 显示修改和追加选项
+    
+    Callback data format: note_edit:archive_id:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        parts = query.data.split(':')
+        archive_id = int(parts[1])
+        note_id = int(parts[2])
+        
+        # 显示修改和追加选项
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        keyboard = [
+            [InlineKeyboardButton("✏️ 修改笔记", callback_data=f"note_modify:{archive_id}:{note_id}")],
+            [InlineKeyboardButton("➕ 追加笔记", callback_data=f"note_append:{archive_id}:{note_id}")],
+            [InlineKeyboardButton("✖️ 取消", callback_data=f"note_close")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.answer()
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"📝 编辑归档 #{archive_id} 的笔记\n\n请选择操作：",
+            reply_markup=reply_markup
+        )
+        
+        logger.info(f"Showing edit options for note {note_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling note edit callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+async def handle_note_modify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle modify note - 复制笔记内容供用户修改
+    
+    Callback data format: note_modify:archive_id:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        parts = query.data.split(':')
+        archive_id = int(parts[1])
+        note_id = int(parts[2])
+        
+        # 获取笔记内容
+        note_manager = context.bot_data.get('note_manager')
+        if not note_manager:
+            await query.answer("笔记管理器未初始化", show_alert=True)
+            return
+        
+        # 获取笔记
+        notes = note_manager.get_notes(archive_id)
+        note_content = None
+        for note in notes:
+            if note['id'] == note_id:
+                note_content = note['content']
+                break
+        
+        if not note_content:
+            await query.answer("笔记不存在", show_alert=True)
+            return
+        
+        # 设置等待状态（修改模式）
+        context.user_data['waiting_note_for_archive'] = archive_id
+        context.user_data['note_modify_mode'] = True
+        context.user_data['note_id_to_modify'] = note_id
+        
+        await query.answer("📋 笔记内容已发送")
+        
+        # 发送当前笔记内容供用户复制修改
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"📝 当前笔记内容：\n\n{note_content}\n\n💡 请复制上方内容，修改后回复此消息发送",
+            reply_to_message_id=query.message.message_id
+        )
+        
+        logger.info(f"User modifying note {note_id} for archive {archive_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling note modify callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+async def handle_note_append_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle append note - 追加内容到现有笔记
+    
+    Callback data format: note_append:archive_id:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        parts = query.data.split(':')
+        archive_id = int(parts[1])
+        note_id = int(parts[2])
+        
+        # 设置等待状态（追加模式）
+        context.user_data['waiting_note_for_archive'] = archive_id
+        context.user_data['note_append_mode'] = True
+        context.user_data['note_id_to_append'] = note_id
+        
+        await query.answer("➕ 请输入要追加的内容")
+        
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"➕ 追加笔记内容\n\n请回复此消息输入要追加的内容",
+            reply_to_message_id=query.message.message_id
+        )
+        
+        logger.info(f"User appending to note {note_id} for archive {archive_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling note append callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+async def handle_note_share_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle share note - 发送格式化的笔记供用户转发分享
+    
+    Callback data format: note_share:archive_id:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        parts = query.data.split(':')
+        archive_id = int(parts[1])
+        note_id = int(parts[2])
+        
+        # 获取笔记内容
+        note_manager = context.bot_data.get('note_manager')
+        if not note_manager:
+            await query.answer("笔记管理器未初始化", show_alert=True)
+            return
+        
+        # 获取笔记
+        notes = note_manager.get_notes(archive_id)
+        note_content = None
+        note_created_at = None
+        for note in notes:
+            if note['id'] == note_id:
+                note_content = note['content']
+                note_created_at = note['created_at']
+                break
+        
+        if not note_content:
+            await query.answer("笔记不存在", show_alert=True)
+            return
+        
+        # 获取存档信息（用于显示标题等）
+        db_storage = context.bot_data.get('db_storage')
+        archive_info = None
+        if db_storage:
+            archive_info = db_storage.get_archive(archive_id)
+        
+        # 构建分享消息
+        share_text = "📝 笔记分享\n\n"
+        
+        # 如果有存档标题，添加标题
+        if archive_info and archive_info.get('title'):
+            share_text += f"📌 {archive_info['title']}\n\n"
+        
+        share_text += f"{note_content}\n\n"
+        share_text += f"---\n"
+        share_text += f"📅 {note_created_at}\n"
+        share_text += f"🔖 来自归档 #{archive_id}"
+        
+        await query.answer("📤 笔记已发送，可直接转发")
+        
+        # 发送格式化的笔记消息
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=share_text
+        )
+        
+        logger.info(f"Shared note {note_id} from archive {archive_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling note share callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+async def handle_note_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle delete note button click
+    
+    Callback data format: note_delete:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        note_id = int(query.data.split(':')[1])
+        
+        note_manager = context.bot_data.get('note_manager')
+        if not note_manager:
+            await query.answer("笔记管理器未初始化", show_alert=True)
+            return
+        
+        # 删除笔记
+        success = note_manager.delete_note(note_id)
+        
+        if success:
+            await query.answer("✅ 笔记已删除")
+            # 删除显示笔记的消息
+            try:
+                await query.message.delete()
+            except:
+                pass
+            logger.info(f"Deleted note {note_id}")
+        else:
+            await query.answer("❌ 删除失败", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"Error handling note delete callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
 async def handle_favorite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -901,6 +1204,7 @@ async def handle_favorite_callback(update: Update, context: ContextTypes.DEFAULT
         db_storage = context.bot_data.get('db_storage')
         if not db_storage:
             await query.answer("Database not initialized", show_alert=True)
+            logger.error("Database storage not initialized")
             return
         
         db = db_storage.db
@@ -911,21 +1215,48 @@ async def handle_favorite_callback(update: Update, context: ContextTypes.DEFAULT
         
         if success:
             i18n = get_i18n()
-            if is_fav:
-                await query.answer("❌ 已取消精选")
-            else:
-                await query.answer("❤️ 已添加到精选")
+            new_status = not is_fav
             
-            # 刷新当前消息（更新按钮状态）
-            # 重新构建按钮...这需要知道当前是在什么页面
-            # 简化处理：只回答不刷新
-            logger.info(f"Archive {archive_id} favorite toggled to {not is_fav}")
+            # 更新按钮显示
+            try:
+                # 获取当前消息的按钮
+                original_markup = query.message.reply_markup
+                if original_markup and original_markup.inline_keyboard:
+                    # 重建按钮，更新精选按钮的图标
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    
+                    new_keyboard = []
+                    for row in original_markup.inline_keyboard:
+                        new_row = []
+                        for button in row:
+                            callback_data = button.callback_data
+                            if callback_data and callback_data.startswith(f'fav:{archive_id}'):
+                                # 更新精选按钮图标
+                                fav_icon = "❤️" if new_status else "🤍"
+                                new_row.append(InlineKeyboardButton(fav_icon, callback_data=callback_data))
+                            else:
+                                new_row.append(button)
+                        new_keyboard.append(new_row)
+                    
+                    # 更新消息的按钮
+                    await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_keyboard))
+            except Exception as e:
+                logger.debug(f"Failed to update button markup: {e}")
+            
+            # 给用户反馈
+            if new_status:
+                await query.answer("❤️ 已添加到精选")
+            else:
+                await query.answer("🤍 已取消精选")
+            
+            logger.info(f"Archive {archive_id} favorite toggled to {new_status}")
         else:
             await query.answer("操作失败", show_alert=True)
+            logger.error(f"Failed to toggle favorite for archive {archive_id}")
         
     except Exception as e:
         logger.error(f"Error handling favorite callback: {e}", exc_info=True)
-        await query.answer(f"Error: {str(e)}", show_alert=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
 async def handle_forward_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

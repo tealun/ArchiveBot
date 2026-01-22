@@ -74,6 +74,7 @@ class SearchEngine:
                 'success': False,
                 'error': str(e),
                 'count': 0,
+                'total_count': 0,
                 'results': []
             }
     
@@ -107,16 +108,17 @@ class SearchEngine:
         
         return keyword, tags
     
-    def format_results(self, search_result: Dict[str, Any], with_links: bool = True) -> tuple:
+    def format_results(self, search_result: Dict[str, Any], with_links: bool = True, db_instance=None) -> tuple:
         """
         Format search results for display
         
         Args:
             search_result: Search result dictionary
             with_links: 是否包含跳转链接
+            db_instance: Database instance for checking favorite/notes status
             
         Returns:
-            Tuple of (formatted_text, results_with_ai_data)
+            Tuple of (formatted_text, inline_keyboards_per_item)
         """
         if not search_result.get('success'):
             error = search_result.get('error', 'Unknown error')
@@ -129,9 +131,10 @@ class SearchEngine:
         
         # Format each result
         formatted_results = []
-        results_with_ai = []
+        keyboards_per_item = []
         
         for idx, archive in enumerate(search_result.get('results', []), 1):
+            archive_id = archive.get('id')
             emoji = get_content_type_emoji(archive.get('content_type', ''))
             title = archive.get('title', 'Untitled')
             title_truncated = truncate_text(title, 50)
@@ -158,37 +161,30 @@ class SearchEngine:
                 title_truncated = f"<a href='{link}'>{title_truncated}</a>"
             
             # Get tags for this archive
-            tags = self.db_storage.get_archive_tags(archive.get('id'))
+            tags = self.db_storage.get_archive_tags(archive_id)
             tags_str = ' '.join(f"#{tag}" for tag in tags) if tags else ''
             
             archived_at = archive.get('archived_at', '')
             
-            # 格式化结果
+            # 检查精选和笔记状态
+            is_favorite = db_instance.is_favorite(archive_id) if db_instance else False
+            has_notes = db_instance.has_notes(archive_id) if db_instance else False
+            
+            # 构建状态图标（按照要求的顺序）
+            fav_icon = "❤️ 已精选" if is_favorite else "🤍 未精选"
+            note_icon = "📝 √ 有笔记" if has_notes else "📝 无笔记"
+            
+            # 格式化结果为一行
             result_text = f"{idx}. {emoji} {title_truncated}"
             if tags_str:
                 result_text += f"\n   {tags_str}"
-            result_text += f"\n   📅 {archived_at}"
+            result_text += f"\n   {fav_icon} | {note_icon} | 📅 {archived_at}"
             
-            # 检查是否有AI数据
-            has_ai = bool(
-                archive.get('ai_summary') or 
-                archive.get('ai_key_points') or 
-                archive.get('ai_category')
-            )
-            
-            if has_ai:
-                results_with_ai.append({
-                    'index': idx,
-                    'id': archive.get('id'),
-                    'title': title,
-                    'ai_summary': archive.get('ai_summary'),
-                    'ai_key_points': archive.get('ai_key_points'),
-                    'ai_category': archive.get('ai_category')
-                })
-            
+            # 不再添加按钮，返回空的按钮列表
+            keyboards_per_item.append([])
             formatted_results.append(result_text)
         
-        results_text = '\n\n'.join(formatted_results)
+        results_text = '\n───────────────────────────────────────\n'.join(formatted_results)
         
         final_text = self.i18n.t(
             'search_results',
@@ -197,4 +193,4 @@ class SearchEngine:
             results=results_text
         )
         
-        return final_text, results_with_ai
+        return final_text, keyboards_per_item

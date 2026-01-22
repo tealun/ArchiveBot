@@ -143,8 +143,16 @@ def main():
             backup_dir="data/backups"
         )
         
-        # Create application
-        application = Application.builder().token(config.bot_token).build()
+        # Create application with network configuration
+        from telegram.request import HTTPXRequest
+        request = HTTPXRequest(
+            connection_pool_size=8,
+            connect_timeout=10.0,
+            read_timeout=30.0,
+            write_timeout=30.0,
+            pool_timeout=10.0
+        )
+        application = Application.builder().token(config.bot_token).request(request).build()
         
         # Initialize Telegram storage if channel is configured
         telegram_storage = None
@@ -200,9 +208,7 @@ def main():
         application.add_handler(CommandHandler("ai", owner_only(commands.ai_status_command)))
         application.add_handler(CommandHandler(["stats", "st"], owner_only(commands.stats_command)))
         application.add_handler(CommandHandler(["language", "lang"], owner_only(commands.language_command)))
-        application.add_handler(CommandHandler("note", owner_only(commands.note_command)))
         application.add_handler(CommandHandler("notes", owner_only(commands.notes_command)))
-        application.add_handler(CommandHandler("cancel", owner_only(commands.cancel_command)))
         application.add_handler(CommandHandler("trash", owner_only(commands.trash_command)))
         application.add_handler(CommandHandler("export", owner_only(commands.export_command)))
         application.add_handler(CommandHandler("backup", owner_only(commands.backup_command)))
@@ -274,7 +280,6 @@ def main():
                         BotCommand("start", "开始使用"),
                         BotCommand("help", "查看帮助"),
                         BotCommand("search", "搜索归档 (简写: /s)"),
-                        BotCommand("note", "添加笔记"),
                         BotCommand("notes", "查看笔记"),
                         BotCommand("tags", "标签列表 (简写: /t)"),
                         BotCommand("stats", "统计信息 (简写: /st)"),
@@ -289,7 +294,6 @@ def main():
                         BotCommand("start", "开始使用"),
                         BotCommand("help", "查看帮助"),
                         BotCommand("search", "搜索归档 (简写: /s)"),
-                        BotCommand("note", "添加笔记"),
                         BotCommand("notes", "查看笔记"),
                         BotCommand("tags", "标签列表 (简写: /t)"),
                         BotCommand("stats", "统计信息 (简写: /st)"),
@@ -304,7 +308,6 @@ def main():
                         BotCommand("start", "Start bot"),
                         BotCommand("help", "Show help"),
                         BotCommand("search", "Search archives (/s)"),
-                        BotCommand("note", "Add note"),
                         BotCommand("notes", "View notes"),
                         BotCommand("tags", "List tags (/t)"),
                         BotCommand("stats", "Show statistics (/st)"),

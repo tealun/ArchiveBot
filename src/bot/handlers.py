@@ -41,7 +41,11 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         progress_callback: 进度回调函数 async def callback(stage: str, progress: float)
         
     Returns:
-        (success, result_msg)
+        (success, result_msg, archive_id, duplicate_info)
+        - success: 是否成功
+        - result_msg: 结果消息
+        - archive_id: 归档ID（成功时）
+        - duplicate_info: 重复文件信息（检测到重复时）
     """
     i18n = get_i18n()
     
@@ -100,51 +104,9 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                 )
                 
                 if duplicate:
-                    # 构建重复文件提示消息（使用HTML格式）
-                    dup_msg = f"⚠️ 文件已存在\n\n"
-                    
-                    # 构建文件名（如果有频道链接则作为超链接）
-                    file_title = duplicate.get('title', '未知')
-                    storage_path = duplicate.get('storage_path')
-                    storage_type = duplicate.get('storage_type')
-                    
-                    if storage_path and storage_type == 'telegram':
-                        from ..utils.config import get_config
-                        config = get_config()
-                        channel_id = config.telegram_channel_id
-                        if channel_id:
-                            # 解析 storage_path: 可能是 "message_id" 或 "channel_id:message_id" 或 "channel_id:message_id:file_id"
-                            parts = storage_path.split(':')
-                            if len(parts) >= 2:
-                                # 格式: channel_id:message_id[:file_id]
-                                channel_id_str = parts[0].replace('-100', '')
-                                message_id = parts[1]
-                            else:
-                                # 格式: message_id（使用配置的channel_id）
-                                channel_id_str = str(channel_id).replace('-100', '')
-                                message_id = storage_path
-                            
-                            file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                            dup_msg += f"📝 文件名：<a href='{file_link}'>{file_title}</a>\n"
-                        else:
-                            dup_msg += f"📝 文件名：{file_title}\n"
-                    else:
-                        dup_msg += f"📝 文件名：{file_title}\n"
-                    
-                    dup_msg += f"📦 大小：{format_file_size(duplicate.get('file_size', 0))}\n"
-                    dup_msg += f"📅 归档时间：{duplicate.get('archived_at', '未知')}\n"
-                    
-                    # 获取标签
-                    tag_manager = context.bot_data.get('tag_manager')
-                    if tag_manager:
-                        tags = tag_manager.get_archive_tags(duplicate['id'])
-                        if tags:
-                            tag_str = ' '.join([f"#{tag}" for tag in tags])
-                            dup_msg += f"🏷️ 标签：{tag_str}"
-                    
-                    await message.reply_text(dup_msg, parse_mode='HTML')
+                    # 检测到重复文件，返回duplicate信息由外层统一处理
                     logger.info(f"Duplicate file detected: {analysis.get('file_name')}, existing ID: {duplicate['id']}")
-                    return False, "文件重复"
+                    return False, "文件重复", None, duplicate
         
         # AI智能处理（如果启用）
         if progress_callback:
@@ -178,6 +140,8 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             if should_analyze:
                 # 自动生成AI标签
                 if config.ai.get('auto_generate_tags', False):
+                    if progress_callback:
+                        await progress_callback("🏷️ AI生成标签中...", 0.45)
                     try:
                         content_for_ai = analysis.get('content') or analysis.get('title', '')
                         if content_for_ai:
@@ -191,9 +155,11 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                 
                 # 自动生成摘要（仅对长文本）
                 if config.ai.get('auto_summarize', False):
+                    if progress_callback:
+                        await progress_callback("📝 AI分析内容中...", 0.5)
                     try:
                         content_for_ai = analysis.get('content') or ''
-                        file_name = analysis.get('file_name', '').lower()
+                        file_name = (analysis.get('file_name') or '').lower()
                         
                         # 对于电子书或大文件，使用元数据而非内容
                         if file_name.endswith('.epub') or (content_type == 'document' and file_size and file_size > 1 * 1024 * 1024):
@@ -245,8 +211,59 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                                     analysis['tags'] = list(set(existing_tags + suggested_tags))
                                 
                                 logger.info(f"AI analysis complete: summary={analysis['ai_summary'][:50]}..., category={analysis['ai_category']}")
+                                if progress_callback:
+                                    await progress_callback("✅ AI分析完成", 0.6)
                     except Exception as e:
                         logger.warning(f"AI summary generation failed: {e}")
+        
+        # 如果是文本内容且需要AI标题，生成标题
+        if analysis.get('_needs_ai_title') and ai_summarizer and ai_summarizer.is_available():
+            if progress_callback:
+                await progress_callback("📝 AI生成标题中...", 0.62)
+            try:
+                content = analysis.get('content', '')
+                is_forwarded = bool(message.forward_origin)
+                
+                # 转发消息无需长度判断，直接发送的消息需要>=250字符
+                should_generate_title = is_forwarded or (content and len(content) >= 250)
+                
+                if should_generate_title and content:
+                    # 提取转发来源
+                    source_prefix = ""
+                    if is_forwarded:
+                        origin = message.forward_origin
+                        if hasattr(origin, 'sender_user') and origin.sender_user:
+                            # 从用户转发
+                            user = origin.sender_user
+                            username = user.username or user.first_name or "用户"
+                            source_prefix = f"来自[{username}] "
+                        elif hasattr(origin, 'chat') and origin.chat:
+                            # 从频道/群组转发
+                            chat = origin.chat
+                            source_prefix = f"来自[{chat.title}] "
+                        elif hasattr(origin, 'sender_user_name'):
+                            # 隐藏用户名的转发
+                            source_prefix = f"来自[{origin.sender_user_name}] "
+                    
+                    user_language = i18n.current_language
+                    # 计算标题可用长度（32 - 来源前缀长度）
+                    max_title_length = 32 - len(source_prefix)
+                    if max_title_length < 10:  # 如果来源太长，限制来源长度
+                        source_prefix = source_prefix[:10] + ".. "
+                        max_title_length = 32 - len(source_prefix)
+                    
+                    ai_title = await ai_summarizer.generate_title_from_text(
+                        content, 
+                        max_length=max_title_length, 
+                        language=user_language
+                    )
+                    if ai_title:
+                        analysis['title'] = source_prefix + ai_title
+                        logger.info(f"AI generated title: {analysis['title']}")
+                        if progress_callback:
+                            await progress_callback("✅ 标题生成完成", 0.65)
+            except Exception as e:
+                logger.warning(f"AI title generation failed: {e}")
         
         # Get storage manager
         if progress_callback:
@@ -263,12 +280,151 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         if progress_callback:
             await progress_callback("✅ 完成", 1.0)
         
-        return success, result_msg, archive_id
+        # 自动生成关联笔记（如果归档成功）
+        if success and archive_id:
+            await _auto_generate_note(
+                archive_id=archive_id,
+                message=message,
+                analysis=analysis,
+                context=context
+            )
+        
+        return success, result_msg, archive_id, None
         
     except Exception as e:
         if progress_callback:
             await progress_callback("❌ 处理失败", 1.0)
         raise
+
+
+async def _auto_generate_note(
+    archive_id: int,
+    message: Message,
+    analysis: Dict,
+    context: ContextTypes.DEFAULT_TYPE
+) -> Optional[int]:
+    """
+    自动生成关联笔记
+    
+    根据内容类型和长度判断是否需要生成笔记：
+    1. 文本内容 >= 阈值：AI生成简洁笔记
+    2. 链接：根据链接信息生成笔记
+    3. 文档（有AI分析）：整理完整笔记
+    
+    Args:
+        archive_id: 归档ID
+        message: Telegram消息
+        analysis: 内容分析结果
+        context: Bot context
+        
+    Returns:
+        note_id or None
+    """
+    try:
+        note_manager = context.bot_data.get('note_manager')
+        ai_summarizer = context.bot_data.get('ai_summarizer')
+        
+        if not note_manager:
+            return None
+        
+        content_type = analysis.get('content_type', '')
+        note_content = None
+        
+        # 判断是否需要生成笔记
+        
+        # 1. 文本内容：判断长度，≥阈值则生成简洁笔记
+        if content_type in ['text', 'article']:
+            content = analysis.get('content', '')
+            if content:
+                from ..utils.helpers import should_create_note
+                is_short, note_type = should_create_note(content)
+                
+                if not is_short and ai_summarizer and ai_summarizer.is_available():
+                    # 长文本，AI生成简洁笔记
+                    from ..utils.i18n import get_i18n
+                    i18n = get_i18n()
+                    language = i18n.current_language
+                    
+                    note_content = await ai_summarizer.generate_note_from_content(
+                        content=content,
+                        content_type='text',
+                        max_length=250,
+                        language=language
+                    )
+                    
+                    if note_content:
+                        note_content = f"[自动] {note_content}"
+                        logger.info(f"Auto-generated note for long text archive {archive_id}")
+        
+        # 2. 链接：根据链接元数据生成笔记
+        elif content_type == 'link':
+            if ai_summarizer and ai_summarizer.is_available():
+                # 构建链接信息用于生成笔记
+                link_info = f"""链接标题：{analysis.get('title', '未知')}
+URL：{analysis.get('url', '')}
+"""
+                # 如果有提取的元数据，添加描述
+                link_metadata = analysis.get('link_metadata', {})
+                if link_metadata and link_metadata.get('description'):
+                    link_info += f"描述：{link_metadata.get('description')}\n"
+                
+                # 如果有页面内容，使用页面内容
+                page_content = link_metadata.get('content', '')
+                if page_content:
+                    link_info += f"\n页面内容节选：\n{page_content[:1000]}"
+                
+                from ..utils.i18n import get_i18n
+                i18n = get_i18n()
+                language = i18n.current_language
+                
+                note_content = await ai_summarizer.generate_note_from_content(
+                    content=link_info,
+                    content_type='link',
+                    max_length=250,
+                    language=language
+                )
+                
+                if note_content:
+                    note_content = f"[自动] {note_content}"
+                    logger.info(f"Auto-generated note for link archive {archive_id}")
+        
+        # 3. 文档：如果有AI分析结果，整理完整笔记
+        elif content_type == 'document':
+            ai_summary = analysis.get('ai_summary')
+            ai_key_points = analysis.get('ai_key_points', [])
+            ai_category = analysis.get('ai_category', '')
+            
+            if ai_summary and ai_summarizer and ai_summarizer.is_available():
+                from ..utils.i18n import get_i18n
+                i18n = get_i18n()
+                language = i18n.current_language
+                
+                title = analysis.get('title') or analysis.get('file_name', '未知文档')
+                
+                note_content = await ai_summarizer.generate_note_from_ai_analysis(
+                    ai_summary=ai_summary,
+                    ai_key_points=ai_key_points,
+                    ai_category=ai_category,
+                    title=title,
+                    language=language
+                )
+                
+                if note_content:
+                    note_content = f"[自动] {note_content}"
+                    logger.info(f"Auto-generated note for document archive {archive_id}")
+        
+        # 保存笔记
+        if note_content:
+            note_id = note_manager.add_note(archive_id, note_content)
+            if note_id:
+                logger.info(f"Auto-generated note {note_id} for archive {archive_id}")
+                return note_id
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error auto-generating note: {e}", exc_info=True)
+        return None
 
 
 async def _process_batch_messages(messages: List[Message], context: ContextTypes.DEFAULT_TYPE, merged_caption: Optional[str] = None, progress_callback=None) -> List[tuple]:
@@ -405,49 +561,102 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
             message = messages[0]
             processing_msg = await message.reply_text("⏳ 正在处理...")
             
-            # 定义进度更新回调
-            async def update_progress(stage: str, progress: float):
-                try:
-                    percentage = int(progress * 100)
-                    progress_bar = '█' * (percentage // 5) + '░' * (20 - percentage // 5)
-                    await processing_msg.edit_text(
-                        f"⏳ {stage}\n"
-                        f"进度: {percentage}%\n"
-                        f"{progress_bar}"
-                    )
-                except Exception as e:
-                    logger.debug(f"Progress update failed: {e}")
+            try:
+                # 定义进度更新回调
+                async def update_progress(stage: str, progress: float):
+                    try:
+                        percentage = int(progress * 100)
+                        progress_bar = '█' * (percentage // 5) + '░' * (20 - percentage // 5)
+                        await processing_msg.edit_text(
+                            f"⏳ {stage}\n"
+                            f"进度: {percentage}%\n"
+                            f"{progress_bar}"
+                        )
+                    except Exception as e:
+                        logger.debug(f"Progress update failed: {e}")
+                
+                success, result_msg, archive_id, duplicate_info = await _process_single_message(message, context, merged_caption, update_progress)
+                
+                # 如果检测到重复文件，构建并发送重复提示消息
+                if duplicate_info:
+                    # 构建重复文件提示消息（使用HTML格式）
+                    dup_msg = f"⚠️ 文件已存在\n\n"
+                    
+                    # 构建文件名（如果有频道链接则作为超链接）
+                    file_title = duplicate_info.get('title', '未知')
+                    storage_path = duplicate_info.get('storage_path')
+                    storage_type = duplicate_info.get('storage_type')
+                    
+                    if storage_path and storage_type == 'telegram':
+                        from ..utils.config import get_config
+                        config = get_config()
+                        channel_id = config.telegram_channel_id
+                        if channel_id:
+                            # 解析 storage_path: 可能是 "message_id" 或 "channel_id:message_id" 或 "channel_id:message_id:file_id"
+                            parts = storage_path.split(':')
+                            if len(parts) >= 2:
+                                # 格式: channel_id:message_id[:file_id]
+                                channel_id_str = parts[0].replace('-100', '')
+                                message_id = parts[1]
+                            else:
+                                # 格式: message_id（使用配置的channel_id）
+                                channel_id_str = str(channel_id).replace('-100', '')
+                                message_id = storage_path
+                            
+                            file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
+                            dup_msg += f"📝 文件名：<a href='{file_link}'>{file_title}</a>\n"
+                        else:
+                            dup_msg += f"📝 文件名：{file_title}\n"
+                    else:
+                        dup_msg += f"📝 文件名：{file_title}\n"
+                    
+                    dup_msg += f"📦 大小：{format_file_size(duplicate_info.get('file_size', 0))}\n"
+                    dup_msg += f"📅 归档时间：{duplicate_info.get('archived_at', '未知')}\n"
+                    
+                    # 获取标签
+                    tag_manager = context.bot_data.get('tag_manager')
+                    if tag_manager:
+                        tags = tag_manager.get_archive_tags(duplicate_info['id'])
+                        if tags:
+                            tag_str = ' '.join([f"#{tag}" for tag in tags])
+                            dup_msg += f"🏷️ 标签：{tag_str}"
+                    
+                    await processing_msg.edit_text(dup_msg, parse_mode='HTML')
+                    return
+                
+                # 如果归档成功且有archive_id，添加操作按钮
+                if success and archive_id:
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    
+                    # 获取数据库检查状态
+                    db_storage = context.bot_data.get('db_storage')
+                    db = db_storage.db if db_storage else None
+                    
+                    has_notes = db.has_notes(archive_id) if db else False
+                    is_favorite = db.is_favorite(archive_id) if db else False
+                    
+                    note_icon = "📝✓" if has_notes else "📝"
+                    fav_icon = "❤️" if is_favorite else "🤍"
+                    
+                    keyboard = [[
+                        InlineKeyboardButton(note_icon, callback_data=f"note:{archive_id}"),
+                        InlineKeyboardButton(fav_icon, callback_data=f"fav:{archive_id}"),
+                        InlineKeyboardButton("↗️", callback_data=f"forward:{archive_id}")
+                    ]]
+                    
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await processing_msg.edit_text(result_msg, parse_mode='HTML', reply_markup=reply_markup)
+                else:
+                    # 使用HTML解析模式（因为result_msg可能包含HTML链接）
+                    await processing_msg.edit_text(result_msg, parse_mode='HTML')
+                
+                if success:
+                    logger.info(f"Message archived: type={ContentAnalyzer.analyze(message).get('content_type')}")
             
-            success, result_msg, archive_id = await _process_single_message(message, context, merged_caption, update_progress)
-            
-            # 如果归档成功且有archive_id，添加操作按钮
-            if success and archive_id:
-                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                
-                # 获取数据库检查状态
-                db_storage = context.bot_data.get('db_storage')
-                db = db_storage.db if db_storage else None
-                
-                has_notes = db.has_notes(archive_id) if db else False
-                is_favorite = db.is_favorite(archive_id) if db else False
-                
-                note_icon = "📝✓" if has_notes else "📝"
-                fav_icon = "❤️" if is_favorite else "🤍"
-                
-                keyboard = [[
-                    InlineKeyboardButton(note_icon, callback_data=f"note:{archive_id}"),
-                    InlineKeyboardButton(fav_icon, callback_data=f"fav:{archive_id}"),
-                    InlineKeyboardButton("↗️", callback_data=f"forward:{archive_id}")
-                ]]
-                
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await processing_msg.edit_text(result_msg, parse_mode='HTML', reply_markup=reply_markup)
-            else:
-                # 使用HTML解析模式（因为result_msg可能包含HTML链接）
-                await processing_msg.edit_text(result_msg, parse_mode='HTML')
-            
-            if success:
-                logger.info(f"Message archived: type={ContentAnalyzer.analyze(message).get('content_type')}")
+            finally:
+                # 确保进度消息被删除（如果还存在且未被修改为最终消息）
+                # 这里只是兜底保护，正常情况下消息已在上面被edit为最终状态
+                pass
         else:
             # 批量消息处理
             first_message = messages[0]
@@ -513,85 +722,87 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         message = update.message
         i18n = get_i18n()
         
-        # 检查是否在笔记模式中
-        if context.user_data.get('note_mode'):
-            # 处理笔记内容
-            note_manager = context.bot_data.get('note_manager')
-            if not note_manager:
-                await message.reply_text(i18n.t('note_manager_not_initialized'))
-                context.user_data['note_mode'] = False
-                return
-            
-            # 获取笔记内容（支持文字、图片caption、语音等）
-            note_content = None
+        # 检查是否在等待添加笔记
+        if context.user_data.get('waiting_note_for_archive'):
+            archive_id = context.user_data.get('waiting_note_for_archive')
             
             if message.text:
-                note_content = message.text
-            elif message.caption:
-                note_content = message.caption
-            elif message.voice:
-                note_content = "[语音笔记]"
-                # TODO: 语音转文字后可以替换这里
-            elif message.photo:
-                note_content = "[图片笔记]"
-            
-            if note_content:
-                # 获取关联的归档ID（如果有）
-                archive_id = context.user_data.get('note_archive_id')
-                
-                # 保存笔记
-                note_id = note_manager.add_note(archive_id, note_content)
-                
-                if note_id:
-                    if archive_id:
-                        await message.reply_text(
-                            i18n.t('note_mode_saved_with_archive', note_id=note_id, archive_id=archive_id)
-                        )
-                    else:
-                        await message.reply_text(
-                            i18n.t('note_mode_saved', note_id=note_id)
-                        )
-                    
-                    # 退出笔记模式
-                    context.user_data['note_mode'] = False
-                    context.user_data['note_archive_id'] = None
-                    
-                    logger.info(f"Note {note_id} saved for archive {archive_id}")
-                else:
-                    await message.reply_text(i18n.t('note_mode_save_failed'))
-            else:
-                await message.reply_text(i18n.t('note_mode_save_failed'))
-            
-            return
-        
-        # 检查是否是回复消息（用于添加笔记）
-        if message.reply_to_message and message.text and not message.text.startswith('/'):
-            # 尝试从回复的消息中提取归档ID
-            replied_msg = message.reply_to_message
-            
-            # 检查是否是Bot发送的归档确认消息
-            if replied_msg.from_user and replied_msg.from_user.is_bot:
-                # 尝试从消息文本中提取归档ID
-                import re
-                if replied_msg.text:
-                    # 查找 "ID: #123" 格式的归档ID
-                    match = re.search(r'ID:\s*#(\d+)', replied_msg.text)
-                    if match:
-                        archive_id = int(match.group(1))
-                        note_manager = context.bot_data.get('note_manager')
-                        
-                        if note_manager:
-                            # 添加笔记
-                            note_id = note_manager.add_note(archive_id, message.text)
-                            if note_id:
-                                await message.reply_text(
-                                    i18n.t('note_added', note_id=note_id, archive_id=archive_id),
-                                    reply_to_message_id=message.message_id
-                                )
-                                return
+                note_manager = context.bot_data.get('note_manager')
+                if note_manager:
+                    # 检查是修改模式还是追加模式
+                    if context.user_data.get('note_modify_mode'):
+                        # 修改模式：删除旧笔记，添加新笔记
+                        note_id_to_modify = context.user_data.get('note_id_to_modify')
+                        if note_id_to_modify:
+                            # 删除旧笔记
+                            note_manager.delete_note(note_id_to_modify)
+                            # 添加新笔记
+                            new_note_id = note_manager.add_note(archive_id, message.text)
+                            if new_note_id:
+                                await message.reply_text(f"✅ 笔记已修改\n\n📝 归档 #{archive_id}")
+                                logger.info(f"Modified note {note_id_to_modify} -> {new_note_id} for archive {archive_id}")
                             else:
                                 await message.reply_text(i18n.t('note_add_failed'))
-                                return
+                        # 清除修改模式标记
+                        context.user_data.pop('note_modify_mode', None)
+                        context.user_data.pop('note_id_to_modify', None)
+                    elif context.user_data.get('note_append_mode'):
+                        # 追加模式：获取现有笔记，追加内容后更新
+                        note_id_to_append = context.user_data.get('note_id_to_append')
+                        if note_id_to_append:
+                            # 获取现有笔记
+                            notes = note_manager.get_notes(archive_id)
+                            old_content = None
+                            for note in notes:
+                                if note['id'] == note_id_to_append:
+                                    old_content = note['content']
+                                    break
+                            
+                            if old_content:
+                                # 删除旧笔记
+                                note_manager.delete_note(note_id_to_append)
+                                # 添加追加后的笔记
+                                new_content = f"{old_content}\n\n---\n\n{message.text}"
+                                new_note_id = note_manager.add_note(archive_id, new_content)
+                                if new_note_id:
+                                    await message.reply_text(f"✅ 笔记已追加\n\n📝 归档 #{archive_id}")
+                                    logger.info(f"Appended to note {note_id_to_append} -> {new_note_id} for archive {archive_id}")
+                                else:
+                                    await message.reply_text(i18n.t('note_add_failed'))
+                        # 清除追加模式标记
+                        context.user_data.pop('note_append_mode', None)
+                        context.user_data.pop('note_id_to_append', None)
+                    else:
+                        # 普通添加模式
+                        note_id = note_manager.add_note(archive_id, message.text)
+                        if note_id:
+                            await message.reply_text(f"✅ 笔记已添加到归档 #{archive_id}\n\n📝 笔记ID: #{note_id}")
+                            logger.info(f"Added note {note_id} to archive {archive_id}")
+                        else:
+                            await message.reply_text("❌ 笔记添加失败")
+                else:
+                    await message.reply_text("❌ 笔记管理器未初始化")
+                
+                # 清除等待状态
+                context.user_data['waiting_note_for_archive'] = None
+                return
+        
+        # 判断是否是直接发送的短文字（不归档，仅作为笔记）
+        if message.text and not message.forward_origin and not message.text.startswith('/'):
+            from ..utils.helpers import should_create_note
+            is_short, note_type = should_create_note(message.text)
+            
+            if is_short:
+                # 直接保存为独立笔记，不归档
+                note_manager = context.bot_data.get('note_manager')
+                if note_manager:
+                    note_id = note_manager.add_note(None, message.text)
+                    if note_id:
+                        await message.reply_text(f"📝 笔记已保存 (ID: #{note_id})")
+                        logger.info(f"Short text saved as standalone note: {note_id}")
+                    else:
+                        await message.reply_text(i18n.t('note_add_failed'))
+                return
         
         # 正常归档流程
         aggregator = get_message_aggregator()

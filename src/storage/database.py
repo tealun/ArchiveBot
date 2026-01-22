@@ -277,6 +277,8 @@ class DatabaseStorage:
                     params.extend(combined_ids)
                 else:
                     # 没有匹配结果
+                    if return_total:
+                        return [], 0
                     return []
             elif keyword:
                 # FTS和标签都没有结果，使用LIKE作为后备

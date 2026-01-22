@@ -105,24 +105,22 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Get total count for pagination
         total_count = search_result.get('total_count', 0)
         
-        # Format and send results (with HTML links)
-        result_text, results_with_ai = search_engine.format_results(search_result, with_links=True)
+        # Get database instance for checking status
+        db_storage = context.bot_data.get('db_storage')
+        db = db_storage.db if db_storage else None
         
-        # Build keyboard with AI buttons and pagination
+        # Format and send results (with HTML links and per-item keyboards)
+        result_text, keyboards_per_item = search_engine.format_results(
+            search_result, 
+            with_links=True,
+            db_instance=db
+        )
+        
+        # Build final keyboard: only pagination buttons (no per-item buttons)
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        from ..utils.helpers import truncate_text
         from urllib.parse import quote
         
         keyboard = []
-        
-        # AI解析按钮
-        if results_with_ai:
-            for item in results_with_ai:
-                # 从标题中提取几个字作为引导，例如：🤖 #2《华尔街之狼…》
-                title_preview = truncate_text(item['title'], 12)
-                button_text = f"🤖 #{item['index']}《{title_preview}》"
-                callback_data = f"ai_view:{item['id']}"
-                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
         # 分页按钮 - 只在多页时显示
         total_pages = (total_count + page_size - 1) // page_size
@@ -397,62 +395,6 @@ async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         
     except Exception as e:
         logger.error(f"Error in ai_status_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
-
-
-async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Handle /note command - 进入笔记模式，等待用户发送笔记内容
-    
-    Args:
-        update: Telegram update
-        context: Bot context
-    """
-    try:
-        i18n = get_i18n()
-        
-        # 设置用户状态为笔记模式
-        context.user_data['note_mode'] = True
-        context.user_data['note_archive_id'] = None  # 未关联归档
-        
-        # 发送提示消息
-        await update.message.reply_text(
-            i18n.t('note_mode_enter'),
-            parse_mode=ParseMode.HTML
-        )
-        
-        logger.info(f"User {update.effective_user.id} entered note mode")
-        
-    except Exception as e:
-        logger.error(f"Error in note_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
-
-
-async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Handle /cancel command - 取消笔记模式或其他操作
-    
-    Args:
-        update: Telegram update
-        context: Bot context
-    """
-    try:
-        i18n = get_i18n()
-        
-        # 检查是否在笔记模式中
-        if context.user_data.get('note_mode'):
-            context.user_data['note_mode'] = False
-            context.user_data['note_archive_id'] = None
-            await update.message.reply_text(i18n.t('note_mode_cancelled'))
-            logger.info(f"User {update.effective_user.id} cancelled note mode")
-        else:
-            # 没有正在进行的操作
-            await update.message.reply_text(i18n.t('nothing_to_cancel'))
-        
-    except Exception as e:
-        logger.error(f"Error in cancel_command: {e}", exc_info=True)
         i18n = get_i18n()
         await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
 
