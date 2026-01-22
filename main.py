@@ -173,26 +173,37 @@ def main():
         application.bot_data['storage_manager'] = storage_manager
         application.bot_data['search_engine'] = search_engine
         application.bot_data['ai_summarizer'] = ai_summarizer
-        # Store managers in bot_data for access in handlers
-        application.bot_data['db_storage'] = db_storage
-        application.bot_data['tag_manager'] = tag_manager
-        application.bot_data['storage_manager'] = storage_manager
-        application.bot_data['search_engine'] = search_engine
+        
+        # 设置机器人命令菜单（持久化到Telegram服务器）
+        async def post_init(application):
+            """初始化后设置命令菜单"""
+            from telegram import BotCommand
+            commands = [
+                BotCommand("start", "开始使用"),
+                BotCommand("search", "搜索归档 (简写: /s)"),
+                BotCommand("tags", "标签列表 (简写: /t)"),
+                BotCommand("ai", "AI状态"),
+                BotCommand("stats", "统计信息 (简写: /st)"),
+                BotCommand("language", "切换语言 (简写: /lang)"),
+                BotCommand("help", "查看帮助"),
+            ]
+            await application.bot.set_my_commands(commands)
+            logger.info("Bot commands menu set successfully")
+        
+        application.post_init = post_init
         
         # Register command handlers (with owner check)
         application.add_handler(CommandHandler("start", owner_only(commands.start_command)))
         application.add_handler(CommandHandler("help", owner_only(commands.help_command)))
-        application.add_handler(CommandHandler("search", owner_only(commands.search_command)))
-        application.add_handler(CommandHandler("tags", owner_only(commands.tags_command)))
-        application.add_handler(CommandHandler("summarize", owner_only(commands.summarize_command)))
+        application.add_handler(CommandHandler(["search", "s"], owner_only(commands.search_command)))
+        application.add_handler(CommandHandler(["tags", "t"], owner_only(commands.tags_command)))
         application.add_handler(CommandHandler("ai", owner_only(commands.ai_status_command)))
-        application.add_handler(CommandHandler("stats", owner_only(commands.stats_command)))
-        application.add_handler(CommandHandler("language", owner_only(commands.language_command)))
+        application.add_handler(CommandHandler(["stats", "st"], owner_only(commands.stats_command)))
+        application.add_handler(CommandHandler(["language", "lang"], owner_only(commands.language_command)))
         
-        # Register callback handlers
+        # Register callback handlers (统一处理)
         application.add_handler(CallbackQueryHandler(
-            owner_only(callbacks.handle_language_callback),
-            pattern='^lang_'
+            owner_only(callbacks.handle_callback_query)
         ))
         
         # Register message handlers (with owner check)

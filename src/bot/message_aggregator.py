@@ -1,0 +1,254 @@
+"""
+Message aggregator module
+Handles batch message detection and aggregation
+"""
+
+import logging
+import asyncio
+from typing import Dict, List, Optional, Tuple
+from datetime import datetime, timedelta
+from telegram import Message, Update
+from collections import defaultdict
+
+logger = logging.getLogger(__name__)
+
+
+class MessageBatch:
+    """Represents a batch of related messages"""
+    
+    def __init__(self, media_group_id: Optional[str] = None):
+        self.messages: List[Message] = []
+        self.captions: List[Message] = []  # 附带的文本消息
+        self.media_group_id = media_group_id
+        self.first_time: Optional[datetime] = None
+        self.last_time: Optional[datetime] = None
+        
+    def add_message(self, message: Message):
+        """Add message to batch"""
+        if self.first_time is None:
+            self.first_time = message.date
+        self.last_time = message.date
+        
+        # 区分媒体消息和纯文本消息
+        if self._is_media_message(message):
+            self.messages.append(message)
+        elif message.text:
+            # 检查是否是标签或笔记
+            self.captions.append(message)
+    
+    @staticmethod
+    def _is_media_message(message: Message) -> bool:
+        """判断是否为媒体消息"""
+        return any([
+            message.photo, message.video, message.document,
+            message.audio, message.voice, message.animation,
+            message.sticker, message.contact, message.location
+        ])
+    
+    def is_complete(self, window_ms: int = 200) -> bool:
+        """判断批次是否完成（超过时间窗口）"""
+        if not self.last_time:
+            return False
+        
+        now = datetime.now(tz=self.last_time.tzinfo)
+        elapsed = (now - self.last_time).total_seconds() * 1000
+        return elapsed > window_ms
+    
+    def size(self) -> int:
+        """批次中的媒体消息数量"""
+        return len(self.messages)
+    
+    def has_captions(self) -> bool:
+        """是否有附带的caption"""
+        return len(self.captions) > 0
+    
+    def get_merged_caption(self) -> Optional[str]:
+        """合并所有caption文本"""
+        if not self.captions:
+            return None
+        
+        texts = [msg.text for msg in self.captions if msg.text]
+        return "\n".join(texts) if texts else None
+
+
+class MessageAggregator:
+    """
+    Message aggregator for batch processing
+    聚合批量转发的消息，提升处理效率
+    """
+    
+    def __init__(self, batch_window_ms: int = 200, max_batch_size: int = 100):
+        """
+        Initialize message aggregator
+        
+        Args:
+            batch_window_ms: Time window for batch detection (milliseconds)
+            max_batch_size: Maximum batch size
+        """
+        self.batch_window_ms = batch_window_ms
+        self.max_batch_size = max_batch_size
+        
+        # 批次缓存
+        self._batches: Dict[str, MessageBatch] = {}  # chat_id -> MessageBatch
+        self._media_groups: Dict[str, MessageBatch] = {}  # media_group_id -> MessageBatch
+        
+        # 处理锁
+        self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        
+        # 定时器
+        self._timers: Dict[str, asyncio.Task] = {}
+        
+        logger.info(f"MessageAggregator initialized: window={batch_window_ms}ms, max_batch={max_batch_size}")
+    
+    async def process_message(
+        self,
+        message: Message,
+        handler_callback
+    ) -> Optional[List]:
+        """
+        Process incoming message with batch detection
+        
+        Args:
+            message: Telegram message
+            handler_callback: Async callback function for processing
+            
+        Returns:
+            Processing results or None if batched
+        """
+        chat_id = str(message.chat_id)
+        media_group_id = message.media_group_id
+        
+        async with self._locks[chat_id]:
+            # 处理media_group（Telegram原生批量）
+            if media_group_id:
+                return await self._handle_media_group(message, media_group_id, handler_callback)
+            
+            # 处理普通消息（可能是批量转发）
+            return await self._handle_regular_message(message, chat_id, handler_callback)
+    
+    async def _handle_media_group(
+        self,
+        message: Message,
+        media_group_id: str,
+        handler_callback
+    ) -> Optional[List]:
+        """Handle media group messages"""
+        
+        # 获取或创建media_group批次
+        if media_group_id not in self._media_groups:
+            self._media_groups[media_group_id] = MessageBatch(media_group_id)
+            logger.debug(f"Created media_group batch: {media_group_id}")
+        
+        batch = self._media_groups[media_group_id]
+        batch.add_message(message)
+        
+        # 启动或重置定时器
+        await self._schedule_batch_processing(
+            media_group_id,
+            batch,
+            handler_callback,
+            is_media_group=True
+        )
+        
+        return None  # 暂不处理，等待批次完成
+    
+    async def _handle_regular_message(
+        self,
+        message: Message,
+        chat_id: str,
+        handler_callback
+    ) -> Optional[List]:
+        """Handle regular messages (potential batch forwards)"""
+        
+        # 检查是否有活跃批次
+        if chat_id in self._batches:
+            batch = self._batches[chat_id]
+            
+            # 判断是否属于同一批次（时间窗口内）
+            if batch.last_time:
+                time_diff = (message.date - batch.last_time).total_seconds() * 1000
+                
+                if time_diff <= self.batch_window_ms and batch.size() < self.max_batch_size:
+                    # 加入当前批次
+                    batch.add_message(message)
+                    logger.debug(f"Added to existing batch: {chat_id}, size={batch.size()}")
+                    
+                    # 重置定时器
+                    await self._schedule_batch_processing(chat_id, batch, handler_callback)
+                    return None
+        
+        # 判断是否是媒体消息（可能开启新批次）
+        if MessageBatch._is_media_message(message):
+            # 创建新批次
+            batch = MessageBatch()
+            batch.add_message(message)
+            self._batches[chat_id] = batch
+            
+            logger.debug(f"Started new batch: {chat_id}")
+            
+            # 启动定时器
+            await self._schedule_batch_processing(chat_id, batch, handler_callback)
+            return None
+        
+        # 纯文本消息
+        # 检查是否应该作为caption添加到活跃批次
+        if chat_id in self._batches and message.text:
+            batch = self._batches[chat_id]
+            if batch.last_time:
+                time_diff = (message.date - batch.last_time).total_seconds() * 1000
+                if time_diff <= self.batch_window_ms:
+                    # 作为caption加入批次
+                    batch.add_message(message)
+                    logger.debug(f"Added caption to batch: {chat_id}")
+                    
+                    # 重置定时器
+                    await self._schedule_batch_processing(chat_id, batch, handler_callback)
+                    return None
+        
+        # 单独处理（不属于任何批次）
+        logger.debug(f"Processing single message: {chat_id}")
+        return await handler_callback([message], None)
+    
+    async def _schedule_batch_processing(
+        self,
+        batch_id: str,
+        batch: MessageBatch,
+        handler_callback,
+        is_media_group: bool = False
+    ):
+        """Schedule batch processing after timeout"""
+        
+        # 取消旧定时器
+        if batch_id in self._timers:
+            self._timers[batch_id].cancel()
+        
+        # 创建新定时器
+        async def process_after_timeout():
+            await asyncio.sleep(self.batch_window_ms / 1000)
+            
+            # 执行批量处理
+            logger.info(f"Processing batch: {batch_id}, size={batch.size()}, captions={len(batch.captions)}")
+            
+            try:
+                merged_caption = batch.get_merged_caption()
+                await handler_callback(batch.messages, merged_caption)
+            except Exception as e:
+                logger.error(f"Error processing batch {batch_id}: {e}", exc_info=True)
+            finally:
+                # 清理批次
+                if is_media_group:
+                    self._media_groups.pop(batch_id, None)
+                else:
+                    self._batches.pop(batch_id, None)
+                self._timers.pop(batch_id, None)
+        
+        task = asyncio.create_task(process_after_timeout())
+        self._timers[batch_id] = task
+    
+    def get_stats(self) -> Dict:
+        """Get aggregator statistics"""
+        return {
+            'active_batches': len(self._batches),
+            'active_media_groups': len(self._media_groups),
+            'active_timers': len(self._timers)
+        }

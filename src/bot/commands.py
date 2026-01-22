@@ -96,13 +96,62 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Send processing message
         processing_msg = await update.message.reply_text(i18n.t('processing'))
         
-        # Perform search
-        search_result = search_engine.search(query, limit=10)
+        # Perform search with pagination
+        page_size = 10
+        page = 0  # First page
+        offset = page * page_size
+        search_result = search_engine.search(query, limit=page_size, offset=offset)
         
-        # Format and send results
-        result_text = search_engine.format_results(search_result)
+        # Get total count for pagination
+        total_count = search_result.get('total_count', 0)
         
-        await processing_msg.edit_text(result_text)
+        # Format and send results (with HTML links)
+        result_text, results_with_ai = search_engine.format_results(search_result, with_links=True)
+        
+        # Build keyboard with AI buttons and pagination
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        from ..utils.helpers import truncate_text
+        from urllib.parse import quote
+        
+        keyboard = []
+        
+        # AI解析按钮
+        if results_with_ai:
+            for item in results_with_ai:
+                # 从标题中提取几个字作为引导，例如：🤖 #2《华尔街之狼…》
+                title_preview = truncate_text(item['title'], 12)
+                button_text = f"🤖 #{item['index']}《{title_preview}》"
+                callback_data = f"ai_view:{item['id']}"
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+        
+        # 分页按钮
+        if total_count > page_size:
+            nav_row = []
+            total_pages = (total_count + page_size - 1) // page_size
+            encoded_query = quote(query)
+            
+            if page > 0:
+                nav_row.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"search_page:{encoded_query}:{page-1}"))
+            
+            nav_row.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="search_noop"))
+            
+            if (page + 1) * page_size < total_count:
+                nav_row.append(InlineKeyboardButton("➡️ 下一页", callback_data=f"search_page:{encoded_query}:{page+1}"))
+            
+            if nav_row:
+                keyboard.append(nav_row)
+        
+        # 发送结果
+        if keyboard:
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await processing_msg.edit_text(
+                result_text, 
+                parse_mode=ParseMode.HTML, 
+                disable_web_page_preview=True,
+                reply_markup=reply_markup
+            )
+        else:
+            await processing_msg.edit_text(result_text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
         
         logger.info(f"Search command: query='{query}', results={search_result.get('count', 0)}")
         
@@ -114,7 +163,7 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Handle /tags command
+    Handle /tags command - 显示标签按钮矩阵
     
     Args:
         update: Telegram update
@@ -128,27 +177,67 @@ async def tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text("Tag manager not initialized")
             return
         
-        # Get all tags
-        tags = tag_manager.get_all_tags(limit=50)
+        # Get all tags (sorted by count descending)
+        tags = tag_manager.get_all_tags(limit=100)
         
         if not tags:
             await update.message.reply_text(i18n.t('tags_empty'))
             return
         
-        # Format tags
-        tag_lines = []
-        for tag in tags:
+        # 构建按钮矩阵（3列，分页显示）
+        page = 0  # 当前页
+        page_size = 30  # 每页30个标签
+        
+        # 获取当前页的标签
+        start_idx = page * page_size
+        end_idx = start_idx + page_size
+        page_tags = tags[start_idx:end_idx]
+        
+        # 构建按钮
+        keyboard = []
+        row = []
+        for i, tag in enumerate(page_tags):
             tag_name = tag.get('tag_name')
             count = tag.get('count', 0)
-            tag_lines.append(f"#{tag_name} ({count})")
+            
+            # 按钮文本：标签名 (数量)
+            button_text = f"#{tag_name} ({count})"
+            # 回调数据：tag:标签名:页码
+            callback_data = f"tag:{tag_name}:0"
+            
+            row.append(InlineKeyboardButton(button_text, callback_data=callback_data))
+            
+            # 每3个按钮一行
+            if len(row) == 3:
+                keyboard.append(row)
+                row = []
         
-        tags_text = '\n'.join(tag_lines)
+        # 添加最后一行（如果有）
+        if row:
+            keyboard.append(row)
         
-        message = i18n.t('tags_list', count=len(tags), tags=tags_text)
+        # 添加分页按钮
+        nav_row = []
+        total_pages = (len(tags) + page_size - 1) // page_size
         
-        await update.message.reply_text(message)
+        if page > 0:
+            nav_row.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"tags_page:{page-1}"))
         
-        logger.info(f"Tags command executed: {len(tags)} tags")
+        nav_row.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="tags_noop"))
+        
+        if end_idx < len(tags):
+            nav_row.append(InlineKeyboardButton("➡️ 下一页", callback_data=f"tags_page:{page+1}"))
+        
+        if nav_row:
+            keyboard.append(nav_row)
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        message = f"🏷️ 标签列表 ({len(tags)} 个)\n\n点击标签查看相关内容："
+        
+        await update.message.reply_text(message, reply_markup=reply_markup)
+        
+        logger.info(f"Tags command executed: {len(tags)} tags, page {page}")
         
     except Exception as e:
         logger.error(f"Error in tags_command: {e}", exc_info=True)
@@ -175,10 +264,18 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # Get stats from database
         stats = db_storage.db.get_stats()
         
+        # Get database file size
+        import os
+        db_path = db_storage.db.db_path
+        db_size = 0
+        if os.path.exists(db_path):
+            db_size = os.path.getsize(db_path)
+        
         # Format stats
         total_archives = stats.get('total_archives', 0)
         total_tags = stats.get('total_tags', 0)
         total_size = format_file_size(stats.get('total_size', 0))
+        db_size_formatted = format_file_size(db_size)
         last_archive = stats.get('last_archive', 'N/A')
         
         message = i18n.t(
@@ -186,6 +283,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             total_archives=total_archives,
             total_tags=total_tags,
             storage_used=total_size,
+            db_size=db_size_formatted,
             last_archive=last_archive
         )
         
@@ -235,117 +333,6 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text(f"Error: {e}")
 
 
-async def summarize_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Handle /summarize command - AI总结最近归档内容
-    
-    Args:
-        update: Telegram update
-        context: Bot context
-    """
-    try:
-        i18n = get_i18n()
-        config = get_config()
-        
-        # 检查AI是否启用
-        if not config.ai.get('enabled', False):
-            await update.message.reply_text("⚠️ AI功能未启用\n\n请在配置文件中启用AI功能并配置API密钥。")
-            return
-        
-        # 获取AI总结器
-        summarizer = get_ai_summarizer(config.ai)
-        
-        if not summarizer or not summarizer.is_available():
-            await update.message.reply_text("⚠️ AI服务不可用\n\n请检查API配置是否正确。")
-            return
-        
-        # 获取要总结的归档ID（从回复消息或参数）
-        archive_id = None
-        if update.message.reply_to_message:
-            # 从回复消息的文本中提取ID
-            reply_text = update.message.reply_to_message.text or ""
-            import re
-            match = re.search(r'ID[：:]\s*(\d+)', reply_text)
-            if match:
-                archive_id = int(match.group(1))
-        elif context.args:
-            try:
-                archive_id = int(context.args[0])
-            except ValueError:
-                pass
-        
-        if not archive_id:
-            await update.message.reply_text(
-                "📝 使用方法：\n\n"
-                "1. 回复一条归档消息，然后发送 /summarize\n"
-                "2. 或者使用 /summarize <归档ID>"
-            )
-            return
-        
-        # 发送处理中消息
-        processing_msg = await update.message.reply_text("🤖 AI正在分析中...")
-        
-        # 从数据库获取归档内容
-        db: DatabaseStorage = context.bot_data.get('database')
-        archive = db.get_archive(archive_id)
-        
-        if not archive:
-            await processing_msg.edit_text(f"❌ 未找到归档 #{archive_id}")
-            return
-        
-        # 准备内容
-        content = archive.get('content', '') or ''
-        if archive.get('link_metadata'):
-            metadata = archive['link_metadata']
-            content = f"{metadata.get('title', '')}\n\n{metadata.get('description', '')}\n\n{content}"
-        
-        if not content.strip():
-            await processing_msg.edit_text("❌ 归档内容为空，无法生成摘要")
-            return
-        
-        # 生成AI摘要
-        result = await summarizer.summarize_content(content, archive.get('url'))
-        
-        if not result.get('success'):
-            error_msg = result.get('error', '未知错误')
-            await processing_msg.edit_text(f"❌ AI总结失败：{error_msg}")
-            return
-        
-        # 格式化并显示结果
-        provider = result.get('provider', 'AI').upper()
-        summary_text = f"🤖 *AI总结* (by {provider})\n\n"
-        summary_text += f"📋 *核心观点*\n{result.get('summary', '无')}\n\n"
-        
-        if result.get('key_points'):
-            summary_text += "🔑 *关键要点*\n"
-            for i, point in enumerate(result['key_points'], 1):
-                summary_text += f"{i}. {point}\n"
-            summary_text += "\n"
-        
-        if result.get('suggested_tags'):
-            tags = ', '.join(f"#{tag}" for tag in result['suggested_tags'])
-            summary_text += f"🏷️ *建议标签*\n{tags}\n\n"
-        
-        if result.get('category'):
-            summary_text += f"📁 *分类*\n{result['category']}\n\n"
-        
-        summary_text += f"📎 原归档: #{archive_id}"
-        
-        await processing_msg.edit_text(
-            summary_text,
-            parse_mode=ParseMode.MARKDOWN
-        )
-        
-        logger.info(f"AI summary generated for archive #{archive_id}")
-        
-    except Exception as e:
-        logger.error(f"Error in summarize_command: {e}", exc_info=True)
-        try:
-            await update.message.reply_text(f"❌ 错误：{str(e)}")
-        except:
-            pass
-
-
 async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle /ai command - 显示AI功能状态
@@ -382,11 +369,7 @@ async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 
                 status_text += f"🎯 *功能开关*\n"
                 status_text += f"自动总结: {'✅' if ai_config.get('auto_summarize') else '❌'}\n"
-                status_text += f"自动标签: {'✅' if ai_config.get('auto_generate_tags') else '❌'}\n\n"
-                
-                status_text += "📝 *可用命令*\n"
-                status_text += "/summarize - 生成AI摘要\n"
-                status_text += "/ai - 查看状态"
+                status_text += f"自动标签: {'✅' if ai_config.get('auto_generate_tags') else '❌'}"
             else:
                 status_text += "⚠️ 服务: 不可用\n"
                 status_text += "请检查API密钥配置是否正确"

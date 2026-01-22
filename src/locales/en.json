@@ -1,11 +1,11 @@
 {
   "welcome": "👋 Welcome to ArchiveBot!\n\nI'm your personal content archiving assistant. I can help you:\n\n📦 Archive various content (text, images, videos, documents)\n🏷️ Automatically tag and categorize\n🔍 Quickly search archived content\n💾 Multi-level storage strategy\n\nSend me any content or use commands:\n\n/help - View help\n/search - Search archives\n/tags - View all tags\n/stats - View statistics\n/language - Change language\n\nLet's get started! 🚀",
   
-  "help": "📖 Help\n\n<b>Archive Content:</b>\n• Send any content directly to me\n• Add tags using #tag format\n\n<b>Commands:</b>\n/start - Initialize bot\n/help - View this help\n/search &lt;keyword&gt; - Search archives\n/tags - View all tags\n/stats - View statistics\n/language - Change language\n\n<b>Search:</b>\n• Keyword search: /search python\n• Tag search: /search #tech\n• Combined search: /search #tech python\n\n<b>Tags:</b>\nAutomatic tags: #text, #image, #video, #document, #link\nManual tags: Add #your_tag when sending content",
+  "help": "📖 Help\n\n<b>Archive Content:</b>\n• Send any content directly to me\n• Add tags using #tag format\n• Forward messages to record source\n• Batch forwarding auto-aggregation\n\n<b>Commands:</b>\n/start - Initialize bot\n/help - View this help\n/search (/s) &lt;keyword&gt; - Search archives\n/tags (/t) - View all tags\n/stats (/st) - View statistics\n/ai - AI status\n/language (/lang) - Change language\n\n<b>Search:</b>\n• Keyword search: /s python\n• Tag search: /s #tech\n• Combined search: /s #tech python\n• Click results to jump to channel\n\n<b>AI Features:</b>\n• Smart summary generation\n• Auto extract key points\n• Suggested tags (batch shared)\n• Intelligent categorization",
   
   "unauthorized": "⛔ Unauthorized\n\nSorry, this bot is for private use only.",
   
-  "archive_success": "✅ Archived successfully\n\n📝 Type: {content_type}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n� Source: {source}\n🕐 Time: {time}",  "archive_success_with_size": "✅ Archived successfully\n\n📝 Type: {content_type}\n📦 Size: {file_size}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n📌 Source: {source}\n🕐 Time: {time}",  
+  "archive_success": "✅ Archived successfully\n\n📝 Type: {content_type}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n📌 Source: {source}\n🕐 Time: {time}",  "archive_success_with_size": "✅ Archived successfully\n\n📝 Type: {content_type}\n📦 Size: {file_size}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n📌 Source: {source}\n🕐 Time: {time}",  
   "archive_failed": "❌ Archive failed\n\nError: {error}\nPlease try again.",
   
   "search_no_keyword": "Please provide search keyword.\n\nExample: /search python",
@@ -18,7 +18,7 @@
   
   "tags_list": "🏷️ All Tags ({count})\n\n{tags}",
   
-  "stats": "📊 Statistics\n\n📦 Total Archives: {total_archives}\n🏷️ Total Tags: {total_tags}\n💾 Storage Used: {storage_used}\n📅 Last Archive: {last_archive}",
+  "stats": "📊 Statistics\n\n📦 Total Archives: {total_archives}\n🏷️ Total Tags: {total_tags}\n💾 Content Size: {storage_used}\n💾 Database Size: {db_size}\n📅 Last Archive: {last_archive}",
   
   "language_changed": "✅ Language changed to English",
   

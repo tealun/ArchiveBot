@@ -155,12 +155,14 @@ class Database:
             """)
             
             # Full-text search virtual table for archives
-            # This enables fast full-text search on title and content
+            # This enables fast full-text search on title, content, and AI analysis
             cursor.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS archives_fts 
                 USING fts5(
                     title,
                     content,
+                    ai_summary,
+                    ai_category,
                     content='archives',
                     content_rowid='id'
                 )
@@ -171,8 +173,8 @@ class Database:
                 CREATE TRIGGER IF NOT EXISTS archives_fts_insert 
                 AFTER INSERT ON archives 
                 BEGIN
-                    INSERT INTO archives_fts(rowid, title, content)
-                    VALUES (new.id, new.title, new.content);
+                    INSERT INTO archives_fts(rowid, title, content, ai_summary, ai_category)
+                    VALUES (new.id, new.title, new.content, new.ai_summary, new.ai_category);
                 END
             """)
             
@@ -189,10 +191,60 @@ class Database:
                 AFTER UPDATE ON archives 
                 BEGIN
                     DELETE FROM archives_fts WHERE rowid = old.id;
-                    INSERT INTO archives_fts(rowid, title, content)
-                    VALUES (new.id, new.title, new.content);
+                    INSERT INTO archives_fts(rowid, title, content, ai_summary, ai_category)
+                    VALUES (new.id, new.title, new.content, new.ai_summary, new.ai_category);
                 END
             """)
+            
+            # Add AI analysis columns if they don't exist (for existing databases)
+            try:
+                cursor.execute("ALTER TABLE archives ADD COLUMN ai_summary TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
+            try:
+                cursor.execute("ALTER TABLE archives ADD COLUMN ai_key_points TEXT")
+            except sqlite3.OperationalError:
+                pass
+            
+            try:
+                cursor.execute("ALTER TABLE archives ADD COLUMN ai_category TEXT")
+            except sqlite3.OperationalError:
+                pass
+            
+            # 重建FTS表以包含AI字段（如果表结构已经存在但字段不同）
+            try:
+                # 检查FTS表是否需要重建（通过检查列是否存在）
+                test_cursor = cursor.execute("SELECT * FROM archives_fts LIMIT 0")
+                columns = [description[0] for description in test_cursor.description]
+                
+                # 如果FTS表缺少AI字段，需要重建
+                if 'ai_summary' not in columns or 'ai_category' not in columns:
+                    logger.info("Rebuilding FTS table to include AI fields...")
+                    cursor.execute("DROP TABLE IF EXISTS archives_fts")
+                    
+                    # 重新创建FTS表
+                    cursor.execute("""
+                        CREATE VIRTUAL TABLE archives_fts 
+                        USING fts5(
+                            title,
+                            content,
+                            ai_summary,
+                            ai_category,
+                            content='archives',
+                            content_rowid='id'
+                        )
+                    """)
+                    
+                    # 重建索引
+                    cursor.execute("""
+                        INSERT INTO archives_fts(rowid, title, content, ai_summary, ai_category)
+                        SELECT id, title, content, ai_summary, ai_category FROM archives
+                    """)
+                    
+                    logger.info("FTS table rebuilt successfully with AI fields")
+            except Exception as e:
+                logger.warning(f"FTS table rebuild check/update failed: {e}")
             
             self.conn.commit()
             logger.info("Database tables initialized successfully")

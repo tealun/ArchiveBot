@@ -1,7 +1,7 @@
 {
   "welcome": "👋 歡迎使用 ArchiveBot！\n\n我是您的個人內容歸檔助手，可以幫您：\n\n📦 歸檔各類內容（文字、圖片、影片、文件）\n🏷️ 自動標籤分類\n🔍 快速搜尋已歸檔內容\n💾 多級儲存策略\n\n傳送任何內容給我，或使用命令：\n\n/help - 檢視說明\n/search - 搜尋歸檔\n/tags - 檢視所有標籤\n/stats - 檢視統計\n/language - 切換語言\n\n讓我們開始吧！🚀",
   
-  "help": "📖 說明\n\n<b>歸檔內容：</b>\n• 直接傳送任何內容給我\n• 使用 #標籤 格式新增標籤\n\n<b>命令：</b>\n/start - 初始化機器人\n/help - 檢視此說明\n/search &lt;關鍵詞&gt; - 搜尋歸檔\n/tags - 檢視所有標籤\n/stats - 檢視統計資訊\n/language - 切換語言\n\n<b>搜尋：</b>\n• 關鍵詞搜尋：/search python\n• 標籤搜尋：/search #技術\n• 組合搜尋：/search #技術 python\n\n<b>標籤：</b>\n自動標籤：#文字、#圖片、#影片、#文件、#連結\n手動標籤：傳送內容時新增 #你的標籤",
+  "help": "📖 說明\n\n<b>歸檔內容：</b>\n• 直接傳送任何內容給我\n• 使用 #標籤 格式新增標籤\n• 轉發訊息自動記錄來源\n• 批次轉發自動聚合處理\n\n<b>命令：</b>\n/start - 初始化機器人\n/help - 檢視此說明\n/search (/s) &lt;關鍵詞&gt; - 搜尋歸檔\n/tags (/t) - 檢視所有標籤\n/stats (/st) - 檢視統計資訊\n/ai - AI功能狀態\n/language (/lang) - 切換語言\n\n<b>搜尋：</b>\n• 關鍵詞搜尋：/s python\n• 標籤搜尋：/s #技術\n• 組合搜尋：/s #技術 python\n• 結果支援點擊跳轉到頻道\n\n<b>AI功能：</b>\n• 智慧摘要生成\n• 自動擷取關鍵點\n• 建議標籤推薦（批次共享）\n• 內容智慧分類",
   
   "unauthorized": "⛔ 未授權\n\n抱歉，此機器人僅供私人使用。",
   
@@ -20,7 +20,7 @@
   
   "tags_list": "🏷️ 所有標籤 ({count})\n\n{tags}",
   
-  "stats": "📊 統計資訊\n\n📦 總歸檔數：{total_archives}\n🏷️ 總標籤數：{total_tags}\n💾 儲存使用：{storage_used}\n📅 最後歸檔：{last_archive}",
+  "stats": "📊 統計資訊\n\n📦 總歸檔數：{total_archives}\n🏷️ 總標籤數：{total_tags}\n💾 內容總量：{storage_used}\n💾 資料庫大小：{db_size}\n📅 最後歸檔：{last_archive}",
   
   "language_changed": "✅ 語言已切換為繁體中文",
   

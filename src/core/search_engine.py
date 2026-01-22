@@ -49,12 +49,13 @@ class SearchEngine:
             # Parse query
             keyword, tag_names = self._parse_query(query)
             
-            # Search
-            results = self.db_storage.search_archives(
+            # Search with total count
+            results, total_count = self.db_storage.search_archives(
                 keyword=keyword,
                 tag_names=tag_names if tag_names else None,
                 limit=limit,
-                offset=offset
+                offset=offset,
+                return_total=True
             )
             
             return {
@@ -63,6 +64,7 @@ class SearchEngine:
                 'keyword': keyword,
                 'tags': tag_names,
                 'count': len(results),
+                'total_count': total_count,
                 'results': results
             }
             
@@ -105,31 +107,46 @@ class SearchEngine:
         
         return keyword, tags
     
-    def format_results(self, search_result: Dict[str, Any]) -> str:
+    def format_results(self, search_result: Dict[str, Any], with_links: bool = True) -> tuple:
         """
         Format search results for display
         
         Args:
             search_result: Search result dictionary
+            with_links: 是否包含跳转链接
             
         Returns:
-            Formatted string
+            Tuple of (formatted_text, results_with_ai_data)
         """
         if not search_result.get('success'):
             error = search_result.get('error', 'Unknown error')
-            return self.i18n.t('error_occurred', error=error)
+            return self.i18n.t('error_occurred', error=error), []
         
         count = search_result.get('count', 0)
         
         if count == 0:
-            return self.i18n.t('search_no_results', keyword=search_result.get('query', ''))
+            return self.i18n.t('search_no_results', keyword=search_result.get('query', '')), []
         
         # Format each result
         formatted_results = []
+        results_with_ai = []
+        
         for idx, archive in enumerate(search_result.get('results', []), 1):
             emoji = get_content_type_emoji(archive.get('content_type', ''))
             title = archive.get('title', 'Untitled')
             title_truncated = truncate_text(title, 50)
+            
+            # 构建跳转链接（如果有storage_path）
+            storage_path = archive.get('storage_path')
+            if with_links and storage_path:
+                # 解析 storage_path: channel_id:message_id:file_id
+                parts = storage_path.split(':')
+                if len(parts) >= 2:
+                    channel_id = parts[0].replace('-100', '')  # 移除-100前缀
+                    message_id = parts[1]
+                    # Telegram链接格式：https://t.me/c/{channel_id}/{message_id}
+                    link = f"https://t.me/c/{channel_id}/{message_id}"
+                    title_truncated = f"<a href='{link}'>{title_truncated}</a>"
             
             # Get tags for this archive
             tags = self.db_storage.get_archive_tags(archive.get('id'))
@@ -137,18 +154,38 @@ class SearchEngine:
             
             archived_at = archive.get('archived_at', '')
             
+            # 格式化结果
             result_text = f"{idx}. {emoji} {title_truncated}"
             if tags_str:
                 result_text += f"\n   {tags_str}"
             result_text += f"\n   📅 {archived_at}"
             
+            # 检查是否有AI数据
+            has_ai = bool(
+                archive.get('ai_summary') or 
+                archive.get('ai_key_points') or 
+                archive.get('ai_category')
+            )
+            
+            if has_ai:
+                results_with_ai.append({
+                    'index': idx,
+                    'id': archive.get('id'),
+                    'title': title,
+                    'ai_summary': archive.get('ai_summary'),
+                    'ai_key_points': archive.get('ai_key_points'),
+                    'ai_category': archive.get('ai_category')
+                })
+            
             formatted_results.append(result_text)
         
         results_text = '\n\n'.join(formatted_results)
         
-        return self.i18n.t(
+        final_text = self.i18n.t(
             'search_results',
             count=count,
             keyword=search_result.get('query', ''),
             results=results_text
         )
+        
+        return final_text, results_with_ai

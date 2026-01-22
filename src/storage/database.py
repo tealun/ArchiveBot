@@ -41,7 +41,10 @@ class DatabaseStorage:
         storage_path: Optional[str] = None,
         file_size: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        source: Optional[str] = None
+        source: Optional[str] = None,
+        ai_summary: Optional[str] = None,
+        ai_key_points: Optional[List[str]] = None,
+        ai_category: Optional[str] = None
     ) -> int:
         """
         Create a new archive entry
@@ -57,6 +60,9 @@ class DatabaseStorage:
             file_size: File size in bytes
             metadata: Additional metadata as dictionary
             source: Source of content
+            ai_summary: AI generated summary
+            ai_key_points: AI extracted key points
+            ai_category: AI categorization
             
         Returns:
             Archive ID
@@ -65,6 +71,7 @@ class DatabaseStorage:
             try:
                 now = format_datetime()
                 metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
+                ai_key_points_json = json.dumps(ai_key_points, ensure_ascii=False) if ai_key_points else None
                 
                 cursor = self.db.execute(
                     """
@@ -72,14 +79,16 @@ class DatabaseStorage:
                         content_type, title, content, file_id,
                         storage_type, storage_provider, storage_path,
                         file_size, metadata, source,
-                        created_at, archived_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        created_at, archived_at,
+                        ai_summary, ai_key_points, ai_category
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         content_type, title, content, file_id,
                         storage_type, storage_provider, storage_path,
                         file_size, metadata_json, source,
-                        now, now
+                        now, now,
+                        ai_summary, ai_key_points_json, ai_category
                     )
                 )
                 
@@ -119,31 +128,140 @@ class DatabaseStorage:
             logger.error(f"Error getting archive: {e}", exc_info=True)
             return None
     
+    def find_duplicate_file(
+        self,
+        file_id: Optional[str] = None,
+        file_name: Optional[str] = None,
+        file_size: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Check if a file already exists in archives
+        
+        Args:
+            file_id: Telegram file_id (most reliable)
+            file_name: File name
+            file_size: File size in bytes
+            
+        Returns:
+            Existing archive dictionary or None
+        """
+        try:
+            # 优先使用file_id查询（最可靠）
+            if file_id:
+                cursor = self.db.execute(
+                    "SELECT * FROM archives WHERE file_id = ? ORDER BY archived_at DESC LIMIT 1",
+                    (file_id,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+            
+            # 如果没有file_id，使用文件名+大小组合查询
+            if file_name and file_size:
+                cursor = self.db.execute(
+                    """
+                    SELECT * FROM archives 
+                    WHERE title = ? AND file_size = ? 
+                    ORDER BY archived_at DESC LIMIT 1
+                    """,
+                    (file_name, file_size)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+            
+            return None
+            
+        except sqlite3.Error as e:
+            logger.error(f"Error finding duplicate file: {e}", exc_info=True)
+            return None
+    
     def search_archives(
         self,
         keyword: Optional[str] = None,
         content_type: Optional[str] = None,
         tag_names: Optional[List[str]] = None,
         limit: int = 10,
-        offset: int = 0
-    ) -> List[Dict[str, Any]]:
+        offset: int = 0,
+        return_total: bool = False
+    ) -> List[Dict[str, Any]] | tuple[List[Dict[str, Any]], int]:
         """
         Search archives with filters
+        增强搜索：支持标题、内容、标签、AI摘要、AI分类的全文搜索
         
         Args:
-            keyword: Search keyword (searches in title and content)
+            keyword: Search keyword (searches in title, content, tags, AI summary, and AI category)
             content_type: Filter by content type
             tag_names: Filter by tag names
             limit: Maximum results
             offset: Results offset for pagination
+            return_total: If True, return tuple of (results, total_count)
             
         Returns:
-            List of archive dictionaries
+            List of archive dictionaries, or tuple of (results, total_count) if return_total is True
         """
         try:
+            # 如果有关键词，使用FTS5全文搜索获取匹配的archive_id
+            fts_archive_ids = []
+            tag_matched_ids = []
+            
+            if keyword:
+                # 1. 使用FTS5搜索标题和内容
+                try:
+                    # 转义FTS5特殊字符
+                    fts_keyword = keyword.replace('"', '""')
+                    fts_cursor = self.db.execute(
+                        """
+                        SELECT rowid FROM archives_fts 
+                        WHERE archives_fts MATCH ?
+                        ORDER BY rank
+                        """,
+                        (fts_keyword,)
+                    )
+                    fts_archive_ids = [row[0] for row in fts_cursor.fetchall()]
+                    logger.debug(f"FTS5 matched {len(fts_archive_ids)} archives")
+                except sqlite3.Error as e:
+                    logger.warning(f"FTS5 search failed, fallback to LIKE: {e}")
+                    # FTS5失败时降级到LIKE搜索
+                    fts_archive_ids = []
+                
+                # 2. 搜索标签（关键词匹配标签名）
+                try:
+                    escaped_keyword = keyword.replace('%', '\\%').replace('_', '\\_')
+                    tag_cursor = self.db.execute(
+                        """
+                        SELECT DISTINCT at.archive_id 
+                        FROM archive_tags at
+                        INNER JOIN tags t ON at.tag_id = t.id
+                        WHERE t.tag_name LIKE ? ESCAPE '\\'
+                        """,
+                        (f"%{escaped_keyword}%",)
+                    )
+                    tag_matched_ids = [row[0] for row in tag_cursor.fetchall()]
+                    logger.debug(f"Tag search matched {len(tag_matched_ids)} archives")
+                except sqlite3.Error as e:
+                    logger.warning(f"Tag search failed: {e}")
+            
+            # 构建主查询
             query_parts = ["SELECT DISTINCT a.* FROM archives a"]
             params = []
             where_clauses = []
+            
+            # 如果有FTS或标签匹配结果，限制在这些ID内
+            if fts_archive_ids or tag_matched_ids:
+                combined_ids = list(set(fts_archive_ids + tag_matched_ids))
+                if combined_ids:
+                    id_placeholders = ','.join('?' * len(combined_ids))
+                    where_clauses.append(f"a.id IN ({id_placeholders})")
+                    params.extend(combined_ids)
+                else:
+                    # 没有匹配结果
+                    return []
+            elif keyword:
+                # FTS和标签都没有结果，使用LIKE作为后备
+                escaped_keyword = keyword.replace('%', '\\%').replace('_', '\\_')
+                where_clauses.append("(a.title LIKE ? ESCAPE '\\' OR a.content LIKE ? ESCAPE '\\')")
+                params.extend([f"%{escaped_keyword}%", f"%{escaped_keyword}%"])
             
             # Join with tags if tag filter is specified
             if tag_names:
@@ -155,13 +273,6 @@ class DatabaseStorage:
                 where_clauses.append(f"t.tag_name IN ({tag_placeholders})")
                 params.extend(tag_names)
             
-            # Keyword search - escape special characters for LIKE
-            if keyword:
-                # Escape SQL LIKE wildcards
-                escaped_keyword = keyword.replace('%', '\\%').replace('_', '\\_')
-                where_clauses.append("(a.title LIKE ? ESCAPE '\\' OR a.content LIKE ? ESCAPE '\\')")
-                params.extend([f"%{escaped_keyword}%", f"%{escaped_keyword}%"])
-            
             # Content type filter
             if content_type:
                 where_clauses.append("a.content_type = ?")
@@ -170,6 +281,15 @@ class DatabaseStorage:
             # Build WHERE clause
             if where_clauses:
                 query_parts.append("WHERE " + " AND ".join(where_clauses))
+            
+            # Get total count if requested (before adding ORDER/LIMIT)
+            total_count = 0
+            if return_total:
+                count_query_parts = query_parts.copy()
+                count_query = " ".join(count_query_parts)
+                count_query = count_query.replace("SELECT DISTINCT a.*", "SELECT COUNT(DISTINCT a.id)")
+                count_cursor = self.db.execute(count_query, tuple(params))
+                total_count = count_cursor.fetchone()[0]
             
             # Order and limit
             query_parts.append("ORDER BY a.archived_at DESC LIMIT ? OFFSET ?")
@@ -181,10 +301,15 @@ class DatabaseStorage:
             results = [dict(row) for row in cursor.fetchall()]
             
             logger.debug(f"Search found {len(results)} results")
+            
+            if return_total:
+                return results, total_count
             return results
             
         except sqlite3.Error as e:
             logger.error(f"Error searching archives: {e}", exc_info=True)
+            if return_total:
+                return [], 0
             return []
     
     def delete_archive(self, archive_id: int) -> bool:

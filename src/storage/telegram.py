@@ -58,9 +58,6 @@ class TelegramStorage(BaseStorage):
             # 直接使用file_id转发（简单、快速、可靠、支持2GB）
             message = None
             
-            # 直接使用file_id转发（简单、快速、可靠、支持2GB）
-            message = None
-            
             try:
                 if content_type == 'image':
                     message = await self.bot.send_photo(
@@ -137,6 +134,39 @@ class TelegramStorage(BaseStorage):
         except Exception as e:
             logger.error(f"Error storing file in Telegram: {e}", exc_info=True)
             return None
+    
+    async def batch_store(self, metadata_list: list) -> list:
+        """
+        批量存储文件到Telegram频道
+        
+        Args:
+            metadata_list: 元数据列表
+            
+        Returns:
+            storage_path列表（成功的路径，失败为None）
+        """
+        import asyncio
+        
+        logger.info(f"Batch storing {len(metadata_list)} files to Telegram channel")
+        
+        # 并发发送（Telegram API支持高并发）
+        tasks = [self.store(None, metadata) for metadata in metadata_list]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 处理结果
+        storage_paths = []
+        success_count = 0
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"Batch store failed for item {i}: {result}")
+                storage_paths.append(None)
+            else:
+                storage_paths.append(result)
+                if result:
+                    success_count += 1
+        
+        logger.info(f"Batch stored {success_count}/{len(metadata_list)} files successfully")
+        return storage_paths
     
     async def retrieve(self, storage_path: str) -> Optional[Any]:
         """

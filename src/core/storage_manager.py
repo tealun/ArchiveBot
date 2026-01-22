@@ -47,7 +47,140 @@ class StorageManager:
         self.telegram_storage = telegram_storage
         self.i18n = get_i18n()
     
-    async def archive_content(self, message, analysis: Dict[str, Any]) -> Tuple[bool, str]:
+    async def batch_archive_content(self, messages: list, analyses: list, progress_callback=None) -> list:
+        """
+        批量归档内容（优化：批量存储到Telegram频道）
+        
+        Args:
+            messages: 消息列表
+            analyses: 分析结果列表
+            progress_callback: 进度回调函数 (current, total, stage)
+            
+        Returns:
+            [(success, message), ...]
+        """
+        if len(messages) != len(analyses):
+            logger.error(f"Messages and analyses count mismatch: {len(messages)} vs {len(analyses)}")
+            return [(False, "Internal error") for _ in messages]
+        
+        results = []
+        total = len(messages)
+        
+        # 收集需要存储到Telegram的文件
+        telegram_indices = []
+        telegram_metadata_list = []
+        
+        for i, (message, analysis) in enumerate(zip(messages, analyses)):
+            content_type = analysis.get('content_type')
+            storage_type = self._determine_storage_type(content_type, analysis.get('file_size'))
+            
+            if storage_type == STORAGE_TELEGRAM and self.telegram_storage:
+                telegram_indices.append(i)
+                metadata = {
+                    'file_id': analysis.get('file_id'),
+                    'content_type': content_type,
+                    'caption': analysis.get('title') or analysis.get('content'),
+                    'file_size': analysis.get('file_size', 0)
+                }
+                telegram_metadata_list.append(metadata)
+        
+        # 批量存储到Telegram（如果有）
+        telegram_storage_paths = []
+        if telegram_indices:
+            logger.info(f"Batch storing {len(telegram_indices)} files to Telegram channel")
+            telegram_storage_paths = await self.telegram_storage.batch_store(telegram_metadata_list)
+        
+        # 逐个创建数据库记录（带进度更新）
+        for i, (message, analysis) in enumerate(zip(messages, analyses)):
+            try:
+                content_type = analysis.get('content_type')
+                
+                if content_type == 'error':
+                    results.append((False, self.i18n.t('archive_failed', error=analysis.get('error', 'Unknown'))))
+                    continue
+                
+                # Determine storage
+                storage_type = self._determine_storage_type(content_type, analysis.get('file_size'))
+                storage_path = None
+                storage_provider = None
+                
+                # 检查是否是批量存储的
+                if i in telegram_indices:
+                    idx_in_batch = telegram_indices.index(i)
+                    storage_path = telegram_storage_paths[idx_in_batch]
+                    if storage_path:
+                        storage_provider = 'telegram_channel'
+                    else:
+                        storage_type = STORAGE_REFERENCE
+                        logger.warning(f"Batch store failed for item {i}, downgraded to reference")
+                
+                # Create archive entry
+                archive_id = self.db_storage.create_archive(
+                    content_type=content_type,
+                    storage_type=storage_type,
+                    title=analysis.get('title'),
+                    content=analysis.get('content'),
+                    file_id=analysis.get('file_id'),
+                    storage_provider=storage_provider,
+                    storage_path=storage_path,
+                    file_size=analysis.get('file_size'),
+                    source=analysis.get('source'),
+                    metadata={
+                        'file_name': analysis.get('file_name'),
+                        'mime_type': analysis.get('mime_type'),
+                        'url': analysis.get('url'),
+                    },
+                    ai_summary=analysis.get('ai_summary'),
+                    ai_key_points=analysis.get('ai_key_points'),
+                    ai_category=analysis.get('ai_category')
+                )
+                
+                # Generate and add tags
+                all_tags = []
+                
+                # Auto tags
+                auto_tags = self.tag_manager.generate_auto_tags(content_type)
+                if auto_tags:
+                    self.tag_manager.add_tags_to_archive(archive_id, auto_tags, 'auto')
+                    all_tags.extend(auto_tags)
+                
+                # Manual tags from hashtags
+                manual_tags = analysis.get('hashtags', [])
+                if manual_tags:
+                    self.tag_manager.add_tags_to_archive(archive_id, manual_tags, 'manual')
+                    all_tags.extend(manual_tags)
+                
+                # AI tags
+                ai_tags = analysis.get('tags', [])
+                if ai_tags:
+                    unique_ai_tags = [tag for tag in ai_tags if tag not in all_tags]
+                    if unique_ai_tags:
+                        self.tag_manager.add_tags_to_archive(archive_id, unique_ai_tags, 'ai')
+                        all_tags.extend(unique_ai_tags)
+                
+                # Success message (简化版)
+                storage_name = self.i18n.t(f'storage_{storage_type}')
+                tags_display = self.tag_manager.format_tags_for_display(all_tags)
+                
+                success_msg = f"✅ {self.i18n.t(f'tag_{content_type}')} | 🏷️ {tags_display}"
+                results.append((True, success_msg))
+                
+                # 更新进度
+                if progress_callback and (i + 1) % max(1, total // 20) == 0:
+                    await progress_callback(i + 1, total, "存储到频道")
+                
+            except Exception as e:
+                logger.error(f"Error in batch archive item {i}: {e}", exc_info=True)
+                results.append((False, str(e)))
+        
+        logger.info(f"Batch archived {sum(1 for s, _ in results if s)}/{len(results)} items")
+        return results
+    
+    async def archive_content(
+        self,
+        message: Message,
+        analysis: Dict[str, Any]
+    ) -> Tuple[bool, str]:
         """
         Archive content based on analysis
         
@@ -103,7 +236,10 @@ class StorageManager:
                     'file_name': analysis.get('file_name'),
                     'mime_type': analysis.get('mime_type'),
                     'url': analysis.get('url'),
-                }
+                },
+                ai_summary=analysis.get('ai_summary'),
+                ai_key_points=analysis.get('ai_key_points'),
+                ai_category=analysis.get('ai_category')
             )
             
             # Generate and add tags
@@ -121,16 +257,43 @@ class StorageManager:
                 self.tag_manager.add_tags_to_archive(archive_id, manual_tags, 'manual')
                 all_tags.extend(manual_tags)
             
+            # AI tags from analysis (修复：从'tags'字段获取AI生成的标签)
+            ai_tags = analysis.get('tags', [])
+            if ai_tags:
+                # 过滤掉已经添加的auto和manual标签
+                unique_ai_tags = [tag for tag in ai_tags if tag not in all_tags]
+                if unique_ai_tags:
+                    self.tag_manager.add_tags_to_archive(archive_id, unique_ai_tags, 'ai')
+                    all_tags.extend(unique_ai_tags)
+                    logger.info(f"Added AI tags: {unique_ai_tags}")
+            
             # Format success message
             storage_name = self.i18n.t(f'storage_{storage_type}')
             tags_display = self.tag_manager.format_tags_for_display(all_tags)
             source_display = analysis.get('source', '直接发送')
+            
+            # 构建标题链接
+            title = analysis.get('title', '')
+            title_link = ''
+            if title and storage_path and storage_provider == 'telegram_channel':
+                # 获取频道ID
+                from ..utils.config import get_config
+                config = get_config()
+                channel_id = config.telegram_channel_id
+                if channel_id:
+                    channel_id_str = str(channel_id).replace('-100', '')
+                    message_id = storage_path
+                    file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
+                    title_link = f"📚 标题: [{title}]({file_link})\n"
+            elif title:
+                title_link = f"📚 标题: {title}\n"
             
             # 对于非文本和非链接类型，显示文件大小
             file_size = analysis.get('file_size', 0)
             if content_type not in ['text', 'link'] and file_size > 0:
                 success_msg = self.i18n.t(
                     'archive_success_with_size',
+                    title_link=title_link,
                     content_type=self.i18n.t(f'tag_{content_type}'),
                     file_size=format_file_size(file_size),
                     tags=tags_display if tags_display else self.i18n.t('tag_text'),
@@ -141,12 +304,32 @@ class StorageManager:
             else:
                 success_msg = self.i18n.t(
                     'archive_success',
+                    title_link=title_link,
                     content_type=self.i18n.t(f'tag_{content_type}'),
                     tags=tags_display if tags_display else self.i18n.t('tag_text'),
                     storage_type=storage_name,
                     source=source_display,
                     time=format_datetime()
                 )
+            
+            # 添加AI分析信息（如果有）
+            ai_summary = analysis.get('ai_summary', '')
+            ai_key_points = analysis.get('ai_key_points', [])
+            ai_category = analysis.get('ai_category', '')
+            
+            if ai_summary or ai_key_points or ai_category:
+                success_msg += "\n\n🤖 AI智能分析："
+                
+                if ai_category:
+                    success_msg += f"\n📁 分类：{ai_category}"
+                
+                if ai_summary:
+                    success_msg += f"\n📝 摘要：{ai_summary}"
+                
+                if ai_key_points:
+                    success_msg += "\n🔑 关键点："
+                    for i, point in enumerate(ai_key_points[:3], 1):
+                        success_msg += f"\n  {i}. {point}"
             
             logger.info(f"Successfully archived content: archive_id={archive_id}")
             return True, success_msg
