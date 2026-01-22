@@ -272,7 +272,7 @@ class StorageManager:
             tags_display = self.tag_manager.format_tags_for_display(all_tags)
             source_display = analysis.get('source', '直接发送')
             
-            # 构建标题链接
+            # 构建标题链接（使用HTML格式）
             title = analysis.get('title', '')
             title_link = ''
             if title and storage_path and storage_provider == 'telegram_channel':
@@ -281,12 +281,24 @@ class StorageManager:
                 config = get_config()
                 channel_id = config.telegram_channel_id
                 if channel_id:
-                    channel_id_str = str(channel_id).replace('-100', '')
-                    message_id = storage_path
+                    # 解析storage_path: 可能是 "message_id" 或 "channel_id:message_id" 或 "channel_id:message_id:file_id"
+                    parts = storage_path.split(':')
+                    if len(parts) >= 2:
+                        # 格式: channel_id:message_id:file_id
+                        channel_id_str = parts[0].replace('-100', '')
+                        message_id = parts[1]
+                    else:
+                        # 格式: message_id（使用配置的channel_id）
+                        channel_id_str = str(channel_id).replace('-100', '')
+                        message_id = storage_path
+                    
                     file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                    title_link = f"📚 标题: [{title}]({file_link})\n"
+                    # 使用HTML格式的链接
+                    title_link = f"📚 标题: <a href='{file_link}'>{title}</a>\n"
+                    logger.debug(f"Generated title link: {file_link} for content_type={content_type}")
             elif title:
                 title_link = f"📚 标题: {title}\n"
+                logger.debug(f"Generated plain title (no link) for content_type={content_type}, storage_provider={storage_provider}")
             
             # 对于非文本和非链接类型，显示文件大小
             file_size = analysis.get('file_size', 0)
@@ -312,6 +324,8 @@ class StorageManager:
                     time=format_datetime()
                 )
             
+            # 注意：此消息需要用 parse_mode='HTML' 发送
+            
             # 添加AI分析信息（如果有）
             ai_summary = analysis.get('ai_summary', '')
             ai_key_points = analysis.get('ai_key_points', [])
@@ -332,11 +346,11 @@ class StorageManager:
                         success_msg += f"\n  {i}. {point}"
             
             logger.info(f"Successfully archived content: archive_id={archive_id}")
-            return True, success_msg
+            return True, success_msg, archive_id
             
         except Exception as e:
             logger.error(f"Error archiving content: {e}", exc_info=True)
-            return False, self.i18n.t('archive_failed', error=str(e))
+            return False, self.i18n.t('archive_failed', error=str(e)), None
     
     async def _store_to_telegram(self, analysis: Dict[str, Any]) -> Optional[str]:
         """

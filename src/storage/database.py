@@ -128,6 +128,27 @@ class DatabaseStorage:
             logger.error(f"Error getting archive: {e}", exc_info=True)
             return None
     
+    def get_random_archive(self, exclude_deleted: bool = True, content_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get a random archive for review use cases"""
+        try:
+            where_clauses = ["1=1"]
+            params: List[Any] = []
+
+            if exclude_deleted:
+                where_clauses.append("(deleted IS NULL OR deleted = 0)")
+
+            if content_type:
+                where_clauses.append("content_type = ?")
+                params.append(content_type)
+
+            query = f"SELECT * FROM archives WHERE {' AND '.join(where_clauses)} ORDER BY RANDOM() LIMIT 1"
+            cursor = self.db.execute(query, tuple(params))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        except sqlite3.Error as e:
+            logger.error(f"Error getting random archive: {e}", exc_info=True)
+            return None
+    
     def find_duplicate_file(
         self,
         file_id: Optional[str] = None,
@@ -464,6 +485,107 @@ class DatabaseStorage:
         except sqlite3.Error as e:
             logger.error(f"Error getting archive tags: {e}", exc_info=True)
             return []
+
+    def remove_tag_from_archives(self, tag_name: str, archive_ids: Optional[List[int]] = None) -> int:
+        """Remove a tag from specified archives"""
+        try:
+            with self.db._lock:
+                cursor = self.db.execute("SELECT id FROM tags WHERE tag_name = ?", (tag_name,))
+                row = cursor.fetchone()
+                if not row:
+                    return 0
+                tag_id = row[0]
+
+                where_clause = ""
+                params: List[Any] = [tag_id]
+                if archive_ids:
+                    placeholders = ",".join(["?"] * len(archive_ids))
+                    where_clause = f"AND archive_id IN ({placeholders})"
+                    params.extend(archive_ids)
+
+                cursor = self.db.execute(
+                    f"SELECT COUNT(*) FROM archive_tags WHERE tag_id = ? {where_clause}",
+                    tuple(params)
+                )
+                remove_count = cursor.fetchone()[0]
+                if remove_count == 0:
+                    return 0
+
+                self.db.execute(
+                    f"DELETE FROM archive_tags WHERE tag_id = ? {where_clause}",
+                    tuple(params)
+                )
+
+                self.db.execute(
+                    "UPDATE tags SET count = MAX(count - ?, 0) WHERE id = ?",
+                    (remove_count, tag_id)
+                )
+                self.db.commit()
+                return remove_count
+        except sqlite3.Error as e:
+            logger.error(f"Error removing tag '{tag_name}': {e}", exc_info=True)
+            self.db.rollback()
+            return 0
+
+    def replace_tag_in_archives(self, old_tag: str, new_tag: str, archive_ids: Optional[List[int]] = None) -> int:
+        """Replace a tag with another across archives"""
+        try:
+            with self.db._lock:
+                cursor = self.db.execute("SELECT id FROM tags WHERE tag_name = ?", (old_tag,))
+                row = cursor.fetchone()
+                if not row:
+                    return 0
+                old_tag_id = row[0]
+
+                new_tag_id = self.get_or_create_tag(new_tag, tag_type='manual')
+
+                where_clause = ""
+                params: List[Any] = [old_tag_id]
+                if archive_ids:
+                    placeholders = ",".join(["?"] * len(archive_ids))
+                    where_clause = f"AND archive_id IN ({placeholders})"
+                    params.extend(archive_ids)
+
+                cursor = self.db.execute(
+                    f"SELECT archive_id FROM archive_tags WHERE tag_id = ? {where_clause}",
+                    tuple(params)
+                )
+                archive_list = [row[0] for row in cursor.fetchall()]
+                if not archive_list:
+                    return 0
+
+                inserted = 0
+                for aid in archive_list:
+                    try:
+                        self.db.execute(
+                            "INSERT OR IGNORE INTO archive_tags (archive_id, tag_id) VALUES (?, ?)",
+                            (aid, new_tag_id)
+                        )
+                        inserted += 1
+                    except sqlite3.Error:
+                        pass
+
+                # Remove old relations
+                self.db.execute(
+                    f"DELETE FROM archive_tags WHERE tag_id = ? {where_clause}",
+                    tuple(params)
+                )
+
+                self.db.execute(
+                    "UPDATE tags SET count = MAX(count - ?, 0) WHERE id = ?",
+                    (len(archive_list), old_tag_id)
+                )
+                self.db.execute(
+                    "UPDATE tags SET count = count + ? WHERE id = ?",
+                    (inserted, new_tag_id)
+                )
+
+                self.db.commit()
+                return inserted
+        except sqlite3.Error as e:
+            logger.error(f"Error replacing tag '{old_tag}'->'{new_tag}': {e}", exc_info=True)
+            self.db.rollback()
+            return 0
     
     def get_all_tags(self, limit: int = 100) -> List[Dict[str, Any]]:
         """
@@ -539,3 +661,15 @@ class DatabaseStorage:
             logger.error(f"Error setting config: {e}", exc_info=True)
             self.db.rollback()
             return False
+
+    def get_activity_summary(self, days: int = 7) -> Dict[str, Any]:
+        """
+        Get activity summary for recent days
+        
+        Args:
+            days: Number of days to look back
+            
+        Returns:
+            Dictionary with activity statistics
+        """
+        return self.db.get_activity_summary(days)

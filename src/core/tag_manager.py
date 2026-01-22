@@ -4,7 +4,7 @@ Handles automatic and manual tag management
 """
 
 import logging
-from typing import List, Set
+from typing import List, Set, Optional
 from ..storage.database import DatabaseStorage
 from ..utils.helpers import extract_hashtags
 from ..utils.validators import sanitize_tag_name
@@ -155,3 +155,18 @@ class TagManager:
             return ""
         
         return " ".join(f"#{tag}" for tag in tag_names)
+
+    def remove_tag(self, tag_name: str, archive_ids: Optional[List[int]] = None) -> int:
+        """Bulk-remove a tag from selected archives"""
+        sanitized = sanitize_tag_name(tag_name)
+        if not sanitized:
+            return 0
+        return self.db_storage.remove_tag_from_archives(sanitized, archive_ids)
+
+    def replace_tag(self, old_tag: str, new_tag: str, archive_ids: Optional[List[int]] = None) -> int:
+        """Replace an existing tag with a new one across archives"""
+        old_sanitized = sanitize_tag_name(old_tag)
+        new_sanitized = sanitize_tag_name(new_tag)
+        if not old_sanitized or not new_sanitized:
+            return 0
+        return self.db_storage.replace_tag_in_archives(old_sanitized, new_sanitized, archive_ids)

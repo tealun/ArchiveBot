@@ -138,15 +138,24 @@ class SearchEngine:
             
             # 构建跳转链接（如果有storage_path）
             storage_path = archive.get('storage_path')
-            if with_links and storage_path:
-                # 解析 storage_path: channel_id:message_id:file_id
+            storage_type = archive.get('storage_type')
+            if with_links and storage_path and storage_type == 'telegram':
+                # 解析 storage_path: 可能是 "message_id" 或 "channel_id:message_id" 或 "channel_id:message_id:file_id"
                 parts = storage_path.split(':')
                 if len(parts) >= 2:
+                    # 格式: channel_id:message_id[:file_id]
                     channel_id = parts[0].replace('-100', '')  # 移除-100前缀
                     message_id = parts[1]
-                    # Telegram链接格式：https://t.me/c/{channel_id}/{message_id}
-                    link = f"https://t.me/c/{channel_id}/{message_id}"
-                    title_truncated = f"<a href='{link}'>{title_truncated}</a>"
+                else:
+                    # 格式: message_id（需要从配置获取channel_id）
+                    from ..utils.config import get_config
+                    config = get_config()
+                    channel_id = str(config.telegram_channel_id).replace('-100', '')
+                    message_id = storage_path
+                
+                # Telegram链接格式：https://t.me/c/{channel_id}/{message_id}
+                link = f"https://t.me/c/{channel_id}/{message_id}"
+                title_truncated = f"<a href='{link}'>{title_truncated}</a>"
             
             # Get tags for this archive
             tags = self.db_storage.get_archive_tags(archive.get('id'))

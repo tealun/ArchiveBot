@@ -1,0 +1,309 @@
+"""
+Trash manager module
+Manages deleted archives (soft delete)
+"""
+
+import logging
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+
+from ..utils.helpers import format_datetime
+
+logger = logging.getLogger(__name__)
+
+
+class TrashManager:
+    """
+    Manages trash bin for deleted archives
+    Supports viewing, restoring, and permanently deleting archives
+    """
+    
+    def __init__(self, db):
+        """
+        Initialize trash manager
+        
+        Args:
+            db: Database instance
+        """
+        self.db = db
+        logger.info("TrashManager initialized")
+    
+    def move_to_trash(self, archive_id: int) -> bool:
+        """
+        Move an archive to trash (soft delete)
+        
+        Args:
+            archive_id: Archive ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with self.db._lock:
+                # Check if archive exists and not already deleted
+                cursor = self.db.execute(
+                    "SELECT id FROM archives WHERE id = ? AND deleted = 0",
+                    (archive_id,)
+                )
+                if not cursor.fetchone():
+                    logger.warning(f"Archive {archive_id} not found or already deleted")
+                    return False
+                
+                # Mark as deleted
+                now = format_datetime()
+                self.db.execute(
+                    "UPDATE archives SET deleted = 1, deleted_at = ? WHERE id = ?",
+                    (now, archive_id)
+                )
+                self.db.commit()
+                
+                logger.info(f"Archive {archive_id} moved to trash")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error moving archive to trash: {e}", exc_info=True)
+            return False
+    
+    def restore_archive(self, archive_id: int) -> bool:
+        """
+        Restore an archive from trash
+        
+        Args:
+            archive_id: Archive ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with self.db._lock:
+                # Check if archive exists and is deleted
+                cursor = self.db.execute(
+                    "SELECT id FROM archives WHERE id = ? AND deleted = 1",
+                    (archive_id,)
+                )
+                if not cursor.fetchone():
+                    logger.warning(f"Archive {archive_id} not found in trash")
+                    return False
+                
+                # Restore archive
+                self.db.execute(
+                    "UPDATE archives SET deleted = 0, deleted_at = NULL WHERE id = ?",
+                    (archive_id,)
+                )
+                self.db.commit()
+                
+                logger.info(f"Archive {archive_id} restored from trash")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error restoring archive: {e}", exc_info=True)
+            return False
+    
+    def delete_permanently(self, archive_id: int) -> bool:
+        """
+        Permanently delete an archive from trash
+        
+        Args:
+            archive_id: Archive ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with self.db._lock:
+                # Check if archive exists and is deleted
+                cursor = self.db.execute(
+                    "SELECT id FROM archives WHERE id = ? AND deleted = 1",
+                    (archive_id,)
+                )
+                if not cursor.fetchone():
+                    logger.warning(f"Archive {archive_id} not found in trash")
+                    return False
+                
+                # Delete associated notes first
+                self.db.execute(
+                    "DELETE FROM notes WHERE archive_id = ?",
+                    (archive_id,)
+                )
+                
+                # Delete archive
+                self.db.execute(
+                    "DELETE FROM archives WHERE id = ?",
+                    (archive_id,)
+                )
+                self.db.commit()
+                
+                logger.info(f"Archive {archive_id} permanently deleted")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error permanently deleting archive: {e}", exc_info=True)
+            return False
+    
+    def list_trash(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        List all archives in trash
+        
+        Args:
+            limit: Maximum number of results
+            
+        Returns:
+            List of deleted archives
+        """
+        try:
+            with self.db._lock:
+                cursor = self.db.execute(
+                    """
+                    SELECT 
+                        id, title, content_type, 
+                        deleted_at, created_at
+                    FROM archives
+                    WHERE deleted = 1
+                    ORDER BY deleted_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,)
+                )
+                
+                results = []
+                for row in cursor.fetchall():
+                    archive_id = row[0]
+                    # 通过tag_manager获取标签
+                    tags = self.tag_manager.get_archive_tags(archive_id) if self.tag_manager else []
+                    
+                    results.append({
+                        'id': archive_id,
+                        'title': row[1],
+                        'content_type': row[2],
+                        'tags': tags,
+                        'deleted_at': row[3],
+                        'created_at': row[4]
+                    })
+                
+                logger.info(f"Listed {len(results)} items in trash")
+                return results
+                
+        except Exception as e:
+            logger.error(f"Error listing trash: {e}", exc_info=True)
+            return []
+    
+    def empty_trash(self, days_old: Optional[int] = None) -> int:
+        """
+        Empty trash (permanently delete all items)
+        
+        Args:
+            days_old: Only delete items older than this many days (optional)
+            
+        Returns:
+            Number of archives permanently deleted
+        """
+        try:
+            with self.db._lock:
+                if days_old:
+                    # Calculate cutoff date
+                    from datetime import timedelta
+                    cutoff_date = datetime.now() - timedelta(days=days_old)
+                    cutoff_str = cutoff_date.strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # Get archives to delete
+                    cursor = self.db.execute(
+                        "SELECT id FROM archives WHERE deleted = 1 AND deleted_at <= ?",
+                        (cutoff_str,)
+                    )
+                else:
+                    # Get all deleted archives
+                    cursor = self.db.execute(
+                        "SELECT id FROM archives WHERE deleted = 1"
+                    )
+                
+                archive_ids = [row[0] for row in cursor.fetchall()]
+                
+                if not archive_ids:
+                    logger.info("No archives to delete in trash")
+                    return 0
+                
+                # Delete associated notes
+                placeholders = ','.join('?' * len(archive_ids))
+                self.db.execute(
+                    f"DELETE FROM notes WHERE archive_id IN ({placeholders})",
+                    archive_ids
+                )
+                
+                # Delete archives
+                self.db.execute(
+                    f"DELETE FROM archives WHERE id IN ({placeholders})",
+                    archive_ids
+                )
+                self.db.commit()
+                
+                count = len(archive_ids)
+                logger.info(f"Emptied trash: {count} archives permanently deleted")
+                return count
+                
+        except Exception as e:
+            logger.error(f"Error emptying trash: {e}", exc_info=True)
+            return 0
+    
+    def get_trash_count(self) -> int:
+        """
+        Get count of archives in trash
+        
+        Returns:
+            Number of deleted archives
+        """
+        try:
+            with self.db._lock:
+                cursor = self.db.execute(
+                    "SELECT COUNT(*) FROM archives WHERE deleted = 1"
+                )
+                count = cursor.fetchone()[0]
+                return count
+                
+        except Exception as e:
+            logger.error(f"Error getting trash count: {e}", exc_info=True)
+            return 0
+    
+    def get_archive_info(self, archive_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed info about a deleted archive
+        
+        Args:
+            archive_id: Archive ID
+            
+        Returns:
+            Archive info dict or None
+        """
+        try:
+            with self.db._lock:
+                cursor = self.db.execute(
+                    """
+                    SELECT 
+                        id, title, content, content_type, tags,
+                        file_name, file_size, storage_type,
+                        deleted_at, created_at
+                    FROM archives
+                    WHERE id = ? AND deleted = 1
+                    """,
+                    (archive_id,)
+                )
+                
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                
+                return {
+                    'id': row[0],
+                    'title': row[1],
+                    'content': row[2],
+                    'content_type': row[3],
+                    'tags': row[4].split(',') if row[4] else [],
+                    'file_name': row[5],
+                    'file_size': row[6],
+                    'storage_type': row[7],
+                    'deleted_at': row[8],
+                    'created_at': row[9]
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting archive info: {e}", exc_info=True)
+            return None

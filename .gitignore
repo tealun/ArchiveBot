@@ -54,6 +54,14 @@ logs/
 *.tmp
 *.bak
 
+# Test files
+test_*.py
+check_*.py
+diagnose_*.py
+deep_fix_*.py
+enable_*.py
+reset_*.py
+
 # Internal documentation (not for public repo)
 docs/DEVELOPMENT.md
 docs/ARCHITECTURE.md

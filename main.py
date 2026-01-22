@@ -30,6 +30,11 @@ from src.storage.telegram import TelegramStorage
 from src.core.tag_manager import TagManager
 from src.core.storage_manager import StorageManager
 from src.core.search_engine import SearchEngine
+from src.core.note_manager import NoteManager
+from src.core.trash_manager import TrashManager
+from src.core.export_manager import ExportManager
+from src.core.backup_manager import BackupManager
+from src.core.review_manager import ReviewManager
 
 from src.bot import commands, handlers, callbacks
 from src.ai.summarizer import get_ai_summarizer
@@ -132,6 +137,11 @@ def main():
         # Initialize storage and managers
         db_storage = DatabaseStorage(db)
         tag_manager = TagManager(db_storage)
+        note_manager = NoteManager(db)
+        backup_manager = BackupManager(
+            db_path=config.database_path,
+            backup_dir="data/backups"
+        )
         
         # Create application
         application = Application.builder().token(config.bot_token).build()
@@ -149,6 +159,9 @@ def main():
         
         storage_manager = StorageManager(db_storage, tag_manager, telegram_storage)
         search_engine = SearchEngine(db_storage)
+        trash_manager = TrashManager(db)
+        export_manager = ExportManager(db, note_manager)
+        review_manager = ReviewManager(db_storage, tag_manager)
         
         # Initialize AI summarizer if enabled
         ai_summarizer = None
@@ -169,28 +182,15 @@ def main():
         # Store managers in bot_data for access in handlers
         application.bot_data['db_storage'] = db_storage
         application.bot_data['database'] = db  # Add database reference
+        application.bot_data['note_manager'] = note_manager
+        application.bot_data['trash_manager'] = trash_manager
+        application.bot_data['export_manager'] = export_manager
+        application.bot_data['backup_manager'] = backup_manager
+        application.bot_data['review_manager'] = review_manager
         application.bot_data['tag_manager'] = tag_manager
         application.bot_data['storage_manager'] = storage_manager
         application.bot_data['search_engine'] = search_engine
         application.bot_data['ai_summarizer'] = ai_summarizer
-        
-        # 设置机器人命令菜单（持久化到Telegram服务器）
-        async def post_init(application):
-            """初始化后设置命令菜单"""
-            from telegram import BotCommand
-            commands = [
-                BotCommand("start", "开始使用"),
-                BotCommand("search", "搜索归档 (简写: /s)"),
-                BotCommand("tags", "标签列表 (简写: /t)"),
-                BotCommand("ai", "AI状态"),
-                BotCommand("stats", "统计信息 (简写: /st)"),
-                BotCommand("language", "切换语言 (简写: /lang)"),
-                BotCommand("help", "查看帮助"),
-            ]
-            await application.bot.set_my_commands(commands)
-            logger.info("Bot commands menu set successfully")
-        
-        application.post_init = post_init
         
         # Register command handlers (with owner check)
         application.add_handler(CommandHandler("start", owner_only(commands.start_command)))
@@ -200,6 +200,13 @@ def main():
         application.add_handler(CommandHandler("ai", owner_only(commands.ai_status_command)))
         application.add_handler(CommandHandler(["stats", "st"], owner_only(commands.stats_command)))
         application.add_handler(CommandHandler(["language", "lang"], owner_only(commands.language_command)))
+        application.add_handler(CommandHandler("note", owner_only(commands.note_command)))
+        application.add_handler(CommandHandler("notes", owner_only(commands.notes_command)))
+        application.add_handler(CommandHandler("cancel", owner_only(commands.cancel_command)))
+        application.add_handler(CommandHandler("trash", owner_only(commands.trash_command)))
+        application.add_handler(CommandHandler("export", owner_only(commands.export_command)))
+        application.add_handler(CommandHandler("backup", owner_only(commands.backup_command)))
+        application.add_handler(CommandHandler("review", owner_only(commands.review_command)))
         
         # Register callback handlers (统一处理)
         application.add_handler(CallbackQueryHandler(
@@ -253,6 +260,86 @@ def main():
         
         logger.info("All handlers registered")
         logger.info(f"Bot owner ID: {config.owner_id}")
+        
+        # 设置机器人命令菜单（多语言支持）
+        from telegram import BotCommand
+        import asyncio
+        
+        async def set_bot_commands():
+            """设置机器人命令菜单 - 为所有支持的语言设置"""
+            try:
+                # 定义多语言命令菜单
+                commands_config = {
+                    None: [  # 默认语言（未设置时）
+                        BotCommand("start", "开始使用"),
+                        BotCommand("help", "查看帮助"),
+                        BotCommand("search", "搜索归档 (简写: /s)"),
+                        BotCommand("note", "添加笔记"),
+                        BotCommand("notes", "查看笔记"),
+                        BotCommand("tags", "标签列表 (简写: /t)"),
+                        BotCommand("stats", "统计信息 (简写: /st)"),
+                        BotCommand("review", "存档回顾"),
+                        BotCommand("trash", "垃圾箱"),
+                        BotCommand("export", "导出数据"),
+                        BotCommand("backup", "备份管理"),
+                        BotCommand("ai", "AI状态"),
+                        BotCommand("language", "切换语言 (简写: /lang)"),
+                    ],
+                    "zh": [  # 简体中文 (Telegram使用 'zh' 作为中文语言代码)
+                        BotCommand("start", "开始使用"),
+                        BotCommand("help", "查看帮助"),
+                        BotCommand("search", "搜索归档 (简写: /s)"),
+                        BotCommand("note", "添加笔记"),
+                        BotCommand("notes", "查看笔记"),
+                        BotCommand("tags", "标签列表 (简写: /t)"),
+                        BotCommand("stats", "统计信息 (简写: /st)"),
+                        BotCommand("review", "存档回顾"),
+                        BotCommand("trash", "垃圾箱"),
+                        BotCommand("export", "导出数据"),
+                        BotCommand("backup", "备份管理"),
+                        BotCommand("ai", "AI状态"),
+                        BotCommand("language", "切换语言 (简写: /lang)"),
+                    ],
+                    "en": [  # 英语
+                        BotCommand("start", "Start bot"),
+                        BotCommand("help", "Show help"),
+                        BotCommand("search", "Search archives (/s)"),
+                        BotCommand("note", "Add note"),
+                        BotCommand("notes", "View notes"),
+                        BotCommand("tags", "List tags (/t)"),
+                        BotCommand("stats", "Show statistics (/st)"),
+                        BotCommand("review", "Review archives"),
+                        BotCommand("trash", "Trash bin"),
+                        BotCommand("export", "Export data"),
+                        BotCommand("backup", "Backup management"),
+                        BotCommand("ai", "AI status"),
+                        BotCommand("language", "Change language (/lang)"),
+                    ],
+                }
+                
+                # 初始化bot（必须先初始化才能调用API）
+                async with application:
+                    success_count = 0
+                    for language_code, commands in commands_config.items():
+                        try:
+                            await application.bot.set_my_commands(
+                                commands=commands,
+                                language_code=language_code
+                            )
+                            lang_name = language_code if language_code else "default"
+                            logger.info(f"✓ Commands set for language: {lang_name} ({len(commands)} commands)")
+                            success_count += 1
+                        except Exception as e:
+                            lang_name = language_code if language_code else "default"
+                            logger.error(f"Failed to set commands for {lang_name}: {e}")
+                    
+                    logger.info(f"✓ Bot commands menu configured for {success_count}/{len(commands_config)} languages")
+            except Exception as e:
+                logger.error(f"Failed to set bot commands: {e}")
+        
+        # 在启动前设置命令菜单
+        asyncio.run(set_bot_commands())
+        
         logger.info("Bot is ready! Starting polling...")
         
         # Start the bot
