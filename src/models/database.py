@@ -139,6 +139,12 @@ class Database:
             except sqlite3.OperationalError:
                 pass
             
+            # Add favorite column if missing (for existing databases)
+            try:
+                cursor.execute("ALTER TABLE archives ADD COLUMN favorite INTEGER DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
+            
             # Storage stats table - tracks storage usage
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS storage_stats (
