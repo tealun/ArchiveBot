@@ -15,6 +15,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
+    ContextTypes,
     filters
 )
 
@@ -288,6 +289,39 @@ def main():
         
         logger.info("All handlers registered")
         logger.info(f"Bot owner ID: {config.owner_id}")
+        
+        # 配置自动备份定时任务
+        async def auto_backup_job(context: ContextTypes.DEFAULT_TYPE):
+            """自动备份任务"""
+            try:
+                backup_mgr = context.bot_data.get('backup_manager')
+                if not backup_mgr:
+                    logger.warning("Backup manager not found in auto backup job")
+                    return
+                
+                # 检查是否需要备份（基于配置的间隔）
+                backup_interval = config.get('backup.auto_interval_hours', 24)
+                if backup_mgr.auto_backup_check(interval_hours=backup_interval):
+                    logger.info(f"Auto backup triggered (interval: {backup_interval}h)")
+                    filename = backup_mgr.create_backup(description="Auto backup")
+                    if filename:
+                        logger.info(f"✓ Auto backup created: {filename}")
+                    else:
+                        logger.error("✗ Auto backup failed")
+                else:
+                    logger.debug(f"Auto backup skipped (last backup < {backup_interval}h ago)")
+            except Exception as e:
+                logger.error(f"Error in auto backup job: {e}", exc_info=True)
+        
+        # 添加定时任务（每小时检查一次）
+        job_queue = application.job_queue
+        if job_queue:
+            # 启动后1分钟执行首次检查，然后每小时执行一次
+            job_queue.run_once(auto_backup_job, when=60)  # 1分钟后首次执行
+            job_queue.run_repeating(auto_backup_job, interval=3600, first=60)  # 每小时执行
+            logger.info("✓ Auto backup scheduler started (check interval: 1 hour)")
+        else:
+            logger.warning("JobQueue not available - auto backup disabled")
         
         # 设置机器人命令菜单（多语言支持）
         from telegram import BotCommand

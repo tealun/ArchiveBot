@@ -36,6 +36,10 @@ storage:
   database:
     path: "data/archive.db"
   
+  backup:
+    auto_interval_hours: 24  # 自动备份间隔（小时），默认24小时
+    keep_count: 10           # 保留备份数量，默认保留最近10个
+  
   telegram:
     # 向后兼容：旧的单频道配置（可选，如果配置了channels.default则此项被忽略）
     channel_id: 0  # 已废弃，请使用下面的 channels.default
