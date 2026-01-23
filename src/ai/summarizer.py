@@ -1,10 +1,11 @@
 """
 AI Summarizer - 云端API服务
 """
-import logging, json, asyncio, re
+import logging, json, asyncio, re, time
 from typing import Dict, Any, List, Optional
 from abc import ABC, abstractmethod
 from .prompts import PromptManager
+from ..core.ai_cache import AICache, content_hash
 
 logger = logging.getLogger(__name__)
 
@@ -387,50 +388,178 @@ Please respond in JSON format:
 class AISummarizer:
     def __init__(self, config):
         self.config, self.provider = config, None
-        if not config.get('enabled'): return
-        
+        self.cache = None
+        self._last_call_info = {}
+        if not config.get('enabled'):
+            return
+
         # 只使用云端API
         api = config.get('api', {})
-        if not api.get('api_key'): 
-            logger.warning("AI enabled but no API key provided")
-            return
-        
+        # 支持两种填写方式：优先使用 api.api_key_env（从环境读取），兼容旧的 api.api_key
+        api_key = api.get('api_key') or api.get('api_key_env')
+        if not api_key:
+            logger.warning("AI enabled but no API key provided in config.api")
+            # 继续允许 provider 初始化失败后的 graceful behavior
         provider_type = api.get('provider', 'openai')
         if provider_type in ['openai', 'grok']:
             try:
                 self.provider = OpenAIProvider(
-                    api['api_key'], 
+                    api_key,
                     api.get('model', 'gpt-3.5-turbo'),
                     api.get('api_url')  # 支持自定义API URL
                 )
                 logger.info(f"Using {provider_type.upper()} API: {api.get('model', 'gpt-3.5-turbo')}")
             except Exception as e:
                 logger.error(f"Failed to initialize {provider_type} provider: {e}")
+
+        # 初始化缓存（如果启用）
+        try:
+            cache_enabled = bool(config.get('cache_enabled', False))
+            cache_path = config.get('cache_path') or api.get('cache_path') or 'data/ai_cache.db'
+            cache_ttl = int(config.get('cache_ttl_seconds', 604800))
+            if cache_enabled:
+                try:
+                    self.cache = AICache(db_path=cache_path, ttl=cache_ttl)
+                    logger.info(f"AI cache enabled at {cache_path}, ttl={cache_ttl}s")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize AI cache: {e}")
+        except Exception:
+            pass
+        # 速率限制配置（calls per minute）
+        try:
+            self.rate_limit = int(config.get('rate_limit_per_minute', 0) or 0)
+        except Exception:
+            self.rate_limit = 0
+        self._rate_count = 0
+        self._rate_window_start = int(time.time())
+
+    def _allow_call(self) -> bool:
+        """简单的每分钟速率限制（非分布式）"""
+        if not self.rate_limit or self.rate_limit <= 0:
+            return True
+        now = int(time.time())
+        # window start per minute
+        if now - self._rate_window_start >= 60:
+            self._rate_window_start = now
+            self._rate_count = 0
+        if self._rate_count < self.rate_limit:
+            self._rate_count += 1
+            return True
+        return False
     
     def is_available(self):
         """Check if AI provider is available"""
         return self.provider is not None and hasattr(self.provider, 'available') and self.provider.available
     
     async def summarize_content(self, content, url=None, language='zh-CN', context: Optional[Dict[str, Any]] = None):
-        if not self.is_available(): return {'success': False, 'error': 'AI不可用'}
+        if not self.is_available():
+            return {'success': False, 'error': 'AI不可用'}
+
         try:
+            # 尝试从缓存读取（cache key 包含 model 与上下文以避免冲突）
+            if self.cache:
+                try:
+                    ctx_ser = json.dumps(context or {}, sort_keys=True, ensure_ascii=False)
+                    key_src = f"{getattr(self.provider, 'model', '')}|{ctx_ser}|{content}"
+                    cache_key = content_hash(key_src)
+                    cached = self.cache.get(cache_key)
+                    if cached:
+                        cached['success'] = True
+                        cached['provider'] = 'CACHE'
+                        return cached
+                except Exception as e:
+                    logger.debug(f"AI cache lookup error: {e}")
+
+            # 速率检测：如超过限制，优先返回缓存或失败
+            if not self._allow_call():
+                logger.warning("AI rate limit reached, skipping external summarize call")
+                if self.cache and cached:
+                    cached['success'] = True
+                    cached['provider'] = 'CACHE'
+                    return cached
+                return {'success': False, 'error': 'AI rate limit exceeded'}
+
+            start = time.time()
             result = await self.provider.summarize(content, 1000, language=language, context=context)
+            duration = time.time() - start
             result['success'] = True
             result['provider'] = 'CLOUD'
-            
+            # 记录调用信息
+            try:
+                self._last_call_info = {'provider': 'CLOUD', 'duration': duration}
+            except Exception:
+                pass
+
             # 如果summarize没有返回category，单独调用categorize
             default_category = '其他' if language.startswith('zh') else 'Other'
             if not result.get('category') or result.get('category') == default_category:
                 result['category'] = await self.provider.categorize(content, language=language)
-            
+
+            # 写回缓存
+            if self.cache:
+                try:
+                    ctx_ser = json.dumps(context or {}, sort_keys=True, ensure_ascii=False)
+                    key_src = f"{getattr(self.provider, 'model', '')}|{ctx_ser}|{content}"
+                    cache_key = content_hash(key_src)
+                    self.cache.set(cache_key, result)
+                except Exception as e:
+                    logger.debug(f"AI cache write error: {e}")
+
             return result
         except Exception as e:
+            try:
+                self._last_call_info = {'provider': 'ERROR', 'duration': 0}
+            except Exception:
+                pass
             return {'success': False, 'error': str(e)}
     
     async def generate_tags(self, content, max_tags=5, language='zh-CN'):
         if not self.is_available(): return []
         try:
-            return await self.provider.generate_tags(content, max_tags, language=language)
+            # 缓存优先
+            if self.cache:
+                try:
+                    key_src = f"tags|{getattr(self.provider, 'model', '')}|{max_tags}|{content}"
+                    cache_key = content_hash(key_src)
+                    cached = self.cache.get(cache_key)
+                    if cached:
+                        return cached
+                except Exception as e:
+                    logger.debug(f"AI tag cache lookup error: {e}")
+
+            # 速率检测：如超过限制，优先返回缓存或空列表
+            if not self._allow_call():
+                logger.warning("AI rate limit reached, skipping external generate_tags call")
+                if self.cache and cached:
+                    try:
+                        self._last_call_info = {'provider': 'CACHE', 'duration': 0}
+                    except Exception:
+                        pass
+                    return cached
+                try:
+                    self._last_call_info = {'provider': 'RATE_LIMIT', 'duration': 0}
+                except Exception:
+                    pass
+                return []
+
+            start = time.time()
+            tags = await self.provider.generate_tags(content, max_tags, language=language)
+            duration = time.time() - start
+            try:
+                self._last_call_info = {'provider': 'CLOUD', 'duration': duration}
+            except Exception:
+                pass
+
+            # 写回缓存
+            if self.cache:
+                try:
+                    key_src = f"tags|{getattr(self.provider, 'model', '')}|{max_tags}|{content}"
+                    cache_key = content_hash(key_src)
+                    self.cache.set(cache_key, tags)
+                except Exception as e:
+                    logger.debug(f"AI tag cache write error: {e}")
+
+            return tags
         except Exception as e:
             logger.error(f"Generate tags error: {e}")
             return []
@@ -449,8 +578,14 @@ class AISummarizer:
         if not self.is_available():
             return [[] for _ in contents]
         
+        start = time.time()
         tasks = [self.generate_tags(content, max_tags) for content in contents]
-        return await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            self._last_call_info = {'provider': 'BATCH', 'duration': time.time() - start}
+        except Exception:
+            pass
+        return results
     
     async def is_ebook(self, file_name: str, language: str = 'zh-CN') -> bool:
         """

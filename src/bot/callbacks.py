@@ -78,6 +78,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await query.answer("已关闭")
         elif callback_data.startswith('short_text:'):
             await handle_short_text_intent_callback(update, context)
+        elif callback_data.startswith('refine_note:'):
+            await handle_refine_note_callback(update, context)
         elif callback_data.startswith('fav:'):
             await handle_favorite_callback(update, context)
         elif callback_data.startswith('forward:'):
@@ -1186,6 +1188,71 @@ async def handle_note_delete_callback(update: Update, context: ContextTypes.DEFA
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
+async def handle_refine_note_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handle refine note button click - prompts user for refinement instructions
+    
+    Callback data format: refine_note:archive_id
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+    """
+    query = update.callback_query
+    
+    try:
+        # Parse archive_id from callback data
+        archive_id = int(query.data.split(':')[1])
+        
+        # Check if AI is available
+        ai_summarizer = context.bot_data.get('ai_summarizer')
+        if not ai_summarizer or not ai_summarizer.is_available():
+            await query.answer("❌ AI功能未启用", show_alert=True)
+            return
+        
+        # Get existing notes
+        note_manager = context.bot_data.get('note_manager')
+        if not note_manager:
+            await query.answer("笔记管理器未初始化", show_alert=True)
+            return
+        
+        notes = note_manager.get_notes_by_archive(archive_id)
+        if not notes:
+            await query.answer("❌ 该归档没有笔记", show_alert=True)
+            return
+        
+        # Store context for next message
+        context.user_data['refine_note_context'] = {
+            'archive_id': archive_id,
+            'notes': notes,
+            'waiting_for_instruction': True
+        }
+        
+        # Format existing notes
+        notes_text = "\n\n".join([f"📝 {note['content']}" for note in notes])
+        
+        # Prompt user for refinement instructions
+        await query.edit_message_text(
+            f"✨ **精炼笔记**\n\n"
+            f"当前笔记：\n{truncate_text(notes_text, 200)}\n\n"
+            f"📨 请告诉我你想怎么改？\n\n"
+            f"例如：\n"
+            f"• 缩短\n"
+            f"• 展开\n"
+            f"• 改写成要点\n"
+            f"• 翻译成英文\n"
+            f"• 其他指令...",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        await query.answer("💡 请发送你的指令")
+        logger.info(f"User requested note refinement for archive {archive_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling refine note callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
 async def handle_favorite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle favorite/unfavorite button click
@@ -1363,16 +1430,44 @@ async def handle_short_text_intent_callback(update: Update, context: ContextType
                 await query.edit_message_text("❌ 笔记管理器未初始化")
         
         elif action == 'ai':
-            # AI互动模式（待开发）
+            # AI互动模式
             ai_summarizer = context.bot_data.get('ai_summarizer')
             if ai_summarizer and ai_summarizer.is_available():
+                # 创建AI会话
+                from ..core.ai_session import get_session_manager
+                from ..bot.ai_chat_router import handle_chat_message
+                
+                session_manager = get_session_manager()
+                user_id = query.from_user.id
+                
+                # 创建新会话
+                session_manager.create_session(user_id)
+                
                 await query.edit_message_text(
-                    "🤖 AI互动模式\n\n"
-                    "正在处理您的消息...\n\n"
-                    "💡 此功能正在开发中，敬请期待！"
+                    "🤖 **AI互动模式已激活**\n\n"
+                    "我可以帮你：\n"
+                    "• 搜索归档内容\n"
+                    "• 回答相关问题\n"
+                    "• 分析和总结信息\n\n"
+                    "💬 直接发送消息开始对话\n"
+                    "📝 发送 \"退出\" 或 \"exit\" 结束会话",
+                    parse_mode=ParseMode.MARKDOWN
                 )
-                logger.info(f"User chose AI mode for text: {text[:50]}")
-                # TODO: 实现AI互动逻辑
+                logger.info(f"User activated AI mode with text: {text[:50]}")
+                
+                # 如果有待处理文本，处理它
+                if text:
+                    # 创建伪造的message对象来处理初始消息
+                    from telegram import Message, Chat, User
+                    fake_message = Message(
+                        message_id=query.message.message_id,
+                        date=query.message.date,
+                        chat=query.message.chat,
+                        from_user=query.from_user,
+                        text=text
+                    )
+                    fake_update = Update(update_id=update.update_id, message=fake_message)
+                    await handle_chat_message(fake_update, context)
             else:
                 await query.edit_message_text(
                     "❌ AI功能未启用\n\n"

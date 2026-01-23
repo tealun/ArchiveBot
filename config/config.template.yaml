@@ -14,17 +14,37 @@ features:
 
 ai:
   enabled: false  # Enable AI features
-  auto_summarize: false  # Auto summarize new archives
+  auto_summarize: false  # Auto summarize new archives (backward compatible with old field names)
   auto_generate_tags: false  # Auto generate AI tags
-  
-  # Cloud API configuration
+
+  # Unified AI configuration (preferred). To avoid hardcoding secrets, set API keys via environment variables
+  # and reference the env var name in `api.api_key_env`. Backward-compatibility: existing `api.api_key` is still supported
   api:
     provider: openai  # openai, claude, gemini, grok, etc.
-    api_key: ''  # Your API key
-    api_url: ''  # Custom API URL (optional, for Grok: https://api.x.ai/v1/chat/completions)
+    # Prefer using an environment variable name here. Example: ARCHIVEBOT_OPENAI_KEY
+    api_key_env: ""  # e.g. ARCHIVEBOT_OPENAI_KEY (preferred)
+    # Backward compatibility: if `api_key_env` is empty, the code may fall back to `api_key` (not recommended)
+    api_key: ''  # (deprecated) Direct API key — avoid committing secrets into config files
+    api_url: ''  # Custom API URL (optional)
     model: gpt-3.5-turbo  # gpt-3.5-turbo, gpt-4, grok-beta, etc.
     max_tokens: 1000
     timeout: 30
+
+  # Runtime controls and safeguards
+  cache_enabled: true            # Enable caching of AI responses to avoid duplicate calls and costs
+  cache_path: "data/ai_cache.db" # Path to cache DB (sqlite)
+  cache_ttl_seconds: 604800     # Cache TTL in seconds (default 7 days)
+  rate_limit_per_minute: 60     # Global approximate API calls per minute
+  log_calls: false              # Whether to log AI call details (avoid logging full responses in production)
+  retry_on_failure: 1           # Number of retries for transient errors
+  auto_summary_on_forward: true # Auto-trigger summary when forwarding messages (handler-level)
+  auto_tagging: true            # Apply AI-generated tags (can be set to false to only generate suggestions)
+  
+  # AI Chat Mode (interactive conversation)
+  chat_enabled: false           # Enable automatic AI chat mode for short messages
+  chat_threshold_chars: 30      # Trigger chat mode when user message is shorter than this (excludes forwarded messages)
+  chat_session_ttl_seconds: 600 # Session timeout (default 10 minutes)
+  chat_allow_write_ops: false   # Allow AI to execute write operations (archive/delete/tag) - keep false for safety
 
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL

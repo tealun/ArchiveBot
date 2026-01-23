@@ -7,14 +7,18 @@ import logging
 from typing import List, Optional
 from telegram import Update, Message
 from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 
 from ..core.analyzer import ContentAnalyzer
 from ..core.storage_manager import StorageManager
 from ..utils.i18n import get_i18n
-from ..utils.helpers import format_file_size
+from ..utils.helpers import format_file_size, truncate_text
 from .message_aggregator import MessageAggregator
+from ..core.ai_session import get_session_manager
+from .ai_chat_router import handle_chat_message
 
 logger = logging.getLogger(__name__)
+import time
 
 # 全局消息聚合器
 _message_aggregator: Optional[MessageAggregator] = None
@@ -168,7 +172,11 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                     try:
                         content_for_ai = analysis.get('content') or analysis.get('title', '')
                         if content_for_ai:
+                            start = time.time()
                             ai_tags = await ai_summarizer.generate_tags(content_for_ai, 5)
+                            duration = time.time() - start
+                            provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'unknown')
+                            logger.info(f"AI generate_tags provider={provider}, duration={duration:.2f}s")
                             if ai_tags:
                                 existing_tags = analysis.get('tags', [])
                                 analysis['tags'] = list(set(existing_tags + ai_tags))
@@ -216,12 +224,17 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                                 'file_extension': analysis.get('file_name', '').split('.')[-1] if analysis.get('file_name') else ''
                             }
                             
+                            summary_result = None
+                            start = time.time()
                             summary_result = await ai_summarizer.summarize_content(
-                                content_for_ai, 
-                                language=user_language,
-                                context=context_info
-                            )
-                            if summary_result.get('success'):
+                                    content_for_ai, 
+                                    language=user_language,
+                                    context=context_info
+                                )
+                            duration = time.time() - start
+                            provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'unknown')
+                            logger.info(f"AI summarize_content provider={provider}, duration={duration:.2f}s")
+                            if summary_result and summary_result.get('success'):
                                 # 将AI分析结果添加到analysis
                                 analysis['ai_summary'] = summary_result.get('summary', '')
                                 analysis['ai_key_points'] = summary_result.get('key_points', [])
@@ -556,7 +569,11 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
                 ]
                 
                 # 批量并发调用AI（但每个内容获得独立标签）
+                start = time.time()
                 batch_ai_tags = await ai_summarizer.batch_generate_tags(contents_for_ai, 3)
+                duration = time.time() - start
+                provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'batch')
+                logger.info(f"AI batch_generate_tags provider={provider}, duration={duration:.2f}s")
                 
                 # 为每个分析结果添加其独立的AI标签
                 for i, ai_tags in enumerate(batch_ai_tags):
@@ -694,7 +711,7 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                     await processing_msg.edit_text(dup_msg, parse_mode='HTML')
                     return
                 
-                # 如果归档成功且有archive_id，添加操作按钮
+                # 如果归档成功且有archive_id，添加操作按钮（包含精炼笔记）
                 if success and archive_id:
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                     
@@ -713,6 +730,12 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                         InlineKeyboardButton(fav_icon, callback_data=f"fav:{archive_id}"),
                         InlineKeyboardButton("↗️", callback_data=f"forward:{archive_id}")
                     ]]
+                    
+                    # 如果有笔记，添加"精炼笔记"按钮
+                    if has_notes:
+                        keyboard.append([
+                            InlineKeyboardButton("✨ 精炼笔记", callback_data=f"refine_note:{archive_id}")
+                        ])
                     
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await processing_msg.edit_text(result_msg, parse_mode='HTML', reply_markup=reply_markup)
@@ -857,9 +880,112 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 context.user_data['waiting_note_for_archive'] = None
                 return
         
-        # 文本消息智能处理逻辑
+        # 检查是否在等待笔记精炼指令
+        refine_context = context.user_data.get('refine_note_context')
+        if refine_context and refine_context.get('waiting_for_instruction'):
+            if message.text:
+                instruction = message.text.strip()
+                archive_id = refine_context['archive_id']
+                notes = refine_context['notes']
+                
+                # 组合所有笔记内容
+                notes_text = "\n\n".join([note['content'] for note in notes])
+                
+                # 使用AI精炼笔记
+                ai_summarizer = context.bot_data.get('ai_summarizer')
+                if ai_summarizer and ai_summarizer.is_available():
+                    try:
+                        await message.reply_text("🤖 正在处理...")
+                        
+                        # 构造提示词
+                        refine_prompt = f"""请根据用户的指令修改以下笔记：
+
+原始笔记：
+{notes_text}
+
+用户指令：{instruction}
+
+请输出修改后的笔记内容，保持简洁清晰。"""
+                        
+                        # 调用AI
+                        refined_content = await ai_summarizer.summarize_content(
+                            content=refine_prompt,
+                            content_type='note_refinement',
+                            max_tokens=500
+                        )
+                        
+                        if refined_content:
+                            # 删除旧笔记
+                            note_manager = context.bot_data.get('note_manager')
+                            if note_manager:
+                                for note in notes:
+                                    note_manager.delete_note(note['id'])
+                                
+                                # 添加精炼后的笔记
+                                new_note_id = note_manager.add_note(archive_id, refined_content)
+                                
+                                if new_note_id:
+                                    await message.reply_text(
+                                        f"✅ **笔记已精炼**\n\n"
+                                        f"📝 归档 #{archive_id}\n\n"
+                                        f"精炼后内容：\n{truncate_text(refined_content, 300)}",
+                                        parse_mode=ParseMode.MARKDOWN
+                                    )
+                                    logger.info(f"Refined notes for archive {archive_id}")
+                                else:
+                                    await message.reply_text("❌ 保存精炼后的笔记失败")
+                            else:
+                                await message.reply_text("❌ 笔记管理器未初始化")
+                        else:
+                            await message.reply_text("❌ AI处理失败")
+                            
+                    except Exception as e:
+                        logger.error(f"Error refining note: {e}", exc_info=True)
+                        await message.reply_text(f"❌ 精炼失败: {str(e)}")
+                else:
+                    await message.reply_text("❌ AI功能未启用")
+                
+                # 清除等待状态
+                context.user_data.pop('refine_note_context', None)
+                return
+
+        
+        # AI Chat Mode - 如果用户已在AI会话中，优先处理
         if message.text and not message.forward_origin:
             text = message.text.strip()
+            
+            from ..utils.config import get_config
+            config = get_config()
+            ai_config = config.ai
+            chat_enabled = ai_config.get('chat_enabled', False)
+            
+            if chat_enabled:
+                # 检查是否已有活跃会话
+                session_manager = get_session_manager(
+                    ttl_seconds=ai_config.get('chat_session_ttl_seconds', 600)
+                )
+                user_id = str(message.from_user.id)
+                session = session_manager.get_session(user_id)
+                
+                if session:
+                    # 用户已在AI会话中，处理消息
+                    try:
+                        ai_response = await handle_chat_message(text, session, context)
+                        
+                        # 带🤖标识回复
+                        await message.reply_text(f"🤖 {ai_response}")
+                        
+                        # 更新会话（保存上下文）
+                        session_manager.update_session(user_id, session.get('context', {}))
+                        
+                        logger.info(f"AI chat response sent to user {user_id}")
+                        return
+                        
+                    except Exception as e:
+                        logger.error(f"AI chat error: {e}", exc_info=True)
+                        await message.reply_text("❌ AI处理出错，已退出会话")
+                        session_manager.clear_session(user_id)
+                        # 继续正常归档流程
             
             # 检测是否是 URL（单独的链接应该归档而非做笔记）
             from ..utils.helpers import is_url
@@ -883,9 +1009,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         keyboard = [
                             [
                                 InlineKeyboardButton("📝 保存为笔记", callback_data="short_text:note"),
-                                InlineKeyboardButton("🤖 AI互动模式", callback_data="short_text:ai")
-                            ],
-                            [
                                 InlineKeyboardButton("📦 归档为内容", callback_data="short_text:archive")
                             ]
                         ]
