@@ -113,7 +113,9 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             await progress_callback("🤖 AI智能分析", 0.4)
         
         ai_summarizer = context.bot_data.get('ai_summarizer')
-        if ai_summarizer and ai_summarizer.is_available():
+        ai_available = ai_summarizer and ai_summarizer.is_available()
+        
+        if ai_available:
             from ..utils.config import get_config
             config = get_config()
             
@@ -237,8 +239,55 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                     except Exception as e:
                         logger.warning(f"AI summary generation failed: {e}")
         
+        # ========== AI 降级策略：AI 不可用时使用基础分析 ==========
+        elif not ai_available and config.ai.get('auto_summarize', False):
+            # AI 未配置或不可用，使用降级分析
+            try:
+                from ..ai.fallback import AIFallbackAnalyzer
+                
+                user_language = i18n.current_language
+                fallback_result = None
+                
+                # 根据内容类型选择降级策略
+                if analysis.get('file_name'):
+                    # 文件分析
+                    fallback_result = AIFallbackAnalyzer.analyze_file(
+                        file_name=analysis.get('file_name', ''),
+                        file_ext=analysis.get('file_name', '').split('.')[-1] if '.' in analysis.get('file_name', '') else '',
+                        file_size=analysis.get('file_size', 0),
+                        language=user_language
+                    )
+                elif analysis.get('urls'):
+                    # URL 分析
+                    url = analysis['urls'][0]
+                    fallback_result = AIFallbackAnalyzer.analyze_url(url, language=user_language)
+                elif analysis.get('content'):
+                    # 文本分析
+                    fallback_result = AIFallbackAnalyzer.analyze_text(
+                        content=analysis['content'],
+                        content_type=content_type,
+                        language=user_language
+                    )
+                
+                if fallback_result and fallback_result.get('success'):
+                    # 使用降级分析结果
+                    if fallback_result.get('category'):
+                        analysis['ai_category'] = fallback_result['category']
+                    if fallback_result.get('title') and not analysis.get('title'):
+                        analysis['title'] = fallback_result['title']
+                    if fallback_result.get('summary'):
+                        analysis['ai_summary'] = fallback_result['summary']
+                    if fallback_result.get('tags'):
+                        existing_tags = analysis.get('tags', [])
+                        analysis['tags'] = list(set(existing_tags + fallback_result['tags']))
+                    
+                    logger.info(f"Fallback analysis applied: category={analysis.get('ai_category')}")
+                    
+            except Exception as e:
+                logger.warning(f"Fallback analysis failed: {e}")
+        
         # 如果是文本内容且需要AI标题，生成标题
-        if analysis.get('_needs_ai_title') and ai_summarizer and ai_summarizer.is_available():
+        if analysis.get('_needs_ai_title') and ai_available:
             if progress_callback:
                 await progress_callback("📝 AI生成标题中...", 0.62)
             try:
