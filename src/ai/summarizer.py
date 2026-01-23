@@ -4,6 +4,8 @@ AI Summarizer - 云端API服务
 import logging, json, asyncio, re
 from typing import Dict, Any, List, Optional
 from abc import ABC, abstractmethod
+from .prompts import PromptManager
+
 logger = logging.getLogger(__name__)
 
 def detect_content_language(content: str) -> str:
@@ -22,6 +24,60 @@ def detect_content_language(content: str) -> str:
         return 'en'
     else:
         return 'mixed'
+
+def is_formal_content(content: str, content_type: str = '', category: str = '') -> bool:
+    """
+    判断内容是否属于技术/严肃/知识类（需要正式风格）
+    
+    Args:
+        content: 内容文本
+        content_type: 内容类型
+        category: AI分类结果
+        
+    Returns:
+        True表示正式内容，False表示轻松内容
+    """
+    # 正式类别关键词
+    formal_categories = [
+        '技术', '科技', '学习', '教育', '研究', '学术', '专业', '医疗', '法律', '金融',
+        'Technology', 'Science', 'Learning', 'Education', 'Research', 'Academic', 
+        'Professional', 'Medical', 'Legal', 'Finance', 'Business'
+    ]
+    
+    # 轻松类别关键词
+    casual_categories = [
+        '娱乐', '生活', '日常', '美食', '旅游', '影视', '音乐', '游戏', '聊天',
+        'Entertainment', 'Life', 'Daily', 'Food', 'Travel', 'Movie', 'Music', 'Game', 'Chat'
+    ]
+    
+    # 优先根据分类判断
+    if category:
+        if any(keyword in category for keyword in formal_categories):
+            return True
+        if any(keyword in category for keyword in casual_categories):
+            return False
+    
+    # 根据内容类型判断
+    formal_types = ['document', 'pdf', 'code', 'data']
+    if any(ftype in content_type.lower() for ftype in formal_types):
+        return True
+    
+    # 根据内容关键词判断（技术类特征）
+    tech_keywords = [
+        'API', 'SDK', 'HTTP', 'JSON', 'SQL', 'Python', 'JavaScript', 'Git',
+        '算法', '数据结构', '编程', '代码', '开发', '架构', '设计模式',
+        '函数', '类', '方法', '变量', '配置', '部署', '测试'
+    ]
+    
+    content_sample = content[:1000]
+    tech_count = sum(1 for keyword in tech_keywords if keyword in content_sample)
+    
+    # 如果技术关键词出现3个以上，判定为正式内容
+    if tech_count >= 3:
+        return True
+    
+    # 默认返回轻松风格（更自然）
+    return False
 
 class AIProvider(ABC):
     @abstractmethod
@@ -100,124 +156,166 @@ class OpenAIProvider(AIProvider):
                     'full': '完整分析，包含摘要和关键点'
                 }
             
+            # 判断是否为正式内容
+            is_formal = is_formal_content(content[:1000], content_type)
+            
             # 构建上下文信息
             file_size_str = f"{file_size / 1024 / 1024:.2f}MB" if file_size > 0 else "文本内容"
-            context_info = f"""【上下文信息】
-- 文件类型：{content_type}{f' ({file_ext})' if file_ext else ''}
-- 文件大小：{file_size_str}
-- 已有标签：{', '.join(existing_tags) if existing_tags else '无'}（请避免重复）
-- 标题：{title if title else '无'}
-- 内容语言：{content_lang}
-- 分析深度：{depth_instruction[analysis_depth]}"""
+            context_info = f"""给你一些背景信息：
+• 内容类型是{content_type}{f'，具体是{file_ext}格式' if file_ext else ''}
+• 文件大小{file_size_str}
+• 用户之前已经打了这些标签：{', '.join(existing_tags) if existing_tags else '还没有'}（别重复了）
+• 标题{title if title else '暂时没有'}
+• 内容主要语言是{content_lang}
+• 深度要求：{depth_instruction[analysis_depth]}"""
             
-            # 构建示例
-            example = """【示例参考】
+            # 根据内容风格选择不同的prompt
+            if is_formal:
+                # 正式风格 - 技术/严肃/知识类
+                role_desc = "你是一位专业的技术信息分析师，擅长处理技术文档、学术资料和专业内容。"
+                task_desc = """请帮我分析这份内容，需要你做到：
+• 准确提炼核心技术要点和关键信息
+• 建立清晰的知识分类体系
+• 生成便于检索的专业标签"""
+                
+                example = """参考示例（技术类）：
+输入：《深入理解计算机系统》第三版.pdf
+输出：{{
+  "summary": "经典计算机系统教材，系统讲解计算机组成原理、操作系统和程序优化",
+  "key_points": ["计算机体系结构基础", "系统级编程技术", "性能优化方法论"],
+  "category": "技术",
+  "suggested_tags": ["计算机系统", "教材", "系统编程", "技术书籍", "PDF文档"]
+}}"""
+                
+                quality_guide = """输出规范：
+• 摘要控制在30-100字，客观准确地描述核心内容
+• 关键点每个10-30字，聚焦于重要信息而非细枝末节
+• 分类选择一个最合适的主类别
+• 标签5个，组合使用主题词和属性词，要精准可搜索
+  正例："Python教程"、"机器学习"、"技术文档"
+  反例："文件"、"资料"（过于宽泛）"""
+            else:
+                # 轻松风格 - 生活/娱乐/日常类
+                role_desc = "你是个很会整理信息的助手，对各种内容都有独到的理解。"
+                task_desc = """帮我看看这个内容讲了什么，你需要：
+• 用简洁的话说清楚核心内容
+• 给它找个合适的分类
+• 打上几个好用的标签，方便以后找"""
+                
+                example = """给你看个例子：
 输入：华尔街之狼电影片段.mp4
 输出：{{
-  "summary": "描述华尔街金融交易员生活的电影片段，展示了奢华与欲望",
-  "key_points": ["金融欺诈主题", "华尔街背景", "传记电影"],
+  "summary": "一段关于华尔街交易员生活的电影片段，奢华、疯狂又充满欲望",
+  "key_points": ["讲金融圈的故事", "华尔街背景", "根据真人真事改编"],
   "category": "娱乐",
-  "suggested_tags": ["电影", "金融", "传记", "影片片段", "马丁·斯科塞萨"]
+  "suggested_tags": ["电影片段", "金融题材", "传记电影", "影视收藏", "小李子"]
 }}"""
+                
+                quality_guide = """输出要求：
+• 摘要30-100字左右，说清楚就行，别太刻板
+• 关键点每个10-30字，抓住要点即可
+• 分类选一个最贴切的
+• 标签给5个，既要准确又要实用
+  可以参考："美食教程"、"旅行照片"、"电影推荐"
+  别用这种："内容"、"文件"（太模糊了）"""
             
-            # 构建输出质量约束
-            quality_constraints = """【输出要求】
-1. 摘要：30-100字，客观描述，不要主观评价
-2. 关键点：每个10-30字，提取核心信息而非细节
-3. 分类：只返回一个主分类
-4. 标签：5个精准标签，格式：主题词+属性词
-   - ✓ 正确示例："Python教程"、"机器学习"、"PDF文件"
-   - ✗ 错误示例："文件"、"内容"、"资料"（太宽泛）"""
-            
-            # 构建思维链
-            thinking_process = """【分析步骤】
-第一步：识别内容类型和主题
-第二步：提取核心信息和关键观点
-第三步：确定适合的分类
-第四步：生成精准、可搜索的标签（避免宽泛标签）"""
-            
-            prompt = f"""你是一位专业的信息管理员和知识组织专家。
-你的任务是分析各类文档、媒体文件，帮助用户：
-1. 快速理解核心内容
-2. 建立清晰的分类体系
-3. 创建精准的搜索标签
-
-请对以下内容进行智能分析（{language_instruction}）：
+            prompt = f"""{role_desc}
+{task_desc}
 
 {context_info}
 
 {example}
 
-{quality_constraints}
+{quality_guide}
 
-{thinking_process}
-
-【待分析内容】
+待分析的内容：
 {content[:4000]}
 
-请按JSON格式返回最终结果：
+请用JSON格式回复（{language_instruction}）：
 {{
-  "summary": "核心观点的简短总结（1-2句话）",
+  "summary": "简短总结（1-2句话）",
   "key_points": ["关键点1", "关键点2", "关键点3"],
-  "category": "内容分类（如：{example_categories}）",
-  "suggested_tags": ["标签1", "标签2", "标签3", "标签4", "标签5"]  (注意：标签应包含内容主题标签和文件属性标签，如：{example_tags})
+  "category": "内容分类（参考：{example_categories}）",
+  "suggested_tags": ["标签1", "标签2", "标签3", "标签4", "标签5"]
 }}"""
         else:
-            # English prompt with all optimizations
+            # English prompt with style adaptation
+            is_formal = is_formal_content(content[:1000], content_type)
             file_size_str = f"{file_size / 1024 / 1024:.2f}MB" if file_size > 0 else "Text content"
-            context_info = f"""【Context Information】
-- File Type: {content_type}{f' ({file_ext})' if file_ext else ''}
-- File Size: {file_size_str}
-- Existing Tags: {', '.join(existing_tags) if existing_tags else 'None'} (avoid duplication)
-- Title: {title if title else 'None'}
-- Content Language: {content_lang}"""
+            context_info = f"""Here's some context:
+• Content type is {content_type}{f', specifically {file_ext} format' if file_ext else ''}
+• File size is {file_size_str}
+• Existing tags: {', '.join(existing_tags) if existing_tags else 'none yet'} (avoid duplicates)
+• Title is {title if title else 'not available'}
+• Content language appears to be {content_lang}"""
             
-            example = """【Example Reference】
+            if is_formal:
+                # Formal style for technical/serious content
+                role_desc = "You are a professional technical information analyst specializing in technical documentation, academic materials, and professional content."
+                task_desc = """Please help me analyze this content by:
+• Accurately extracting core technical points and key information
+• Establishing a clear knowledge classification
+• Generating professional tags for easy retrieval"""
+                
+                example = """Example (Technical):
+Input: Deep_Learning_by_Ian_Goodfellow.pdf
+Output: {{
+  "summary": "Comprehensive textbook on deep learning covering neural networks, optimization, and modern architectures",
+  "key_points": ["Neural network fundamentals", "Training optimization methods", "CNN and RNN architectures"],
+  "category": "Technology",
+  "suggested_tags": ["Deep Learning", "Textbook", "AI", "Technical Book", "PDF"]
+}}"""
+                
+                quality_guide = """Output specifications:
+• Summary: 30-100 words, objective and accurate description
+• Key points: 10-30 words each, focus on important information
+• Category: Select one most appropriate main category
+• Tags: 5 tags combining topic and attribute words, precise and searchable
+  Good examples: "Python Tutorial", "Machine Learning", "Technical Doc"
+  Avoid: "File", "Content" (too vague)"""
+            else:
+                # Casual style for life/entertainment content
+                role_desc = "You're a helpful assistant who's great at organizing information and understanding various types of content."
+                task_desc = """Help me understand what this content is about by:
+• Explaining the core content in simple terms
+• Finding a suitable category for it
+• Adding some useful tags for later searching"""
+                
+                example = """Here's an example:
 Input: The-Wolf-of-Wall-Street-clip.mp4
 Output: {{
-  "summary": "Movie clip depicting the life of Wall Street traders, showcasing luxury and desire",
-  "key_points": ["Financial fraud theme", "Wall Street setting", "Biographical film"],
+  "summary": "A movie clip about Wall Street traders' lifestyle - luxurious, wild, and full of ambition",
+  "key_points": ["Story about finance world", "Wall Street setting", "Based on true events"],
   "category": "Entertainment",
-  "suggested_tags": ["Movie", "Finance", "Biography", "Movie Clip", "Martin Scorsese"]
+  "suggested_tags": ["Movie Clip", "Finance Theme", "Biographical", "Film Collection", "DiCaprio"]
 }}"""
+                
+                quality_guide = """Output requirements:
+• Summary: Around 30-100 words, clear and natural
+• Key points: 10-30 words each, capture the essence
+• Category: Pick one that fits best
+• Tags: 5 tags that are both accurate and practical
+  Like: "Food Tutorial", "Travel Photos", "Movie Recommendation"
+  Not: "Content", "File" (too vague)"""
             
-            quality_constraints = """【Output Requirements】
-1. Summary: 30-100 words, objective description, no subjective comments
-2. Key Points: 10-30 words each, extract core info not details
-3. Category: Return only one main category
-4. Tags: 5 precise tags, format: topic + attribute
-   - ✓ Correct: "Python Tutorial", "Machine Learning", "PDF Document"
-   - ✗ Wrong: "File", "Content", "Material" (too broad)"""
-            
-            prompt = f"""You are a professional information manager and knowledge organization expert.
-Your task is to analyze various documents and media files to help users:
-1. Quickly understand core content
-2. Establish clear classification systems
-3. Create precise search tags
-
-Please analyze the following content intelligently (respond in English):
+            prompt = f"""{role_desc}
+{task_desc}
 
 {context_info}
 
 {example}
 
-{quality_constraints}
+{quality_guide}
 
-【Analysis Steps】
-Step 1: Identify content type and theme
-Step 2: Extract core information and key points
-Step 3: Determine appropriate category
-Step 4: Generate precise, searchable tags (avoid broad tags)
-
-【Content to Analyze】
+Content to analyze:
 {content[:4000]}
 
-Return in JSON format:
+Please respond in JSON format:
 {{
-  "summary": "Brief summary of core ideas (1-2 sentences)",
+  "summary": "Brief summary (1-2 sentences)",
   "key_points": ["Key point 1", "Key point 2", "Key point 3"],
-  "category": "Content category (e.g., Technology, Life, Learning, Entertainment, News, etc.)",
-  "suggested_tags": ["Tag1", "Tag2", "Tag3", "Tag4", "Tag5"]  (Note: Tags should include content topic tags and file attribute tags)
+  "category": "Content category",
+  "suggested_tags": ["Tag1", "Tag2", "Tag3", "Tag4", "Tag5"]
 }}"""
         
         r = await self.client.post(self.api_url,
@@ -464,25 +562,46 @@ class AISummarizer:
             return ""
         
         try:
+            # 判断是否为正式内容
+            is_formal = is_formal_content(content[:1000], content_type)
+            
             # 构建prompt
             if language.startswith('zh'):
-                prompt = f"请为以下{content_type}内容生成一份简洁的笔记({max_length}字以内)\n\n"
-                prompt += "要求:\n"
-                prompt += "1. 突出核心内容和关键信息\n"
-                prompt += "2. 使用清晰简练的语言\n"
-                prompt += "3. 适合快速回顾和检索\n"
-                prompt += "4. 不要在末尾添加字数统计或任何元信息\n\n"
-                prompt += f"内容:\n{content[:3000]}\n\n"
-                prompt += "请直接输出笔记文本"
+                if is_formal:
+                    # 正式风格
+                    prompt = f"请为这份{content_type}内容生成简明笔记（不超过{max_length}字）。\n\n"
+                    prompt += "要求：\n"
+                    prompt += "• 准确提炼核心内容和关键信息\n"
+                    prompt += "• 保持专业性和准确性\n"
+                    prompt += "• 便于检索和复习\n"
+                    prompt += "• 直接输出笔记内容，不要附加其他信息\n\n"
+                else:
+                    # 轻松风格
+                    prompt = f"帮我记一下这个{content_type}的要点（{max_length}字以内就好）。\n\n"
+                    prompt += "希望你能：\n"
+                    prompt += "• 说清楚核心内容和重要信息\n"
+                    prompt += "• 语言自然一些，别太正式\n"
+                    prompt += "• 方便以后快速回顾\n"
+                    prompt += "• 直接输出笔记，不需要其他说明\n\n"
+                prompt += f"内容：\n{content[:3000]}"
             else:
-                prompt = f"Please generate a concise note (within {max_length} words) for the following {content_type} content.\n\n"
-                prompt += "Requirements:\n"
-                prompt += "1. Highlight core content and key information\n"
-                prompt += "2. Use clear and concise language\n"
-                prompt += "3. Suitable for quick review and search\n"
-                prompt += "4. Do not add word count or any meta information at the end\n\n"
-                prompt += f"Content:\n{content[:3000]}\n\n"
-                prompt += "Output the note text directly"
+                if is_formal:
+                    # Formal style
+                    prompt = f"Please generate a concise note (within {max_length} words) for this {content_type} content.\n\n"
+                    prompt += "Requirements:\n"
+                    prompt += "• Accurately extract core content and key information\n"
+                    prompt += "• Maintain professionalism and accuracy\n"
+                    prompt += "• Suitable for retrieval and review\n"
+                    prompt += "• Output note content directly, no metadata\n\n"
+                else:
+                    # Casual style
+                    prompt = f"Help me jot down the key points of this {content_type} (around {max_length} words).\n\n"
+                    prompt += "Please:\n"
+                    prompt += "• Explain the core content and important info clearly\n"
+                    prompt += "• Keep it natural, not too formal\n"
+                    prompt += "• Make it easy to review later\n"
+                    prompt += "• Just the note, no extra explanations\n\n"
+                prompt += f"Content:\n{content[:3000]}"
             
             # 调用 API
             r = await self.provider.client.post(
@@ -527,33 +646,62 @@ class AISummarizer:
             return ""
         
         try:
+            # 判断是否为正式内容（基于分类）
+            is_formal = is_formal_content("", "", ai_category)
+            
             # 构建prompt
             key_points_text = '\n'.join([f"- {point}" for point in ai_key_points]) if ai_key_points else "无"
             
             if language.startswith('zh'):
-                prompt = f"请根据以下AI分析内容整理一份完整的文档笔记\n\n"
-                prompt += f"文档标题: {title}\n"
-                prompt += f"分类: {ai_category}\n\n"
-                prompt += f"AI摘要:\n{ai_summary}\n\n"
-                prompt += f"关键点:\n{key_points_text}\n\n"
-                prompt += "要求:\n"
-                prompt += "1. 整合摘要和关键点信息\n"
-                prompt += "2. 组织成结构清晰的笔记格式\n"
-                prompt += "3. 便于理解和记忆\n"
-                prompt += "4. 不要在末尾添加字数统计或任何元信息\n\n"
-                prompt += "请直接输出笔记文本"
+                if is_formal:
+                    # 正式风格
+                    prompt = f"请根据以下AI分析整理一份完整的文档笔记。\n\n"
+                    prompt += f"文档：{title}\n"
+                    prompt += f"分类：{ai_category}\n\n"
+                    prompt += f"摘要：\n{ai_summary}\n\n"
+                    prompt += f"关键点：\n{key_points_text}\n\n"
+                    prompt += "要求：\n"
+                    prompt += "• 准确整合摘要和关键点信息\n"
+                    prompt += "• 保持专业性和逻辑性\n"
+                    prompt += "• 结构清晰便于理解\n"
+                    prompt += "• 直接输出笔记内容\n"
+                else:
+                    # 轻松风格
+                    prompt = f"帮我把这些AI分析的内容整理成一份笔记。\n\n"
+                    prompt += f"标题是《{title}》\n"
+                    prompt += f"类型是{ai_category}\n\n"
+                    prompt += f"AI的总结：\n{ai_summary}\n\n"
+                    prompt += f"主要要点：\n{key_points_text}\n\n"
+                    prompt += "希望你能：\n"
+                    prompt += "• 把摘要和要点融合在一起\n"
+                    prompt += "• 组织得清楚易懂\n"
+                    prompt += "• 语言自然流畅\n"
+                    prompt += "• 直接给我笔记内容就好\n"
             else:
-                prompt = "Please organize a complete document note based on the following AI analysis.\n\n"
-                prompt += f"Document Title: {title}\n"
-                prompt += f"Category: {ai_category}\n\n"
-                prompt += f"AI Summary:\n{ai_summary}\n\n"
-                prompt += f"Key Points:\n{key_points_text}\n\n"
-                prompt += "Requirements:\n"
-                prompt += "1. Integrate summary and key points\n"
-                prompt += "2. Organize into clear note format\n"
-                prompt += "3. Easy to understand and remember\n"
-                prompt += "4. Do not add word count or any meta information at the end\n\n"
-                prompt += "Output the note text directly"
+                if is_formal:
+                    # Formal style
+                    prompt = "Please organize a complete document note based on the following AI analysis.\n\n"
+                    prompt += f"Document: {title}\n"
+                    prompt += f"Category: {ai_category}\n\n"
+                    prompt += f"Summary:\n{ai_summary}\n\n"
+                    prompt += f"Key Points:\n{key_points_text}\n\n"
+                    prompt += "Requirements:\n"
+                    prompt += "• Accurately integrate summary and key points\n"
+                    prompt += "• Maintain professionalism and logical flow\n"
+                    prompt += "• Clear structure, easy to understand\n"
+                    prompt += "• Output note content directly\n"
+                else:
+                    # Casual style
+                    prompt = "Help me organize these AI analysis results into a note.\n\n"
+                    prompt += f"Title: {title}\n"
+                    prompt += f"Type: {ai_category}\n\n"
+                    prompt += f"AI Summary:\n{ai_summary}\n\n"
+                    prompt += f"Main Points:\n{key_points_text}\n\n"
+                    prompt += "Please:\n"
+                    prompt += "• Combine the summary and points naturally\n"
+                    prompt += "• Keep it clear and easy to understand\n"
+                    prompt += "• Use natural, flowing language\n"
+                    prompt += "• Just give me the note content\n"
             
             # 调用 API
             r = await self.provider.client.post(
@@ -589,28 +737,42 @@ class AISummarizer:
             return "无标题"
         
         try:
-            # 检测语言
+            # 检测语言和判断内容类型
             detected_lang = detect_content_language(content)
+            is_formal = is_formal_content(content[:1000])
             
             if language.startswith('zh') or detected_lang == 'zh':
-                prompt = "请为以下文本生成一个简洁准确的标题\n\n要求:\n"
-                prompt += f"1. 标题长度不超过{max_length}个字符\n"
-                prompt += "2. 准确概括文本核心内容\n"
-                prompt += "3. 简洁明了便于理解\n"
-                prompt += "4. 不要使用引号或其他标点符号包裹标题\n"
-                prompt += "5. 直接输出标题文本不要任何解释\n\n"
-                prompt += f"文本内容:\n{content[:1000]}\n\n"
-                prompt += "请直接输出标题"
+                if is_formal:
+                    prompt = f"请为这段文本拟一个标题（{max_length}字以内）。\n\n"
+                    prompt += "要求：\n"
+                    prompt += "• 准确概括核心内容\n"
+                    prompt += "• 简洁规范\n"
+                    prompt += "• 不加引号\n"
+                    prompt += "• 直接输出标题\n\n"
+                else:
+                    prompt = f"帮我给这段内容想个标题（{max_length}字以内）。\n\n"
+                    prompt += "希望：\n"
+                    prompt += "• 能说清楚主要内容\n"
+                    prompt += "• 简单明了\n"
+                    prompt += "• 不要加引号\n"
+                    prompt += "• 直接给我标题就好\n\n"
+                prompt += f"内容：\n{content[:1000]}"
             else:
-                prompt = "Generate a concise and accurate title for the following text.\n\n"
-                prompt += "Requirements:\n"
-                prompt += f"1. Title length should not exceed {max_length} characters\n"
-                prompt += "2. Accurately summarize the core content\n"
-                prompt += "3. Clear and easy to understand\n"
-                prompt += "4. Do not use quotes or other punctuation to wrap the title\n"
-                prompt += "5. Output only the title text, no explanations\n\n"
-                prompt += f"Text content:\n{content[:1000]}\n\n"
-                prompt += "Output the title directly"
+                if is_formal:
+                    prompt = f"Please create a title for this text (within {max_length} characters).\n\n"
+                    prompt += "Requirements:\n"
+                    prompt += "• Accurately summarize core content\n"
+                    prompt += "• Concise and formal\n"
+                    prompt += "• No quotation marks\n"
+                    prompt += "• Output title directly\n\n"
+                else:
+                    prompt = f"Help me come up with a title for this content (around {max_length} characters).\n\n"
+                    prompt += "Please:\n"
+                    prompt += "• Capture the main content\n"
+                    prompt += "• Keep it simple and clear\n"
+                    prompt += "• No quotes\n"
+                    prompt += "• Just give me the title\n\n"
+                prompt += f"Content:\n{content[:1000]}"
             
             # 调用 API
             r = await self.provider.client.post(
