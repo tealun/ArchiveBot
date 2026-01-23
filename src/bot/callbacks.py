@@ -76,6 +76,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             # 关闭笔记查看窗口
             await query.message.delete()
             await query.answer("已关闭")
+        elif callback_data.startswith('short_text:'):
+            await handle_short_text_intent_callback(update, context)
         elif callback_data.startswith('fav:'):
             await handle_favorite_callback(update, context)
         elif callback_data.startswith('forward:'):
@@ -160,7 +162,7 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             result_text = f"{idx}. {emoji} {title_truncated}\n   {fav_icon} | {note_icon} | 📅 {archived_at}"
             formatted_results.append(result_text)
         
-        results_text = '\n───────────────────────────────────────\n'.join(formatted_results)
+        results_text = '\n---------------------\n'.join(formatted_results)
         
         # 获取总数
         has_more = search_result.get('count', 0) == page_size
@@ -1324,4 +1326,94 @@ async def handle_forward_callback(update: Update, context: ContextTypes.DEFAULT_
         
     except Exception as e:
         logger.error(f"Error handling forward callback: {e}", exc_info=True)
+
+
+async def handle_short_text_intent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    处理短文本意图选择回调
+    
+    Callback data format: short_text:note|ai|archive
+    """
+    try:
+        query = update.callback_query
+        callback_data = query.data
+        
+        # 解析: short_text:action
+        action = callback_data.split(':', 1)[1]
+        
+        # 获取待处理文本
+        text = context.user_data.get('pending_short_text')
+        if not text:
+            await query.edit_message_text("⚠️ 会话已过期，请重新发送文本")
+            return
+        
+        i18n = get_i18n()
+        
+        if action == 'note':
+            # 保存为笔记
+            note_manager = context.bot_data.get('note_manager')
+            if note_manager:
+                note_id = note_manager.add_note(None, text)
+                if note_id:
+                    await query.edit_message_text(f"✅ 已保存为笔记 (ID: #{note_id})")
+                    logger.info(f"User chose to save as note: {note_id}")
+                else:
+                    await query.edit_message_text("❌ 笔记保存失败")
+            else:
+                await query.edit_message_text("❌ 笔记管理器未初始化")
+        
+        elif action == 'ai':
+            # AI互动模式（待开发）
+            ai_summarizer = context.bot_data.get('ai_summarizer')
+            if ai_summarizer and ai_summarizer.is_available():
+                await query.edit_message_text(
+                    "🤖 AI互动模式\n\n"
+                    "正在处理您的消息...\n\n"
+                    "💡 此功能正在开发中，敬请期待！"
+                )
+                logger.info(f"User chose AI mode for text: {text[:50]}")
+                # TODO: 实现AI互动逻辑
+            else:
+                await query.edit_message_text(
+                    "❌ AI功能未启用\n\n"
+                    "请在配置文件中启用AI功能后重试。"
+                )
+        
+        elif action == 'archive':
+            # 归档为内容
+            await query.edit_message_text("📦 正在归档...")
+            
+            # 创建归档
+            storage_manager = context.bot_data.get('storage_manager')
+            if storage_manager:
+                from ..utils.helpers import format_datetime
+                
+                result = storage_manager.create_archive(
+                    content_type='text',
+                    title=text[:50] + ('...' if len(text) > 50 else ''),
+                    content=text,
+                    file_id=None,
+                    tags=[],
+                    source='telegram',
+                    ai_analysis=None
+                )
+                
+                if result:
+                    archive_id = result.get('id')
+                    await query.edit_message_text(
+                        f"✅ 已归档 (ID: #{archive_id})\n\n"
+                        f"内容：{truncate_text(text, 100)}"
+                    )
+                    logger.info(f"User chose to archive text: {archive_id}")
+                else:
+                    await query.edit_message_text("❌ 归档失败")
+            else:
+                await query.edit_message_text("❌ 存储管理器未初始化")
+        
+        # 清除待处理文本
+        context.user_data.pop('pending_short_text', None)
+        
+    except Exception as e:
+        logger.error(f"Error handling short text intent callback: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ 处理失败: {str(e)}")
         await query.answer(f"Error: {str(e)}", show_alert=True)

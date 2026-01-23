@@ -184,7 +184,7 @@ class SearchEngine:
             keyboards_per_item.append([])
             formatted_results.append(result_text)
         
-        results_text = '\n───────────────────────────────────────\n'.join(formatted_results)
+        results_text = '\n---------------------\n'.join(formatted_results)
         
         final_text = self.i18n.t(
             'search_results',
