@@ -117,12 +117,33 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             from ..utils.config import get_config
             config = get_config()
             
-            # 判断是否应该进行AI分析
+            # 1. 优先处理电子书判断（如果需要）
+            if analysis.get('_needs_ai_ebook_check'):
+                if progress_callback:
+                    await progress_callback("📚 AI判断文档类型中...", 0.35)
+                try:
+                    file_name = analysis.get('file_name', '')
+                    user_language = i18n.current_language
+                    is_ebook = await ai_summarizer.is_ebook(file_name, language=user_language)
+                    
+                    if is_ebook:
+                        analysis['content_type'] = 'ebook'
+                        logger.info(f"AI判定为电子书: {file_name}")
+                    else:
+                        logger.info(f"AI判定为普通文档: {file_name}")
+                        
+                except Exception as e:
+                    logger.warning(f"AI电子书判断失败: {e}")
+                
+                # 移除标记
+                analysis.pop('_needs_ai_ebook_check', None)
+            
+            # 2. 判断是否应该进行AI分析
             content_type = analysis.get('content_type', '')
             file_size = analysis.get('file_size', 0)
             
-            # 可分析的内容类型：文本、链接、文档
-            analyzable_types = ['text', 'link', 'article', 'document']
+            # 可分析的内容类型：文本、链接、文档、电子书
+            analyzable_types = ['text', 'link', 'article', 'document', 'ebook']
             # 文档文件扩展名
             analyzable_extensions = ['.txt', '.md', '.doc', '.docx', '.pdf', '.epub', '.rtf']
             
@@ -787,22 +808,57 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 context.user_data['waiting_note_for_archive'] = None
                 return
         
-        # 判断是否是直接发送的短文字（不归档，仅作为笔记）
-        if message.text and not message.forward_origin and not message.text.startswith('/'):
-            from ..utils.helpers import should_create_note
-            is_short, note_type = should_create_note(message.text)
+        # 文本消息智能处理逻辑
+        if message.text and not message.forward_origin:
+            text = message.text.strip()
             
-            if is_short:
-                # 直接保存为独立笔记，不归档
-                note_manager = context.bot_data.get('note_manager')
-                if note_manager:
-                    note_id = note_manager.add_note(None, message.text)
-                    if note_id:
-                        await message.reply_text(f"📝 笔记已保存 (ID: #{note_id})")
-                        logger.info(f"Short text saved as standalone note: {note_id}")
-                    else:
-                        await message.reply_text(i18n.t('note_add_failed'))
-                return
+            # 检测是否是 URL（单独的链接应该归档而非做笔记）
+            from ..utils.helpers import is_url
+            if is_url(text):
+                # URL 作为链接归档，不走短文本笔记逻辑
+                logger.info(f"Detected URL, processing as link archive: {text[:50]}")
+                # 继续执行归档流程（不 return）
+            else:
+                # 判断是否是短文字
+                from ..utils.helpers import should_create_note
+                is_short, note_type = should_create_note(text)
+                
+                if is_short:
+                    # 如果非常短（<50字符），询问用户意图
+                    if len(text) < 50:
+                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                        
+                        # 保存待处理文本到用户数据
+                        context.user_data['pending_short_text'] = text
+                        
+                        keyboard = [
+                            [
+                                InlineKeyboardButton("📝 保存为笔记", callback_data="short_text:note"),
+                                InlineKeyboardButton("🤖 AI互动模式", callback_data="short_text:ai")
+                            ],
+                            [
+                                InlineKeyboardButton("📦 归档为内容", callback_data="short_text:archive")
+                            ]
+                        ]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        
+                        await message.reply_text(
+                            "💬 请问您需要做什么呢？",
+                            reply_markup=reply_markup
+                        )
+                        logger.info(f"Asking user intent for short text: {text[:30]}")
+                        return
+                    
+                    # 50-150字符（中文）或50-250字符（英文）的短文本，直接保存为笔记
+                    note_manager = context.bot_data.get('note_manager')
+                    if note_manager:
+                        note_id = note_manager.add_note(None, text)
+                        if note_id:
+                            await message.reply_text(f"📝 笔记已保存 (ID: #{note_id})")
+                            logger.info(f"Short text saved as standalone note: {note_id}")
+                        else:
+                            await message.reply_text(i18n.t('note_add_failed'))
+                    return
         
         # 正常归档流程
         aggregator = get_message_aggregator()

@@ -101,9 +101,10 @@ class OpenAIProvider(AIProvider):
                 }
             
             # 构建上下文信息
+            file_size_str = f"{file_size / 1024 / 1024:.2f}MB" if file_size > 0 else "文本内容"
             context_info = f"""【上下文信息】
 - 文件类型：{content_type}{f' ({file_ext})' if file_ext else ''}
-- 文件大小：{file_size / 1024 / 1024:.2f}MB" if file_size > 0 else "文本内容"
+- 文件大小：{file_size_str}
 - 已有标签：{', '.join(existing_tags) if existing_tags else '无'}（请避免重复）
 - 标题：{title if title else '无'}
 - 内容语言：{content_lang}
@@ -163,9 +164,10 @@ class OpenAIProvider(AIProvider):
 }}"""
         else:
             # English prompt with all optimizations
+            file_size_str = f"{file_size / 1024 / 1024:.2f}MB" if file_size > 0 else "Text content"
             context_info = f"""【Context Information】
 - File Type: {content_type}{f' ({file_ext})' if file_ext else ''}
-- File Size: {file_size / 1024 / 1024:.2f}MB" if file_size > 0 else "Text content"
+- File Size: {file_size_str}
 - Existing Tags: {', '.join(existing_tags) if existing_tags else 'None'} (avoid duplication)
 - Title: {title if title else 'None'}
 - Content Language: {content_lang}"""
@@ -261,25 +263,19 @@ Return in JSON format:
         if language.startswith('zh'):
             # 区分简体和繁体中文
             if language in ['zh-TW', 'zh-HK', 'zh-MO']:
-                prompt = f"""請對以下內容進行分類，只返回分類名稱。請使用符合台灣/香港地區的用詞習慣（如：技術、學習、娛樂等）：
-
-{content[:500]}
-
-分類："""
+                prompt = "請對以下內容進行分類只返回分類名稱\n"
+                prompt += "請使用符合台灣香港地區的用詞習慣如技術學習娛樂等\n\n"
+                prompt += f"{content[:500]}\n\n分類"
                 default_category = "其他"
             else:
-                prompt = f"""请对以下内容进行分类，只返回分类名称（如：技术、生活、学习、娱乐、新闻、工作、健康等）：
-
-{content[:500]}
-
-分类："""
+                prompt = "请对以下内容进行分类只返回分类名称\n"
+                prompt += "如技术生活学习娱乐新闻工作健康等\n\n"
+                prompt += f"{content[:500]}\n\n分类"
                 default_category = "其他"
         else:
-            prompt = f"""Please categorize the following content, return only the category name (e.g., Technology, Life, Learning, Entertainment, News, Work, Health, etc.):
-
-{content[:500]}
-
-Category:"""
+            prompt = "Please categorize the following content return only the category name\n"
+            prompt += "e.g. Technology Life Learning Entertainment News Work Health etc\n\n"
+            prompt += f"{content[:500]}\n\nCategory"
             default_category = "Other"
         
         try:
@@ -348,6 +344,75 @@ class AISummarizer:
         Args:
             contents: 内容列表
             max_tags: 每个内容的最大标签数
+        
+        Returns:
+            标签列表的列表
+        """
+        if not self.is_available():
+            return [[] for _ in contents]
+        
+        tasks = [self.generate_tags(content, max_tags) for content in contents]
+        return await asyncio.gather(*tasks, return_exceptions=True)
+    
+    async def is_ebook(self, file_name: str, language: str = 'zh-CN') -> bool:
+        """
+        判断文件是否为电子书（书籍、杂志、报刊、画报等）
+        
+        Args:
+            file_name: 文件名
+            language: 用户界面语言
+            
+        Returns:
+            True表示是电子书，False表示不是
+        """
+        if not self.is_available():
+            return False
+        
+        try:
+            # 根据语言构建prompt
+            if language.startswith('zh'):
+                if language in ['zh-TW', 'zh-HK', 'zh-MO']:
+                    prompt = "請判斷以下檔案名稱是否為電子書\n"
+                    prompt += "包括書籍雜誌期刊畫報漫畫等\n"
+                    prompt += "只需回答是或否\n\n"
+                    prompt += f"檔案名稱{file_name}\n\n這是電子書嗎"
+                else:
+                    prompt = "请判断以下文件名是否为电子书\n"
+                    prompt += "包括书籍杂志期刊画报漫画等\n"
+                    prompt += "只需回答是或否\n\n"
+                    prompt += f"文件名{file_name}\n\n这是电子书吗"
+            else:
+                prompt = "Please determine if the following file name is an eBook\n"
+                prompt += "including books magazines journals pictorials comics etc\n"
+                prompt += "Just answer Yes or No\n\n"
+                prompt += f"File name {file_name}\n\nIs this an eBook"
+            
+            r = await self.provider.client.post(
+                self.provider.api_url,
+                json={
+                    "model": self.provider.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 10
+                }
+            )
+            
+            response = r.json()['choices'][0]['message']['content'].strip().lower()
+            
+            # 判断回答
+            positive_answers = ['yes', '是', 'true', 'y']
+            return any(ans in response for ans in positive_answers)
+            
+        except Exception as e:
+            logger.error(f"AI判断电子书失败: {e}")
+            return False
+    
+    async def generate_tags_batch(self, contents: list, max_tags: int = 5) -> list:
+        """
+        批量生成标签
+        
+        Args:
+            contents: 内容列表
+            max_tags: 每个内容的最大标签数
             
         Returns:
             标签列表的列表 [[tags1], [tags2], ...]
@@ -401,31 +466,23 @@ class AISummarizer:
         try:
             # 构建prompt
             if language.startswith('zh'):
-                prompt = f"""请为以下{content_type}内容生成一份简洁的笔记（{max_length}字以内）。
-
-要求：
-1. 突出核心内容和关键信息
-2. 使用清晰简练的语言
-3. 适合快速回顾和检索
-4. 不要在末尾添加字数统计或任何元信息
-
-内容：
-{content[:3000]}
-
-请直接输出笔记文本。"""
+                prompt = f"请为以下{content_type}内容生成一份简洁的笔记({max_length}字以内)\n\n"
+                prompt += "要求:\n"
+                prompt += "1. 突出核心内容和关键信息\n"
+                prompt += "2. 使用清晰简练的语言\n"
+                prompt += "3. 适合快速回顾和检索\n"
+                prompt += "4. 不要在末尾添加字数统计或任何元信息\n\n"
+                prompt += f"内容:\n{content[:3000]}\n\n"
+                prompt += "请直接输出笔记文本"
             else:
-                prompt = f"""Please generate a concise note (within {max_length} words) for the following {content_type} content.
-
-Requirements:
-1. Highlight core content and key information
-2. Use clear and concise language
-3. Suitable for quick review and search
-4. Do not add word count or any meta information at the end
-
-Content:
-{content[:3000]}
-
-Output the note text directly."""
+                prompt = f"Please generate a concise note (within {max_length} words) for the following {content_type} content.\n\n"
+                prompt += "Requirements:\n"
+                prompt += "1. Highlight core content and key information\n"
+                prompt += "2. Use clear and concise language\n"
+                prompt += "3. Suitable for quick review and search\n"
+                prompt += "4. Do not add word count or any meta information at the end\n\n"
+                prompt += f"Content:\n{content[:3000]}\n\n"
+                prompt += "Output the note text directly"
             
             # 调用 API
             r = await self.provider.client.post(
@@ -474,43 +531,29 @@ Output the note text directly."""
             key_points_text = '\n'.join([f"- {point}" for point in ai_key_points]) if ai_key_points else "无"
             
             if language.startswith('zh'):
-                prompt = f"""请根据以下AI分析内容，整理一份完整的文档笔记。
-
-文档标题：{title}
-分类：{ai_category}
-
-AI摘要：
-{ai_summary}
-
-关键点：
-{key_points_text}
-
-要求：
-1. 整合摘要和关键点信息
-2. 组织成结构清晰的笔记格式
-3. 便于理解和记忆
-4. 不要在末尾添加字数统计或任何元信息
-
-请直接输出笔记文本。"""
+                prompt = f"请根据以下AI分析内容整理一份完整的文档笔记\n\n"
+                prompt += f"文档标题: {title}\n"
+                prompt += f"分类: {ai_category}\n\n"
+                prompt += f"AI摘要:\n{ai_summary}\n\n"
+                prompt += f"关键点:\n{key_points_text}\n\n"
+                prompt += "要求:\n"
+                prompt += "1. 整合摘要和关键点信息\n"
+                prompt += "2. 组织成结构清晰的笔记格式\n"
+                prompt += "3. 便于理解和记忆\n"
+                prompt += "4. 不要在末尾添加字数统计或任何元信息\n\n"
+                prompt += "请直接输出笔记文本"
             else:
-                prompt = f"""Please organize a complete document note based on the following AI analysis.
-
-Document Title: {title}
-Category: {ai_category}
-
-AI Summary:
-{ai_summary}
-
-Key Points:
-{key_points_text}
-
-Requirements:
-1. Integrate summary and key points
-2. Organize into clear note format
-3. Easy to understand and remember
-4. Do not add word count or any meta information at the end
-
-Output the note text directly."""
+                prompt = "Please organize a complete document note based on the following AI analysis.\n\n"
+                prompt += f"Document Title: {title}\n"
+                prompt += f"Category: {ai_category}\n\n"
+                prompt += f"AI Summary:\n{ai_summary}\n\n"
+                prompt += f"Key Points:\n{key_points_text}\n\n"
+                prompt += "Requirements:\n"
+                prompt += "1. Integrate summary and key points\n"
+                prompt += "2. Organize into clear note format\n"
+                prompt += "3. Easy to understand and remember\n"
+                prompt += "4. Do not add word count or any meta information at the end\n\n"
+                prompt += "Output the note text directly"
             
             # 调用 API
             r = await self.provider.client.post(
@@ -536,7 +579,7 @@ Output the note text directly."""
         
         Args:
             content: 文本内容
-            max_length: 标题最大长度（字符数）
+            max_length: 标题最大长度(字符数)
             language: 语言代码
             
         Returns:
@@ -550,33 +593,24 @@ Output the note text directly."""
             detected_lang = detect_content_language(content)
             
             if language.startswith('zh') or detected_lang == 'zh':
-                prompt = f"""请为以下文本生成一个简洁准确的标题。
-
-要求：
-1. 标题长度不超过{max_length}个字符
-2. 准确概括文本核心内容
-3. 简洁明了，便于理解
-4. 不要使用引号或其他标点符号包裹标题
-5. 直接输出标题文本，不要任何解释
-
-文本内容：
-{content[:1000]}
-
-请直接输出标题："""
+                prompt = "请为以下文本生成一个简洁准确的标题\n\n要求:\n"
+                prompt += f"1. 标题长度不超过{max_length}个字符\n"
+                prompt += "2. 准确概括文本核心内容\n"
+                prompt += "3. 简洁明了便于理解\n"
+                prompt += "4. 不要使用引号或其他标点符号包裹标题\n"
+                prompt += "5. 直接输出标题文本不要任何解释\n\n"
+                prompt += f"文本内容:\n{content[:1000]}\n\n"
+                prompt += "请直接输出标题"
             else:
-                prompt = f"""Generate a concise and accurate title for the following text.
-
-Requirements:
-1. Title length should not exceed {max_length} characters
-2. Accurately summarize the core content
-3. Clear and easy to understand
-4. Do not use quotes or other punctuation to wrap the title
-5. Output only the title text, no explanations
-
-Text content:
-{content[:1000]}
-
-Output the title directly:"""
+                prompt = "Generate a concise and accurate title for the following text.\n\n"
+                prompt += "Requirements:\n"
+                prompt += f"1. Title length should not exceed {max_length} characters\n"
+                prompt += "2. Accurately summarize the core content\n"
+                prompt += "3. Clear and easy to understand\n"
+                prompt += "4. Do not use quotes or other punctuation to wrap the title\n"
+                prompt += "5. Output only the title text, no explanations\n\n"
+                prompt += f"Text content:\n{content[:1000]}\n\n"
+                prompt += "Output the title directly"
             
             # 调用 API
             r = await self.provider.client.post(

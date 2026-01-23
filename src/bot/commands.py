@@ -35,7 +35,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         i18n.set_language(config.language)
         
         welcome_msg = i18n.t('welcome')
-        await update.message.reply_text(welcome_msg)
+        await update.message.reply_text(welcome_msg, parse_mode=ParseMode.HTML)
         
         logger.info(f"Start command executed by user {update.effective_user.id}")
         

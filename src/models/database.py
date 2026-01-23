@@ -118,11 +118,11 @@ class Database:
                 )
             """)
             
-            # Notes table - stores notes attached to archives
+            # Notes table - stores notes (can be standalone or attached to archives)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS notes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    archive_id INTEGER NOT NULL,
+                    archive_id INTEGER,
                     content TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (archive_id) REFERENCES archives (id) ON DELETE CASCADE
@@ -144,6 +144,58 @@ class Database:
                 cursor.execute("ALTER TABLE archives ADD COLUMN favorite INTEGER DEFAULT 0")
             except sqlite3.OperationalError:
                 pass
+            
+            # Migrate notes table to allow NULL archive_id (for standalone notes)
+            # Check if migration is needed
+            cursor.execute("PRAGMA table_info(notes)")
+            columns = cursor.fetchall()
+            archive_id_col = next((col for col in columns if col[1] == 'archive_id'), None)
+            
+            if archive_id_col and archive_id_col[3] == 1:  # notnull = 1
+                logger.info("Migrating notes table to support standalone notes...")
+                try:
+                    # Create new table with correct schema
+                    cursor.execute("""
+                        CREATE TABLE notes_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            archive_id INTEGER,
+                            content TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            FOREIGN KEY (archive_id) REFERENCES archives (id) ON DELETE CASCADE
+                        )
+                    """)
+                    
+                    # Copy data from old table
+                    cursor.execute("""
+                        INSERT INTO notes_new (id, archive_id, content, created_at)
+                        SELECT id, archive_id, content, created_at FROM notes
+                    """)
+                    
+                    # Drop old table
+                    cursor.execute("DROP TABLE notes")
+                    
+                    # Rename new table
+                    cursor.execute("ALTER TABLE notes_new RENAME TO notes")
+                    
+                    # Recreate index
+                    cursor.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_notes_archive_id 
+                        ON notes (archive_id)
+                    """)
+                    
+                    cursor.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_notes_created_at 
+                        ON notes (created_at DESC)
+                    """)
+                    
+                    logger.info("✓ Notes table migration completed successfully")
+                except Exception as e:
+                    logger.error(f"Failed to migrate notes table: {e}")
+                    # If migration fails, continue with existing schema
+                    try:
+                        cursor.execute("DROP TABLE IF EXISTS notes_new")
+                    except:
+                        pass
             
             # Storage stats table - tracks storage usage
             cursor.execute("""

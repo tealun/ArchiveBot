@@ -9,6 +9,7 @@ from datetime import datetime
 from telegram import Message
 
 from ..utils.helpers import is_url, extract_urls, extract_hashtags
+from ..utils.constants import EBOOK_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -242,15 +243,38 @@ class ContentAnalyzer:
         """Analyze document message"""
         document = message.document
         
-        return {
-            'content_type': 'document',
-            'title': document.file_name or f"Document_{message.date.strftime('%Y%m%d_%H%M%S')}",
+        file_name = document.file_name or f"Document_{message.date.strftime('%Y%m%d_%H%M%S')}"
+        file_ext = ''
+        if document.file_name and '.' in document.file_name:
+            file_ext = '.' + document.file_name.rsplit('.', 1)[1].lower()
+        
+        # 判断是否为电子书
+        content_type = 'document'
+        needs_ai_ebook_check = False
+        
+        # 1. 扩展名直接判断
+        if file_ext in EBOOK_EXTENSIONS:
+            content_type = 'ebook'
+        # 2. PDF等需要AI判断
+        elif file_ext in ['.pdf', '.doc', '.docx']:
+            content_type = 'document'
+            needs_ai_ebook_check = True  # 标记需要AI判断
+        
+        result = {
+            'content_type': content_type,
+            'title': file_name,
             'content': message.caption,
             'file_id': document.file_id,
             'file_size': document.file_size,
-            'file_name': document.file_name,
+            'file_name': file_name,
             'mime_type': document.mime_type
         }
+        
+        # 如果需要AI判断，添加标记
+        if needs_ai_ebook_check:
+            result['_needs_ai_ebook_check'] = True
+        
+        return result
     
     @staticmethod
     def _analyze_audio(message: Message) -> Dict[str, Any]:

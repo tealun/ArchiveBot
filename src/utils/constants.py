@@ -20,6 +20,7 @@ CONTENT_TYPE_TEXT = 'text'
 CONTENT_TYPE_IMAGE = 'image'
 CONTENT_TYPE_VIDEO = 'video'
 CONTENT_TYPE_DOCUMENT = 'document'
+CONTENT_TYPE_EBOOK = 'ebook'
 CONTENT_TYPE_LINK = 'link'
 CONTENT_TYPE_AUDIO = 'audio'
 CONTENT_TYPE_VOICE = 'voice'
@@ -44,6 +45,12 @@ SUPPORTED_LANGUAGES = {
     'zh-CN': '简体中文',
     'zh-TW': '繁體中文'
 }
+
+# Ebook file extensions
+EBOOK_EXTENSIONS = [
+    '.epub', '.mobi', '.azw', '.azw3',
+    '.fb2', '.djvu', '.cbz', '.cbr'
+]
 
 # File cleanup
 TEMP_FILE_MAX_AGE_HOURS = 24

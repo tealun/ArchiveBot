@@ -1,5 +1,5 @@
 {
-  "welcome": "👋 Welcome to ArchiveBot!\n\nI'm your personal content archiving assistant. I can help you:\n\n📦 Archive various content (text, images, videos, documents)\n🏷️ Automatically tag and categorize\n🔍 Quickly search archived content\n💾 Multi-level storage strategy\n\nSend me any content or use commands:\n\n/help - View help\n/search - Search archives\n/tags - View all tags\n/stats - View statistics\n/review - Archive review\n/language - Change language\n\nLet's get started! 🚀",
+  "welcome": "👋 Welcome to ArchiveBot!\n\n🤖 Your Intelligent Personal Archive Assistant\n\n<b>Core Features:</b>\n📦 Universal Archiving - Text/Images/Videos/Documents/Links\n🏷️ Smart Tags - Auto-classification & tag extraction\n🤖 AI Enhanced - Summarization/Key points/Smart titles\n🔍 Powerful Search - Full-text/Tag filtering/Time range\n💾 Flexible Storage - Telegram channel + Database backup\n📝 Notes Management - Linked archives/Standalone/AI assist\n🗑️ Safe Operations - Trash bin/Backup/Export formats\n\n<b>Quick Start:</b>\n• Send any content to archive\n• Use #hashtags for custom tags\n• Send /help for complete command list\n\n<b>Open Source:</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\nLet's start archiving! 🚀",
   
   "help": "📖 Help\n\n<b>Archive Content:</b>\n• Send any content directly to me\n• Add tags using #tag format\n• Forward messages to record source\n• Batch forwarding auto-aggregation\n\n<b>Basic Commands:</b>\n/start - Initialize bot\n/help - View this help\n/search (/s) &lt;keyword&gt; - Search archives\n/tags (/t) - View all tags\n/stats (/st) - View statistics\n/review - Archive review & stats\n\n<b>Notes:</b>\n/note - Add note to archive\n/notes - View all notes\n\n<b>Data Management:</b>\n/trash - View trash bin\n/export - Export data (JSON/HTML/Markdown)\n/backup - Backup & restore database\n\n<b>Other:</b>\n/ai - AI status\n/language (/lang) - Change language\n\n<b>Search Tips:</b>\n• Keyword: /s python\n• Tag: /s #tech\n• Combined: /s #tech python\n• Click results to jump to channel\n\n<b>AI Features:</b>\n• Smart summary generation\n• Auto extract key points\n• Tag suggestions (batch shared)\n• Intelligent categorization",
   
@@ -153,5 +153,18 @@
   "notes_list_empty": "📝 No notes yet\n\nUse /note command or click the 📝 button in archive lists to create notes.",
   "notes_list_header": "📝 Notes ({count})",
   "button_add_note": "📝 Note",
-  "nothing_to_cancel": "ℹ️ No operation in progress."
+  "nothing_to_cancel": "ℹ️ No operation in progress.",
+  
+  "invalid_command": "⚠️ This looks like a command, but is invalid or not found.\n\nSend /help to see all available commands.",
+  "short_text_prompt": "💬 What would you like to do?",
+  "button_save_as_note": "📝 Save as Note",
+  "button_ai_mode": "🤖 AI Chat",
+  "button_archive_content": "📦 Archive",
+  "short_text_saved_note": "✅ Saved as note (ID: #{note_id})",
+  "short_text_ai_mode": "🤖 AI Chat Mode\n\nProcessing your message...\n\n💡 This feature is under development!",
+  "short_text_ai_disabled": "❌ AI features not enabled\n\nPlease enable AI in config and restart.",
+  "short_text_archiving": "📦 Archiving...",
+  "short_text_archived": "✅ Archived (ID: #{archive_id})\n\nContent: {content}",
+  "short_text_archive_failed": "❌ Archive failed",
+  "short_text_expired": "⚠️ Session expired, please resend"
 }

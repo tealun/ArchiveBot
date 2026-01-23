@@ -1,5 +1,5 @@
 {
-  "welcome": "👋 欢迎使用 ArchiveBot！\n\n我是您的个人内容归档助手，可以帮您：\n\n📦 归档各类内容（文本、图片、视频、文档）\n🏷️ 自动标签分类\n🔍 快速搜索已归档内容\n💾 多级存储策略\n\n发送任何内容给我，或使用命令：\n\n/help - 查看帮助\n/search - 搜索归档\n/tags - 查看所有标签\n/stats - 查看统计\n/review - 存档回顾\n/language - 切换语言\n\n让我们开始吧！🚀",
+  "welcome": "👋 欢迎使用 ArchiveBot！\n\n🤖 您的专属智能归档助手\n\n<b>核心功能：</b>\n📦 全能归档 - 文本/图片/视频/文档/链接\n🏷️ 智能标签 - 自动分类与标签提取\n🤖 AI 增强 - 摘要生成/关键点提取/智能标题\n🔍 高效搜索 - 全文检索/标签筛选/时间范围\n💾 灵活存储 - Telegram频道/数据库双备份\n📝 笔记管理 - 关联归档/独立笔记/AI辅助\n🗑️ 安全管理 - 垃圾箱/备份/导出多格式\n\n<b>快速开始：</b>\n• 发送任何内容即可归档\n• 使用 #标签 添加自定义标签\n• 发送 /help 查看完整命令列表\n\n<b>项目开源：</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\n让我们开始归档之旅！🚀",
   
   "help": "📖 帮助\n\n<b>归档内容：</b>\n• 直接发送任何内容给我\n• 使用 #标签 格式添加标签\n• 转发消息自动记录来源\n• 批量转发自动聚合处理\n\n<b>基础命令：</b>\n/start - 初始化机器人\n/help - 查看此帮助\n/search (/s) &lt;关键词&gt; - 搜索归档\n/tags (/t) - 查看所有标签\n/stats (/st) - 查看统计信息\n/review - 存档回顾与统计\n\n<b>笔记功能：</b>\n/note - 添加笔记到归档\n/notes - 查看所有笔记\n\n<b>数据管理：</b>\n/trash - 查看垃圾箱\n/export - 导出数据（JSON/HTML/Markdown）\n/backup - 备份与恢复数据库\n\n<b>其他：</b>\n/ai - AI功能状态\n/language (/lang) - 切换语言\n\n<b>搜索技巧：</b>\n• 关键词：/s python\n• 标签：/s #技术\n• 组合：/s #技术 python\n• 点击结果可跳转到频道\n\n<b>AI功能：</b>\n• 智能摘要生成\n• 自动提取关键点\n• 标签推荐（批量共享）\n• 内容智能分类",
   
@@ -154,5 +154,18 @@
   "notes_list_empty": "📝 暂无笔记\n\n使用 /note 命令或点击归档列表中的 📝 按钮来创建笔记。",
   "notes_list_header": "📝 笔记列表 ({count}条)",
   "button_add_note": "📝 笔记",
-  "nothing_to_cancel": "ℹ️ 没有正在进行的操作。"
+  "nothing_to_cancel": "ℹ️ 没有正在进行的操作。",
+  
+  "invalid_command": "⚠️ 这似乎是一个命令，但格式不正确或命令不存在。\n\n发送 /help 查看所有可用命令。",
+  "short_text_prompt": "💬 请问您需要做什么呢？",
+  "button_save_as_note": "📝 保存为笔记",
+  "button_ai_mode": "🤖 AI互动",
+  "button_archive_content": "📦 归档为内容",
+  "short_text_saved_note": "✅ 已保存为笔记 (ID: #{note_id})",
+  "short_text_ai_mode": "🤖 AI互动模式\n\n正在处理您的消息...\n\n💡 此功能正在开发中，敬请期待！",
+  "short_text_ai_disabled": "❌ AI功能未启用\n\n请在配置文件中启用AI功能后重试。",
+  "short_text_archiving": "📦 正在归档...",
+  "short_text_archived": "✅ 已归档 (ID: #{archive_id})\n\n内容：{content}",
+  "short_text_archive_failed": "❌ 归档失败",
+  "short_text_expired": "⚠️ 会话已过期，请重新发送文本"
 }

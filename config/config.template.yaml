@@ -37,8 +37,33 @@ storage:
     path: "data/archive.db"
   
   telegram:
-    channel_id: 0  # Private channel ID (format: -1001234567890)
+    # 向后兼容：旧的单频道配置（可选，如果配置了channels.default则此项被忽略）
+    channel_id: 0  # 已废弃，请使用下面的 channels.default
     enabled: true
+    
+    # 新的多频道配置
+    channels:
+      default: 0      # 默认频道ID（必填，格式: -1001234567890）
+      text: 0         # 文本频道（可选，不配置则使用default）
+      ebook: 0        # 电子书频道（可选）
+      document: 0     # 文档频道（可选）
+      image: 0        # 图片频道（可选）
+      media: 0        # 媒体频道-视频音频（可选）
+    
+    # 类型到频道的映射规则
+    type_mapping:
+      text: text           # 纯文本 → 文本频道
+      link: text           # 链接 → 文本频道
+      ebook: ebook         # 电子书 → 电子书频道
+      document: document   # 文档 → 文档频道
+      image: image         # 图片 → 图片频道
+      animation: image     # 动画GIF → 图片频道
+      sticker: image       # 贴纸 → 图片频道
+      video: media         # 视频 → 媒体频道
+      audio: media         # 音频 → 媒体频道
+      voice: media         # 语音 → 媒体频道
+      contact: default     # 联系人 → 默认频道
+      location: default    # 位置 → 默认频道
   
   cloud:
     google_drive:

@@ -168,11 +168,27 @@ class Config:
     
     @property
     def telegram_channel_id(self) -> Optional[int]:
-        """Get Telegram channel ID"""
+        """Get Telegram channel ID (backward compatibility)"""
+        # 优先使用新配置
+        default_channel = self.get('storage.telegram.channels.default')
+        if default_channel and default_channel != 0:
+            return default_channel
+        
+        # 向后兼容：使用旧的channel_id
         channel_id = self.get('storage.telegram.channel_id')
         if channel_id and channel_id != 0:
             return channel_id
         return None
+    
+    @property
+    def telegram_channels(self) -> Dict[str, int]:
+        """Get all Telegram channel IDs"""
+        return self.get('storage.telegram.channels', {})
+    
+    @property
+    def telegram_type_mapping(self) -> Dict[str, str]:
+        """Get Telegram type to channel mapping"""
+        return self.get('storage.telegram.type_mapping', {})
     
     @property
     def telegram_storage_enabled(self) -> bool:

@@ -86,13 +86,13 @@ def should_create_note(content: str) -> tuple:
     chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', content))
     english_chars = len(re.findall(r'[a-zA-Z]', content))
     
-    # 判断阈值
+    # 判断阈值（聊天友好型）
     if chinese_chars > english_chars:
-        # 中文为主：250字符
-        threshold = 250
+        # 中文为主：150字符
+        threshold = 150
     else:
-        # 英文为主：500字符
-        threshold = 500
+        # 英文为主：250字符
+        threshold = 250
     
     char_count = len(content)
     

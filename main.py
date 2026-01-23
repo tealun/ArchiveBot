@@ -37,6 +37,7 @@ from src.core.backup_manager import BackupManager
 from src.core.review_manager import ReviewManager
 
 from src.bot import commands, handlers, callbacks
+from src.bot.unknown_command import handle_unknown_command
 from src.ai.summarizer import get_ai_summarizer
 
 logger = logging.getLogger(__name__)
@@ -157,11 +158,25 @@ def main():
         # Initialize Telegram storage if channel is configured
         telegram_storage = None
         if config.telegram_storage_enabled:
+            # 构建telegram配置
+            telegram_config = {
+                'enabled': True,
+                'channel_id': config.telegram_channel_id,  # 向后兼容
+                'channels': config.get('telegram_channels', {}),
+                'type_mapping': config.get('telegram_type_mapping', {})
+            }
+            
             telegram_storage = TelegramStorage(
                 bot=application.bot,
-                channel_id=config.telegram_channel_id
+                config=telegram_config
             )
-            logger.info(f"Telegram storage enabled: channel_id={config.telegram_channel_id}")
+            
+            # 获取配置的频道数量
+            channels_count = len(telegram_config.get('channels', {}))
+            if channels_count > 0:
+                logger.info(f"Telegram storage enabled: {channels_count} channels configured")
+            else:
+                logger.info(f"Telegram storage enabled: single channel mode (channel_id={config.telegram_channel_id})")
         else:
             logger.warning("Telegram storage not configured - files will be stored as references only")
         
@@ -217,6 +232,13 @@ def main():
         # Register callback handlers (统一处理)
         application.add_handler(CallbackQueryHandler(
             owner_only(callbacks.handle_callback_query)
+        ))
+        
+        # Register unknown command handler (must be before message handlers)
+        from telegram.ext import MessageHandler
+        application.add_handler(MessageHandler(
+            filters.COMMAND,
+            owner_only(handle_unknown_command)
         ))
         
         # Register message handlers (with owner check)
