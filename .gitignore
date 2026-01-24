@@ -65,3 +65,4 @@ reset_*.py
 # Internal documentation (not for public repo)
 docs/DEVELOPMENT.md
 docs/ARCHITECTURE.md
+docs/SPONSORSHIP_GUIDE.md
