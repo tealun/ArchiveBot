@@ -40,7 +40,7 @@ class MessageBatch:
             # 从第一条媒体消息提取来源信息
             if self.source_info is None:
                 self.source_info = self._extract_source_info(message)
-                self.is_forwarded = bool(message.forward_from_chat or message.forward_from)
+                self.is_forwarded = bool(message.forward_origin)
                 if self.source_info:
                     logger.debug(f"Batch source detected: {self.source_info.get('name')} (forwarded={self.is_forwarded})")
         elif message.text:
@@ -50,18 +50,31 @@ class MessageBatch:
     @staticmethod
     def _extract_source_info(message: Message) -> Optional[Dict]:
         """从消息中提取来源信息"""
-        if message.forward_from_chat:
-            # 来自频道或群组的转发
+        if not message.forward_origin:
+            return None
+            
+        from telegram import MessageOriginChannel, MessageOriginUser, MessageOriginChat
+        
+        if isinstance(message.forward_origin, MessageOriginChannel):
+            # 来自频道的转发
             return {
-                'name': message.forward_from_chat.title,
-                'id': message.forward_from_chat.id,
-                'type': message.forward_from_chat.type
+                'name': message.forward_origin.chat.title,
+                'id': message.forward_origin.chat.id,
+                'type': message.forward_origin.chat.type
             }
-        elif message.forward_from:
-            # 来自用户的转发
+        elif isinstance(message.forward_origin, MessageOriginChat):
+            # 来自群组的转发
             return {
-                'name': message.forward_from.username or message.forward_from.first_name,
-                'id': message.forward_from.id,
+                'name': message.forward_origin.sender_chat.title,
+                'id': message.forward_origin.sender_chat.id,
+                'type': message.forward_origin.sender_chat.type
+            }
+        elif isinstance(message.forward_origin, MessageOriginUser):
+            # 来自用户的转发
+            user = message.forward_origin.sender_user
+            return {
+                'name': user.username or user.first_name,
+                'id': user.id,
                 'type': 'private'
             }
         return None
