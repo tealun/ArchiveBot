@@ -366,24 +366,35 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         is_direct_send = True  # 默认是直接发送
         
         # 检查是否为转发消息
-        if message.forward_from_chat:
-            # 来自频道或群组的转发
+        if message.forward_origin:
+            from telegram import MessageOriginChannel, MessageOriginUser, MessageOriginChat
+            
             is_direct_send = False
-            source_info = {
-                'name': message.forward_from_chat.title,
-                'id': message.forward_from_chat.id,
-                'type': message.forward_from_chat.type
-            }
-            logger.info(f"Message forwarded from: {source_info['name']} (ID: {source_info['id']})")
-        elif message.forward_from:
-            # 来自用户的转发
-            is_direct_send = False
-            source_info = {
-                'name': message.forward_from.username or message.forward_from.first_name,
-                'id': message.forward_from.id,
-                'type': 'private'
-            }
-            logger.info(f"Message forwarded from user: {source_info['name']} (ID: {source_info['id']})")
+            if isinstance(message.forward_origin, MessageOriginChannel):
+                # 来自频道的转发
+                source_info = {
+                    'name': message.forward_origin.chat.title,
+                    'id': message.forward_origin.chat.id,
+                    'type': message.forward_origin.chat.type
+                }
+                logger.info(f"Message forwarded from channel: {source_info['name']} (ID: {source_info['id']})")
+            elif isinstance(message.forward_origin, MessageOriginChat):
+                # 来自群组的转发
+                source_info = {
+                    'name': message.forward_origin.sender_chat.title,
+                    'id': message.forward_origin.sender_chat.id,
+                    'type': message.forward_origin.sender_chat.type
+                }
+                logger.info(f"Message forwarded from chat: {source_info['name']} (ID: {source_info['id']})")
+            elif isinstance(message.forward_origin, MessageOriginUser):
+                # 来自用户的转发
+                user = message.forward_origin.sender_user
+                source_info = {
+                    'name': user.username or user.first_name,
+                    'id': user.id,
+                    'type': 'private'
+                }
+                logger.info(f"Message forwarded from user: {source_info['name']} (ID: {source_info['id']})")
         else:
             # 个人直接发送
             logger.info("Message sent directly by user (not forwarded)")

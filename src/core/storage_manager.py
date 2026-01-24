@@ -379,6 +379,42 @@ class StorageManager:
             
             # 注意：此消息需要用 parse_mode='HTML' 发送
             
+            # 添加存档频道信息和跳转链接
+            if storage_provider == STORAGE_TELEGRAM and storage_path:
+                parts = storage_path.split(':')
+                if len(parts) >= 2:
+                    # 解析频道ID和消息ID
+                    channel_id_from_path = int(parts[0])
+                    message_id_from_path = parts[1]
+                    
+                    # 获取频道名称
+                    config = get_config()
+                    all_channels = config.get('storage.telegram.channels', {})
+                    
+                    # 查找频道名称
+                    channel_name = None
+                    for name, ch_id in all_channels.items():
+                        if ch_id == channel_id_from_path:
+                            channel_name_map = {
+                                'default': '默认',
+                                'text': '文本',
+                                'ebook': '电子书',
+                                'document': '文档',
+                                'image': '图片',
+                                'media': '媒体'
+                            }
+                            channel_name = channel_name_map.get(name, name)
+                            break
+                    
+                    if not channel_name:
+                        channel_name = f'ID:{channel_id_from_path}'
+                    
+                    # 生成跳转链接
+                    channel_id_str = str(channel_id_from_path).replace('-100', '')
+                    view_link = f"https://t.me/c/{channel_id_str}/{message_id_from_path}"
+                    
+                    success_msg += f"\n\n📂 已存档到 <a href='{view_link}'>{channel_name}频道</a>，点击查看"
+            
             # 添加AI分析信息（如果有）
             ai_summary = analysis.get('ai_summary', '')
             ai_key_points = analysis.get('ai_key_points', [])
@@ -451,6 +487,8 @@ class StorageManager:
                 source_name = source_info.get('name', '')
                 source_id = source_info.get('id')
                 
+                logger.debug(f"Checking source mapping: source_name='{source_name}', source_id={source_id}, source_type={source_info.get('type')}")
+                
                 for mapping in source_mapping:
                     sources = mapping.get('sources', [])
                     channel_id = mapping.get('channel_id')
@@ -459,6 +497,8 @@ class StorageManager:
                         if source_name in sources or source_id in sources:
                             logger.info(f"Channel determined by source mapping: {channel_id} (source: {source_name or source_id})")
                             return channel_id
+                
+                logger.debug(f"No source mapping matched for source: {source_name or source_id}")
         
         # 优先级3: 个人直发配置
         if is_direct_send:

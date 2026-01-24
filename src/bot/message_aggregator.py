@@ -252,7 +252,7 @@ class MessageAggregator:
         logger.debug(f"Processing single message: {chat_id}")
         # 提取单个消息的来源信息
         source_info = MessageBatch._extract_source_info(message)
-        is_forwarded = bool(message.forward_from_chat or message.forward_from)
+        is_forwarded = bool(message.forward_origin)
         return await handler_callback([message], None, source_info, is_forwarded)
     
     async def _schedule_batch_processing(
