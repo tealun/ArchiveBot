@@ -4,7 +4,7 @@ Manages content storage across different providers
 """
 
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
 
 from ..storage.database import DatabaseStorage
@@ -13,6 +13,7 @@ from ..core.tag_manager import TagManager
 from ..core.analyzer import ContentAnalyzer
 from ..utils.helpers import format_datetime, format_file_size
 from ..utils.i18n import get_i18n
+from ..utils.config import get_config
 from ..utils.constants import (
     TELEGRAM_MAX_SIZE,
     STORAGE_DATABASE,
@@ -58,13 +59,15 @@ class StorageManager:
             self.ai_cache.invalidate('statistics', 'recent_samples', 'tag_analysis')
             logger.debug("AI cache invalidated")
     
-    async def batch_archive_content(self, messages: list, analyses: list, progress_callback=None) -> list:
+    async def batch_archive_content(self, messages: list, analyses: list, source_info: Optional[Dict[str, Any]] = None, is_batch_forwarded: bool = False, progress_callback=None) -> list:
         """
         批量归档内容（优化：批量存储到Telegram频道）
         
         Args:
             messages: 消息列表
             analyses: 分析结果列表
+            source_info: 批次来源信息（从batch中提取）
+            is_batch_forwarded: 批次是否为转发消息
             progress_callback: 进度回调函数 (current, total, stage)
             
         Returns:
@@ -81,18 +84,40 @@ class StorageManager:
         telegram_indices = []
         telegram_metadata_list = []
         
+        # 对于批次消息，确定是否为直发（批次中无转发信息则认为是直发）
+        is_direct_send = not is_batch_forwarded
+        
         for i, (message, analysis) in enumerate(zip(messages, analyses)):
             content_type = analysis.get('content_type')
             storage_type = self._determine_storage_type(content_type, analysis.get('file_size'))
             
             if storage_type == STORAGE_TELEGRAM and self.telegram_storage:
                 telegram_indices.append(i)
+                
+                # 收集标签用于频道选择
+                collected_tags = []
+                collected_tags.extend(analysis.get('hashtags', []))
+                collected_tags.extend(analysis.get('tags', []))
+                
+                # 根据规则确定频道
+                target_channel_id = self._determine_channel_id(
+                    content_type=content_type,
+                    tags=collected_tags,
+                    source_info=source_info,
+                    is_direct_send=is_direct_send
+                )
+                
                 metadata = {
                     'file_id': analysis.get('file_id'),
                     'content_type': content_type,
                     'caption': analysis.get('title') or analysis.get('content'),
                     'file_size': analysis.get('file_size', 0)
                 }
+                
+                # 如果确定了特定频道，添加override
+                if target_channel_id:
+                    metadata['override_channel_id'] = target_channel_id
+                
                 telegram_metadata_list.append(metadata)
         
         # 批量存储到Telegram（如果有）
@@ -190,7 +215,9 @@ class StorageManager:
     async def archive_content(
         self,
         message: Message,
-        analysis: Dict[str, Any]
+        analysis: Dict[str, Any],
+        source_info: Dict[str, Any] = None,
+        is_direct_send: bool = False
     ) -> Tuple[bool, str]:
         """
         Archive content based on analysis
@@ -198,6 +225,8 @@ class StorageManager:
         Args:
             message: Telegram message object
             analysis: Content analysis result
+            source_info: 消息来源信息 {'name': str, 'id': int, 'type': str}
+            is_direct_send: 是否为个人直接发送（非转发）
             
         Returns:
             Tuple of (success, message)
@@ -212,6 +241,11 @@ class StorageManager:
             storage_type = self._determine_storage_type(content_type, analysis.get('file_size'))
             logger.info(f"Determined storage type: {storage_type} for {content_type} (size: {analysis.get('file_size')})")
             
+            # 收集标签（用于频道选择）
+            collected_tags = []
+            collected_tags.extend(analysis.get('hashtags', []))
+            collected_tags.extend(analysis.get('tags', []))
+            
             # Store file if needed
             storage_path = None
             storage_provider = None
@@ -219,7 +253,12 @@ class StorageManager:
             if storage_type == STORAGE_TELEGRAM and self.telegram_storage:
                 # Store to Telegram channel
                 try:
-                    storage_path = await self._store_to_telegram(analysis)
+                    storage_path = await self._store_to_telegram(
+                        analysis,
+                        tags=collected_tags,
+                        source_info=source_info,
+                        is_direct_send=is_direct_send
+                    )
                     if storage_path:
                         storage_provider = 'telegram_channel'
                         logger.info(f"File stored to Telegram: {storage_path}")
@@ -366,12 +405,113 @@ class StorageManager:
             logger.error(f"Error archiving content: {e}", exc_info=True)
             return False, self.i18n.t('archive_failed', error=str(e)), None
     
-    async def _store_to_telegram(self, analysis: Dict[str, Any]) -> Optional[str]:
+    def _determine_channel_id(
+        self, 
+        content_type: str, 
+        tags: List[str] = None,
+        source_info: Dict[str, Any] = None,
+        is_direct_send: bool = False
+    ) -> Optional[int]:
+        """
+        根据多种规则确定存储频道ID（优先级从高到低）
+        
+        优先级:
+        1. 标签匹配 (tag_mapping)
+        2. 来源匹配 (source_mapping)
+        3. 个人直发配置 (direct_send)
+        4. 内容类型映射 (type_mapping)
+        5. 默认频道 (default)
+        
+        Args:
+            content_type: 内容类型
+            tags: 标签列表
+            source_info: 来源信息 {'name': str, 'id': int, 'type': str}
+            is_direct_send: 是否为个人直接发送
+            
+        Returns:
+            频道ID或None
+        """
+        config = get_config()
+        
+        # 优先级1: 标签匹配
+        if tags:
+            tag_mapping = config.get('storage.telegram.tag_mapping', [])
+            if tag_mapping:
+                for mapping in tag_mapping:
+                    mapping_tags = mapping.get('tags', [])
+                    channel_id = mapping.get('channel_id')
+                    if channel_id and any(tag in mapping_tags for tag in tags):
+                        logger.info(f"Channel determined by tag mapping: {channel_id} (matched tags: {[t for t in tags if t in mapping_tags]})")
+                        return channel_id
+        
+        # 优先级2: 来源匹配
+        if source_info:
+            source_mapping = config.get('storage.telegram.source_mapping', [])
+            if source_mapping:
+                source_name = source_info.get('name', '')
+                source_id = source_info.get('id')
+                
+                for mapping in source_mapping:
+                    sources = mapping.get('sources', [])
+                    channel_id = mapping.get('channel_id')
+                    if channel_id and sources:
+                        # 检查名称或ID匹配
+                        if source_name in sources or source_id in sources:
+                            logger.info(f"Channel determined by source mapping: {channel_id} (source: {source_name or source_id})")
+                            return channel_id
+        
+        # 优先级3: 个人直发配置
+        if is_direct_send:
+            direct_config = config.get('storage.telegram.direct_send')
+            if direct_config and isinstance(direct_config, dict):
+                # 检查是否配置了个人直发的channels
+                direct_channels = direct_config.get('channels')
+                direct_type_mapping = direct_config.get('type_mapping')
+                
+                # 只有当channels或type_mapping非空且是字典时才启用
+                has_channels = direct_channels and isinstance(direct_channels, dict) and len(direct_channels) > 0
+                has_type_mapping = direct_type_mapping and isinstance(direct_type_mapping, dict) and len(direct_type_mapping) > 0
+                
+                if has_channels or has_type_mapping:
+                    # 优先使用type_mapping确定频道key
+                    channel_key = None
+                    if has_type_mapping:
+                        channel_key = direct_type_mapping.get(content_type)
+                    
+                    # 如果有channel_key，从channels中获取频道ID
+                    if channel_key and has_channels:
+                        channel_id = direct_channels.get(channel_key)
+                        if channel_id:
+                            logger.info(f"Channel determined by direct_send config: {channel_id} (type: {content_type} -> {channel_key})")
+                            return channel_id
+                    
+                    # 如果有default频道
+                    if has_channels:
+                        default_channel = direct_channels.get('default')
+                        if default_channel:
+                            logger.info(f"Channel determined by direct_send default: {default_channel}")
+                            return default_channel
+        
+        # 优先级4和5: 使用TelegramStorage的默认逻辑（类型映射+默认频道）
+        # 返回None让TelegramStorage自己处理
+        logger.debug(f"No specific channel rule matched, using TelegramStorage default logic")
+        return None
+    
+    async def _store_to_telegram(
+        self, 
+        analysis: Dict[str, Any],
+        tags: List[str] = None,
+        source_info: Dict[str, Any] = None,
+        is_direct_send: bool = False
+    ) -> Optional[str]:
         """
         Store file to Telegram channel
         
         Args:
             analysis: Content analysis result
+            tags: 标签列表（用于频道选择）
+            source_info: 来源信息（用于频道选择）
+            is_direct_send: 是否为个人直接发送
             
         Returns:
             Storage path or None
@@ -389,6 +529,14 @@ class StorageManager:
             logger.error(f"No file_id in analysis for {content_type}")
             return None
         
+        # 确定存储频道（根据多种规则）
+        target_channel_id = self._determine_channel_id(
+            content_type=content_type,
+            tags=tags,
+            source_info=source_info,
+            is_direct_send=is_direct_send
+        )
+        
         # 构建metadata（统一使用file_id转发，简单可靠）
         metadata = {
             'file_id': file_id,
@@ -396,6 +544,11 @@ class StorageManager:
             'caption': analysis.get('title') or analysis.get('content'),
             'file_size': file_size
         }
+        
+        # 如果确定了特定频道，添加override_channel_id参数
+        if target_channel_id:
+            metadata['override_channel_id'] = target_channel_id
+            logger.info(f"Using specific channel {target_channel_id} for this storage")
         
         logger.info(f"Forwarding {content_type} to Telegram channel: file_id={file_id[:20]}..., size={format_file_size(file_size) if file_size else 'unknown'}")
         

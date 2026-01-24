@@ -188,8 +188,8 @@ def main():
         export_manager = ExportManager(db, note_manager)
         review_manager = ReviewManager(db_storage, tag_manager)
         
-        # Initialize AI data cache for efficient data gathering
-        ai_data_cache = AIDataCache(db_storage)
+        # Initialize AI data cache for efficient data gathering (传入config以支持排除过滤)
+        ai_data_cache = AIDataCache(db_storage, config)
         
         # 将缓存实例传递给需要的管理器（事件驱动失效）
         storage_manager.set_ai_cache(ai_data_cache)

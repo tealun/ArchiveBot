@@ -361,8 +361,40 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         if not storage_manager:
             return False, "Storage manager not initialized"
         
-        # Archive content
-        success, result_msg, archive_id = await storage_manager.archive_content(message, analysis)
+        # 提取消息来源信息
+        source_info = None
+        is_direct_send = True  # 默认是直接发送
+        
+        # 检查是否为转发消息
+        if message.forward_from_chat:
+            # 来自频道或群组的转发
+            is_direct_send = False
+            source_info = {
+                'name': message.forward_from_chat.title,
+                'id': message.forward_from_chat.id,
+                'type': message.forward_from_chat.type
+            }
+            logger.info(f"Message forwarded from: {source_info['name']} (ID: {source_info['id']})")
+        elif message.forward_from:
+            # 来自用户的转发
+            is_direct_send = False
+            source_info = {
+                'name': message.forward_from.username or message.forward_from.first_name,
+                'id': message.forward_from.id,
+                'type': 'private'
+            }
+            logger.info(f"Message forwarded from user: {source_info['name']} (ID: {source_info['id']})")
+        else:
+            # 个人直接发送
+            logger.info("Message sent directly by user (not forwarded)")
+        
+        # Archive content (传递来源信息和直发标识)
+        success, result_msg, archive_id = await storage_manager.archive_content(
+            message, 
+            analysis,
+            source_info=source_info,
+            is_direct_send=is_direct_send
+        )
         
         if progress_callback:
             await progress_callback(lang_ctx.t('progress_complete'), 1.0)
@@ -517,7 +549,7 @@ URL：{analysis.get('url', '')}
         return None
 
 
-async def _process_batch_messages(messages: List[Message], context: ContextTypes.DEFAULT_TYPE, merged_caption: Optional[str] = None, progress_callback=None) -> List[tuple]:
+async def _process_batch_messages(messages: List[Message], context: ContextTypes.DEFAULT_TYPE, merged_caption: Optional[str] = None, source_info: Optional[Dict] = None, is_forwarded: bool = False, progress_callback=None) -> List[tuple]:
     """
     批量处理消息（优化：共享手动标签 + 独立AI标签）
     
@@ -525,6 +557,8 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
         messages: 消息列表
         context: Bot context
         merged_caption: 合并的caption文本（如果有）
+        source_info: 来源信息（从batch中提取）
+        is_forwarded: 是否为转发消息
         progress_callback: 进度回调函数 (current, total, stage)
         
     Returns:
@@ -631,8 +665,14 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     if not storage_manager:
         return [(False, "Storage manager not initialized") for _ in messages]
     
-    # 调用批量归档（带进度回调）
-    results = await storage_manager.batch_archive_content(messages, analyses, progress_callback)
+    # 调用批量归档（带进度回调和来源信息）
+    results = await storage_manager.batch_archive_content(
+        messages, 
+        analyses, 
+        source_info=source_info,
+        is_batch_forwarded=is_forwarded,
+        progress_callback=progress_callback
+    )
     
     if progress_callback:
         await progress_callback(total, total, lang_ctx.t('batch_progress_complete'))
@@ -640,13 +680,15 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     return results
 
 
-async def _batch_callback(messages: List[Message], merged_caption: Optional[str], update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def _batch_callback(messages: List[Message], merged_caption: Optional[str], source_info: Optional[Dict], is_forwarded: bool, update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     批次处理回调
     
     Args:
         messages: 消息列表
         merged_caption: 合并的caption
+        source_info: 来源信息
+        is_forwarded: 是否为转发消息
         update: Telegram update
         context: Bot context
     """
@@ -786,14 +828,20 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                     await processing_msg.edit_text(
                         f"📦 批量处理中\n"
                         f"阶段: {stage}\n"
-                        f"进度: {percentage}% ({current}/{total})\n"
-                        f"{'█' * (percentage // 5)}{'░' * (20 - percentage // 5)}"
+                        f"进度: {current}/{total} ({percentage}%)"
                     )
                 except Exception as e:
-                    # 忽略消息编辑过于频繁的错误
-                    logger.debug(f"Progress update skipped: {e}")
+                    logger.debug(f"Progress update failed: {e}")
             
-            results = await _process_batch_messages(messages, context, merged_caption, update_progress)
+            # 调用批量处理（传递source_info和is_forwarded）
+            results = await _process_batch_messages(
+                messages, 
+                context, 
+                merged_caption,
+                source_info=source_info,
+                is_forwarded=is_forwarded,
+                progress_callback=update_progress
+            )
             
             # 统计结果
             success_count = sum(1 for success, _ in results if success)
@@ -1103,8 +1151,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         aggregator = get_message_aggregator()
         
         # 使用聚合器处理（自动检测批量）
-        async def callback(messages: List[Message], merged_caption: Optional[str]):
-            await _batch_callback(messages, merged_caption, update, context)
+        async def callback(messages: List[Message], merged_caption: Optional[str], source_info: Optional[Dict], is_forwarded: bool):
+            await _batch_callback(messages, merged_caption, source_info, is_forwarded, update, context)
         
         await aggregator.process_message(message, callback)
         

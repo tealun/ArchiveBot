@@ -23,6 +23,10 @@ class MessageBatch:
         self.first_time: Optional[datetime] = None
         self.last_time: Optional[datetime] = None
         
+        # 来源信息（从batch中的第一条媒体消息提取）
+        self.source_info: Optional[Dict] = None
+        self.is_forwarded: bool = False
+        
     def add_message(self, message: Message):
         """Add message to batch"""
         if self.first_time is None:
@@ -32,9 +36,35 @@ class MessageBatch:
         # 区分媒体消息和纯文本消息
         if self._is_media_message(message):
             self.messages.append(message)
+            
+            # 从第一条媒体消息提取来源信息
+            if self.source_info is None:
+                self.source_info = self._extract_source_info(message)
+                self.is_forwarded = bool(message.forward_from_chat or message.forward_from)
+                if self.source_info:
+                    logger.debug(f"Batch source detected: {self.source_info.get('name')} (forwarded={self.is_forwarded})")
         elif message.text:
             # 检查是否是标签或笔记
             self.captions.append(message)
+    
+    @staticmethod
+    def _extract_source_info(message: Message) -> Optional[Dict]:
+        """从消息中提取来源信息"""
+        if message.forward_from_chat:
+            # 来自频道或群组的转发
+            return {
+                'name': message.forward_from_chat.title,
+                'id': message.forward_from_chat.id,
+                'type': message.forward_from_chat.type
+            }
+        elif message.forward_from:
+            # 来自用户的转发
+            return {
+                'name': message.forward_from.username or message.forward_from.first_name,
+                'id': message.forward_from.id,
+                'type': 'private'
+            }
+        return None
     
     @staticmethod
     def _is_media_message(message: Message) -> bool:
@@ -207,7 +237,10 @@ class MessageAggregator:
         
         # 单独处理（不属于任何批次）
         logger.debug(f"Processing single message: {chat_id}")
-        return await handler_callback([message], None)
+        # 提取单个消息的来源信息
+        source_info = MessageBatch._extract_source_info(message)
+        is_forwarded = bool(message.forward_from_chat or message.forward_from)
+        return await handler_callback([message], None, source_info, is_forwarded)
     
     async def _schedule_batch_processing(
         self,
@@ -227,11 +260,12 @@ class MessageAggregator:
             await asyncio.sleep(self.batch_window_ms / 1000)
             
             # 执行批量处理
-            logger.info(f"Processing batch: {batch_id}, size={batch.size()}, captions={len(batch.captions)}")
+            logger.info(f"Processing batch: {batch_id}, size={batch.size()}, captions={len(batch.captions)}, source={batch.source_info.get('name') if batch.source_info else 'direct'}, forwarded={batch.is_forwarded}")
             
             try:
                 merged_caption = batch.get_merged_caption()
-                await handler_callback(batch.messages, merged_caption)
+                # 传递来源信息和转发状态
+                await handler_callback(batch.messages, merged_caption, batch.source_info, batch.is_forwarded)
             except Exception as e:
                 logger.error(f"Error processing batch {batch_id}: {e}", exc_info=True)
             finally:

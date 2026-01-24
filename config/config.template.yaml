@@ -45,6 +45,11 @@ ai:
   chat_threshold_chars: 30      # Trigger chat mode when user message is shorter than this (excludes forwarded messages)
   chat_session_ttl_seconds: 600 # Session timeout (default 10 minutes)
   chat_allow_write_ops: false   # Allow AI to execute write operations (archive/delete/tag) - keep false for safety
+  
+  # AI参考内容排除配置（用于AI互动模式的上下文数据过滤）
+  exclude_from_context:
+    channel_ids: []  # 排除的存档频道ID列表，例如: [-1001234567890, -1009876543210]
+    tags: []         # 排除的标签列表，例如: ['私密', '草稿', '临时'， '不存档'， 'exclude'， 'skip']
 
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -88,6 +93,54 @@ storage:
       voice: media         # 语音 → 媒体频道
       contact: default     # 联系人 → 默认频道
       location: default    # 位置 → 默认频道
+    
+    # 来源到频道的映射配置（优先级高于类型映射）
+    # 根据转发来源（频道/群组名称或ID）指定存储频道
+    # 多个来源可以映射到同一个频道，但一个来源不能映射到多个频道
+    source_mapping:
+      # 示例：
+      # - sources: ['技术频道', '开发群组', -1001234567890]  # 支持名称或ID
+      #   channel_id: -1001111111111  # 目标存储频道
+      # - sources: ['生活日常']
+      #   channel_id: -1002222222222
+    
+    # 标签到频道的映射配置（优先级最高）
+    # 根据消息标签指定存储频道
+    # 多个标签可以映射到同一个频道，但一个标签不能映射到多个频道
+    tag_mapping:
+      # 示例：
+      # - tags: ['工作', '项目', '任务']  # 多个标签映射到同一频道
+      #   channel_id: -1001111111111
+      # - tags: ['学习', '笔记']
+      #   channel_id: -1002222222222
+    
+    # 个人直接发送内容的存储配置（无转发来源时）
+    direct_send:
+      # 个人直发的频道配置（可选，不配置则使用系统channels）
+      channels:
+        # 示例（可以配置与系统不同的频道）：
+        # default: -1003675667626  # 默认频道
+        # text: -1003779168344     # 文本频道
+        # ebook: -1003859375248    # 电子书频道
+        # document: -1003869785901 # 文档频道
+        # image: -1003534777860    # 图片频道
+        # media: -1003843636869    # 媒体频道
+      
+      # 个人直发的类型映射规则（可选，不配置则使用系统type_mapping）
+      type_mapping:
+        # 示例（与系统type_mapping保持一致）：
+        # text: text           # 纯文本 → 文本频道
+        # link: text           # 链接 → 文本频道
+        # ebook: ebook         # 电子书 → 电子书频道
+        # document: document   # 文档 → 文档频道
+        # image: image         # 图片 → 图片频道
+        # animation: image     # 动画GIF → 图片频道
+        # sticker: image       # 贴纸 → 图片频道
+        # video: media         # 视频 → 媒体频道
+        # audio: media         # 音频 → 媒体频道
+        # voice: media         # 语音 → 媒体频道
+        # contact: default     # 联系人 → 默认频道
+        # location: default    # 位置 → 默认频道
   
   cloud:
     google_drive:

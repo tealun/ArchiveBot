@@ -85,7 +85,7 @@ class TelegramStorage(BaseStorage):
         
         Args:
             file_data: File to store (file_id or file object)
-            metadata: File metadata (title, caption, content_type, etc.)
+            metadata: File metadata (title, caption, content_type, override_channel_id, etc.)
             
         Returns:
             Storage path in format "channel_id:message_id:file_id" or None
@@ -94,9 +94,10 @@ class TelegramStorage(BaseStorage):
             file_id = metadata.get('file_id')
             content_type = metadata.get('content_type')
             caption = metadata.get('caption')
+            override_channel_id = metadata.get('override_channel_id')
             
-            # 根据content_type选择频道
-            channel_id = self._get_channel_id(content_type)
+            # 根据content_type选择频道（可被override_channel_id覆盖）
+            channel_id = override_channel_id if override_channel_id else self._get_channel_id(content_type)
             
             if not channel_id:
                 logger.error(f"No channel configured for content_type: {content_type}")
