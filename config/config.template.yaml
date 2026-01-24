@@ -1,65 +1,65 @@
-# ArchiveBot Configuration Template
-# Copy this file to config.yaml and fill in your values
+# ArchiveBot 配置模板
+# 复制此文件为 config.yaml 并填写你的值
 
 bot:
-  token: "YOUR_BOT_TOKEN_HERE"  # From @BotFather
-  owner_id: 0  # Your Telegram ID from @userinfobot
-  language: "zh-CN"  # en, zh-CN, zh-TW
-  polling_interval: 1
+  token: "YOUR_BOT_TOKEN_HERE"  # 从 @BotFather 获取
+  owner_id: 0  # 你的 Telegram ID，从 @userinfobot 获取
+  language: "zh-CN"  # 界面语言: en, zh-CN, zh-TW
+  polling_interval: 1  # 轮询间隔（秒）
 
 features:
-  auto_tag: true  # Auto type tags
-  enable_fts: true  # Full-text search
-  enable_ocr: false  # OCR for images
+  auto_tag: true  # 自动生成类型标签
+  enable_fts: true  # 启用全文搜索
+  enable_ocr: false  # 启用图片OCR识别
 
 ai:
-  enabled: false  # Enable AI features
-  auto_summarize: false  # Auto summarize new archives (backward compatible with old field names)
-  auto_generate_tags: false  # Auto generate AI tags
+  enabled: false  # 启用AI功能
+  auto_summarize: false  # 自动总结新归档内容
+  auto_generate_tags: false  # 自动生成AI标签
 
-  # Unified AI configuration (preferred). To avoid hardcoding secrets, set API keys via environment variables
-  # and reference the env var name in `api.api_key_env`. Backward-compatibility: existing `api.api_key` is still supported
+  # 统一AI配置（推荐）。为避免硬编码密钥，建议通过环境变量设置API密钥
+  # 并在 api.api_key_env 中引用环境变量名称
   api:
-    provider: openai  # openai, claude, gemini, grok, etc.
-    # Prefer using an environment variable name here. Example: ARCHIVEBOT_OPENAI_KEY
-    api_key_env: ""  # e.g. ARCHIVEBOT_OPENAI_KEY (preferred)
-    # Backward compatibility: if `api_key_env` is empty, the code may fall back to `api_key` (not recommended)
-    api_key: ''  # (deprecated) Direct API key — avoid committing secrets into config files
-    api_url: ''  # Custom API URL (optional)
-    model: gpt-3.5-turbo  # gpt-3.5-turbo, gpt-4, grok-beta, etc.
-    max_tokens: 1000
-    timeout: 30
+    provider: openai  # 供应商: openai, claude, gemini, grok 等
+    # 推荐使用环境变量名称，例如: ARCHIVEBOT_OPENAI_KEY
+    api_key_env: ""  # 例如 ARCHIVEBOT_OPENAI_KEY（推荐）
+    # 向后兼容：如果 api_key_env 为空，代码会回退到 api_key（不推荐）
+    api_key: ''  # （已废弃）直接配置API密钥 - 避免将密钥提交到配置文件
+    api_url: ''  # 自定义API地址（可选）
+    model: gpt-3.5-turbo  # 模型: gpt-3.5-turbo, gpt-4, grok-beta 等
+    max_tokens: 1000  # 最大token数
+    timeout: 30  # 超时时间（秒）
 
-  # Runtime controls and safeguards
-  cache_enabled: true            # Enable caching of AI responses to avoid duplicate calls and costs
-  cache_path: "data/ai_cache.db" # Path to cache DB (sqlite)
-  cache_ttl_seconds: 604800     # Cache TTL in seconds (default 7 days)
-  rate_limit_per_minute: 60     # Global approximate API calls per minute
-  log_calls: false              # Whether to log AI call details (avoid logging full responses in production)
-  retry_on_failure: 1           # Number of retries for transient errors
-  auto_summary_on_forward: true # Auto-trigger summary when forwarding messages (handler-level)
-  auto_tagging: true            # Apply AI-generated tags (can be set to false to only generate suggestions)
+  # 运行时控制和保护措施
+  cache_enabled: true            # 启用AI响应缓存以避免重复调用和成本
+  cache_path: "data/ai_cache.db" # 缓存数据库路径（sqlite）
+  cache_ttl_seconds: 604800      # 缓存有效期（秒），默认7天
+  rate_limit_per_minute: 60      # 全局每分钟API调用次数限制
+  log_calls: false               # 是否记录AI调用详情（生产环境避免记录完整响应）
+  retry_on_failure: 1            # 临时错误重试次数
+  auto_summary_on_forward: true  # 转发消息时自动触发摘要（处理器层级）
+  auto_tagging: true             # 应用AI生成的标签（可设为false仅生成建议）
   
-  # AI Chat Mode (interactive conversation)
-  chat_enabled: false           # Enable automatic AI chat mode for short messages
-  chat_threshold_chars: 30      # Trigger chat mode when user message is shorter than this (excludes forwarded messages)
-  chat_session_ttl_seconds: 600 # Session timeout (default 10 minutes)
-  chat_allow_write_ops: false   # Allow AI to execute write operations (archive/delete/tag) - keep false for safety
+  # AI聊天模式（交互式对话）
+  chat_enabled: false           # 启用短消息自动AI聊天模式
+  chat_threshold_chars: 30      # 当用户消息短于此长度时触发聊天模式（排除转发消息）
+  chat_session_ttl_seconds: 600 # 会话超时时间（默认10分钟）
+  chat_allow_write_ops: false   # 允许AI执行写操作（归档/删除/标签）- 为安全起见保持false
   
   # AI参考内容排除配置（用于AI互动模式的上下文数据过滤）
   exclude_from_context:
     channel_ids: []  # 排除的存档频道ID列表，例如: [-1001234567890, -1009876543210]
-    tags: []         # 排除的标签列表，例如: ['私密', '草稿', '临时'， '不存档'， 'exclude'， 'skip']
+    tags: []         # 排除的标签列表，例如: ['私密', '草稿', '临时', '不存档', 'exclude', 'skip']
 
 logging:
-  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-  file: "data/bot.log"
-  console: true
+  level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"  # 日志文件路径
+  console: true  # 是否输出到控制台
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 storage:
   database:
-    path: "data/archive.db"
+    path: "data/archive.db"  # 数据库文件路径
   
   backup:
     auto_interval_hours: 24  # 自动备份间隔（小时），默认24小时
@@ -68,7 +68,7 @@ storage:
   telegram:
     # 向后兼容：旧的单频道配置（可选，如果配置了channels.default则此项被忽略）
     channel_id: 0  # 已废弃，请使用下面的 channels.default
-    enabled: true
+    enabled: true  # 启用Telegram存储
     
     # 新的多频道配置
     channels:
@@ -144,12 +144,12 @@ storage:
   
   cloud:
     google_drive:
-      enabled: false
-      client_id: ""
-      client_secret: ""
-      folder_name: "ArchiveBot"
+      enabled: false  # 启用Google Drive存储
+      client_id: ""  # Google Drive客户端ID
+      client_secret: ""  # Google Drive客户端密钥
+      folder_name: "ArchiveBot"  # 存储文件夹名称
     
     aliyun:
-      enabled: false
-      refresh_token: ""
-      folder_name: "归档"
+      enabled: false  # 启用阿里云盘存储
+      refresh_token: ""  # 阿里云盘刷新令牌
+      folder_name: "归档"  # 存储文件夹名称

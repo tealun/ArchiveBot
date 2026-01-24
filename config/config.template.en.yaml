@@ -1,0 +1,155 @@
+# ArchiveBot Configuration Template
+# Copy this file to config.yaml and fill in your values
+
+bot:
+  token: "YOUR_BOT_TOKEN_HERE"  # Get from @BotFather
+  owner_id: 0  # Your Telegram ID from @userinfobot
+  language: "en"  # Interface language: en, zh-CN, zh-TW
+  polling_interval: 1  # Polling interval in seconds
+
+features:
+  auto_tag: true  # Automatically generate type tags
+  enable_fts: true  # Enable full-text search
+  enable_ocr: false  # Enable OCR for images
+
+ai:
+  enabled: false  # Enable AI features
+  auto_summarize: false  # Automatically summarize new archives
+  auto_generate_tags: false  # Automatically generate AI tags
+
+  # Unified AI configuration (recommended). To avoid hardcoding secrets, 
+  # set API keys via environment variables and reference the variable name in api.api_key_env
+  api:
+    provider: openai  # Provider: openai, claude, gemini, grok, etc.
+    # Recommended: use environment variable name, e.g. ARCHIVEBOT_OPENAI_KEY
+    api_key_env: ""  # e.g. ARCHIVEBOT_OPENAI_KEY (recommended)
+    # Backward compatibility: if api_key_env is empty, code falls back to api_key (not recommended)
+    api_key: ''  # (Deprecated) Direct API key - avoid committing secrets to config files
+    api_url: ''  # Custom API URL (optional)
+    model: gpt-3.5-turbo  # Model: gpt-3.5-turbo, gpt-4, grok-beta, etc.
+    max_tokens: 1000  # Maximum tokens
+    timeout: 30  # Timeout in seconds
+
+  # Runtime controls and safeguards
+  cache_enabled: true            # Enable caching of AI responses to avoid duplicate calls and costs
+  cache_path: "data/ai_cache.db" # Path to cache DB (sqlite)
+  cache_ttl_seconds: 604800      # Cache TTL in seconds (default 7 days)
+  rate_limit_per_minute: 60      # Global approximate API calls per minute
+  log_calls: false               # Whether to log AI call details (avoid logging full responses in production)
+  retry_on_failure: 1            # Number of retries for transient errors
+  auto_summary_on_forward: true  # Auto-trigger summary when forwarding messages (handler-level)
+  auto_tagging: true             # Apply AI-generated tags (can be set to false to only generate suggestions)
+  
+  # AI Chat Mode (interactive conversation)
+  chat_enabled: false           # Enable automatic AI chat mode for short messages
+  chat_threshold_chars: 30      # Trigger chat mode when user message is shorter than this (excludes forwarded messages)
+  chat_session_ttl_seconds: 600 # Session timeout (default 10 minutes)
+  chat_allow_write_ops: false   # Allow AI to execute write operations (archive/delete/tag) - keep false for safety
+  
+  # AI reference content exclusion configuration (for filtering context data in AI interaction mode)
+  exclude_from_context:
+    channel_ids: []  # List of archive channel IDs to exclude, e.g.: [-1001234567890, -1009876543210]
+    tags: []         # List of tags to exclude, e.g.: ['private', 'draft', 'temp', 'no-archive', 'exclude', 'skip']
+
+logging:
+  level: "INFO"  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"  # Log file path
+  console: true  # Whether to output to console
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+storage:
+  database:
+    path: "data/archive.db"  # Database file path
+  
+  backup:
+    auto_interval_hours: 24  # Automatic backup interval in hours (default 24)
+    keep_count: 10           # Number of backups to keep (default 10 most recent)
+  
+  telegram:
+    # Backward compatibility: old single channel configuration (optional, ignored if channels.default is set)
+    channel_id: 0  # Deprecated, please use channels.default below
+    enabled: true  # Enable Telegram storage
+    
+    # New multi-channel configuration
+    channels:
+      default: 0      # Default channel ID (required, format: -1001234567890)
+      text: 0         # Text channel (optional, uses default if not set)
+      ebook: 0        # E-book channel (optional)
+      document: 0     # Document channel (optional)
+      image: 0        # Image channel (optional)
+      media: 0        # Media channel for videos and audio (optional)
+    
+    # Type to channel mapping rules
+    type_mapping:
+      text: text           # Plain text → text channel
+      link: text           # Links → text channel
+      ebook: ebook         # E-books → ebook channel
+      document: document   # Documents → document channel
+      image: image         # Images → image channel
+      animation: image     # Animated GIFs → image channel
+      sticker: image       # Stickers → image channel
+      video: media         # Videos → media channel
+      audio: media         # Audio → media channel
+      voice: media         # Voice messages → media channel
+      contact: default     # Contacts → default channel
+      location: default    # Locations → default channel
+    
+    # Source to channel mapping configuration (higher priority than type mapping)
+    # Route messages based on forward source (channel/group name or ID)
+    # Multiple sources can map to the same channel, but one source cannot map to multiple channels
+    source_mapping:
+      # Examples:
+      # - sources: ['Tech Channel', 'Dev Group', -1001234567890]  # Supports names or IDs
+      #   channel_id: -1001111111111  # Target storage channel
+      # - sources: ['Daily Life']
+      #   channel_id: -1002222222222
+    
+    # Tag to channel mapping configuration (highest priority)
+    # Route messages based on message tags
+    # Multiple tags can map to the same channel, but one tag cannot map to multiple channels
+    tag_mapping:
+      # Examples:
+      # - tags: ['work', 'project', 'task']  # Multiple tags to same channel
+      #   channel_id: -1001111111111
+      # - tags: ['study', 'notes']
+      #   channel_id: -1002222222222
+    
+    # Storage configuration for directly sent content (no forward source)
+    direct_send:
+      # Channel configuration for direct sends (optional, uses system channels if not set)
+      channels:
+        # Examples (can configure different channels from system):
+        # default: -1003675667626  # Default channel
+        # text: -1003779168344     # Text channel
+        # ebook: -1003859375248    # E-book channel
+        # document: -1003869785901 # Document channel
+        # image: -1003534777860    # Image channel
+        # media: -1003843636869    # Media channel
+      
+      # Type mapping rules for direct sends (optional, uses system type_mapping if not set)
+      type_mapping:
+        # Examples (consistent with system type_mapping):
+        # text: text           # Plain text → text channel
+        # link: text           # Links → text channel
+        # ebook: ebook         # E-books → ebook channel
+        # document: document   # Documents → document channel
+        # image: image         # Images → image channel
+        # animation: image     # Animated GIFs → image channel
+        # sticker: image       # Stickers → image channel
+        # video: media         # Videos → media channel
+        # audio: media         # Audio → media channel
+        # voice: media         # Voice messages → media channel
+        # contact: default     # Contacts → default channel
+        # location: default    # Locations → default channel
+  
+  cloud:
+    google_drive:
+      enabled: false  # Enable Google Drive storage
+      client_id: ""  # Google Drive client ID
+      client_secret: ""  # Google Drive client secret
+      folder_name: "ArchiveBot"  # Storage folder name
+    
+    aliyun:
+      enabled: false  # Enable Aliyun Drive storage
+      refresh_token: ""  # Aliyun Drive refresh token
+      folder_name: "Archive"  # Storage folder name

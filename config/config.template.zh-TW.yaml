@@ -1,0 +1,155 @@
+# ArchiveBot 設定範本
+# 複製此檔案為 config.yaml 並填寫你的值
+
+bot:
+  token: "YOUR_BOT_TOKEN_HERE"  # 從 @BotFather 取得
+  owner_id: 0  # 你的 Telegram ID，從 @userinfobot 取得
+  language: "zh-TW"  # 介面語言: en, zh-CN, zh-TW
+  polling_interval: 1  # 輪詢間隔（秒）
+
+features:
+  auto_tag: true  # 自動產生類型標籤
+  enable_fts: true  # 啟用全文搜尋
+  enable_ocr: false  # 啟用圖片OCR識別
+
+ai:
+  enabled: false  # 啟用AI功能
+  auto_summarize: false  # 自動摘要新歸檔內容
+  auto_generate_tags: false  # 自動產生AI標籤
+
+  # 統一AI設定（建議）。為避免硬編碼金鑰，建議透過環境變數設定API金鑰
+  # 並在 api.api_key_env 中引用環境變數名稱
+  api:
+    provider: openai  # 供應商: openai, claude, gemini, grok 等
+    # 建議使用環境變數名稱，例如: ARCHIVEBOT_OPENAI_KEY
+    api_key_env: ""  # 例如 ARCHIVEBOT_OPENAI_KEY（建議）
+    # 向後相容：如果 api_key_env 為空，程式碼會回退到 api_key（不建議）
+    api_key: ''  # （已棄用）直接設定API金鑰 - 避免將金鑰提交到設定檔
+    api_url: ''  # 自訂API位址（可選）
+    model: gpt-3.5-turbo  # 模型: gpt-3.5-turbo, gpt-4, grok-beta 等
+    max_tokens: 1000  # 最大token數
+    timeout: 30  # 逾時時間（秒）
+
+  # 執行時控制和保護措施
+  cache_enabled: true            # 啟用AI回應快取以避免重複呼叫和成本
+  cache_path: "data/ai_cache.db" # 快取資料庫路徑（sqlite）
+  cache_ttl_seconds: 604800      # 快取有效期（秒），預設7天
+  rate_limit_per_minute: 60      # 全域每分鐘API呼叫次數限制
+  log_calls: false               # 是否記錄AI呼叫詳情（生產環境避免記錄完整回應）
+  retry_on_failure: 1            # 暫時性錯誤重試次數
+  auto_summary_on_forward: true  # 轉發訊息時自動觸發摘要（處理器層級）
+  auto_tagging: true             # 套用AI產生的標籤（可設為false僅產生建議）
+  
+  # AI聊天模式（互動式對話）
+  chat_enabled: false           # 啟用短訊息自動AI聊天模式
+  chat_threshold_chars: 30      # 當使用者訊息短於此長度時觸發聊天模式（排除轉發訊息）
+  chat_session_ttl_seconds: 600 # 工作階段逾時時間（預設10分鐘）
+  chat_allow_write_ops: false   # 允許AI執行寫入操作（歸檔/刪除/標籤）- 為安全起見保持false
+  
+  # AI參考內容排除設定（用於AI互動模式的上下文資料過濾）
+  exclude_from_context:
+    channel_ids: []  # 排除的歸檔頻道ID清單，例如: [-1001234567890, -1009876543210]
+    tags: []         # 排除的標籤清單，例如: ['私密', '草稿', '臨時', '不存檔', 'exclude', 'skip']
+
+logging:
+  level: "INFO"  # 記錄層級: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"  # 記錄檔路徑
+  console: true  # 是否輸出到主控台
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+storage:
+  database:
+    path: "data/archive.db"  # 資料庫檔案路徑
+  
+  backup:
+    auto_interval_hours: 24  # 自動備份間隔（小時），預設24小時
+    keep_count: 10           # 保留備份數量，預設保留最近10個
+  
+  telegram:
+    # 向後相容：舊的單頻道設定（可選，如果設定了channels.default則此項被忽略）
+    channel_id: 0  # 已棄用，請使用下面的 channels.default
+    enabled: true  # 啟用Telegram儲存
+    
+    # 新的多頻道設定
+    channels:
+      default: 0      # 預設頻道ID（必填，格式: -1001234567890）
+      text: 0         # 文字頻道（可選，不設定則使用default）
+      ebook: 0        # 電子書頻道（可選）
+      document: 0     # 文件頻道（可選）
+      image: 0        # 圖片頻道（可選）
+      media: 0        # 媒體頻道-影片音訊（可選）
+    
+    # 類型到頻道的對映規則
+    type_mapping:
+      text: text           # 純文字 → 文字頻道
+      link: text           # 連結 → 文字頻道
+      ebook: ebook         # 電子書 → 電子書頻道
+      document: document   # 文件 → 文件頻道
+      image: image         # 圖片 → 圖片頻道
+      animation: image     # 動畫GIF → 圖片頻道
+      sticker: image       # 貼圖 → 圖片頻道
+      video: media         # 影片 → 媒體頻道
+      audio: media         # 音訊 → 媒體頻道
+      voice: media         # 語音 → 媒體頻道
+      contact: default     # 聯絡人 → 預設頻道
+      location: default    # 位置 → 預設頻道
+    
+    # 來源到頻道的對映設定（優先順序高於類型對映）
+    # 根據轉發來源（頻道/群組名稱或ID）指定儲存頻道
+    # 多個來源可以對映到同一個頻道，但一個來源不能對映到多個頻道
+    source_mapping:
+      # 範例：
+      # - sources: ['技術頻道', '開發群組', -1001234567890]  # 支援名稱或ID
+      #   channel_id: -1001111111111  # 目標儲存頻道
+      # - sources: ['生活日常']
+      #   channel_id: -1002222222222
+    
+    # 標籤到頻道的對映設定（最高優先順序）
+    # 根據訊息標籤指定儲存頻道
+    # 多個標籤可以對映到同一個頻道，但一個標籤不能對映到多個頻道
+    tag_mapping:
+      # 範例：
+      # - tags: ['工作', '專案', '任務']  # 多個標籤對映到同一頻道
+      #   channel_id: -1001111111111
+      # - tags: ['學習', '筆記']
+      #   channel_id: -1002222222222
+    
+    # 個人直接傳送內容的儲存設定（無轉發來源時）
+    direct_send:
+      # 個人直發的頻道設定（可選，不設定則使用系統channels）
+      channels:
+        # 範例（可以設定與系統不同的頻道）：
+        # default: -1003675667626  # 預設頻道
+        # text: -1003779168344     # 文字頻道
+        # ebook: -1003859375248    # 電子書頻道
+        # document: -1003869785901 # 文件頻道
+        # image: -1003534777860    # 圖片頻道
+        # media: -1003843636869    # 媒體頻道
+      
+      # 個人直發的類型對映規則（可選，不設定則使用系統type_mapping）
+      type_mapping:
+        # 範例（與系統type_mapping保持一致）：
+        # text: text           # 純文字 → 文字頻道
+        # link: text           # 連結 → 文字頻道
+        # ebook: ebook         # 電子書 → 電子書頻道
+        # document: document   # 文件 → 文件頻道
+        # image: image         # 圖片 → 圖片頻道
+        # animation: image     # 動畫GIF → 圖片頻道
+        # sticker: image       # 貼圖 → 圖片頻道
+        # video: media         # 影片 → 媒體頻道
+        # audio: media         # 音訊 → 媒體頻道
+        # voice: media         # 語音 → 媒體頻道
+        # contact: default     # 聯絡人 → 預設頻道
+        # location: default    # 位置 → 預設頻道
+  
+  cloud:
+    google_drive:
+      enabled: false  # 啟用Google Drive儲存
+      client_id: ""  # Google Drive客戶端ID
+      client_secret: ""  # Google Drive客戶端密鑰
+      folder_name: "ArchiveBot"  # 儲存資料夾名稱
+    
+    aliyun:
+      enabled: false  # 啟用阿里雲盤儲存
+      refresh_token: ""  # 阿里雲盤重新整理權杖
+      folder_name: "歸檔"  # 儲存資料夾名稱
