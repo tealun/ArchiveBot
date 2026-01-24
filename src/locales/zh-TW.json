@@ -177,5 +177,67 @@
   "ai_chat_understanding": "⏳ 理解你的問題...",
   "ai_chat_analyzing": "🧠 分析需求...",
   "ai_chat_gathering": "📊 收集資料...",
-  "ai_chat_generating": "💬 生成回覆..."
+  "ai_chat_generating": "💬 生成回覆...",
+  
+  "archive_processing": "⏳ 正在處理...",
+  "archive_progress": "進度: {percentage}%",
+  "archive_duplicate_file": "⚠️ 文件已存在",
+  "archive_duplicate_file_name": "📝 文件名：{title}",
+  "archive_duplicate_file_size": "📦 大小：{size}",
+  "archive_duplicate_file_archived_at": "📅 歸檔時間：{time}",
+  "archive_duplicate_file_tags": "🏷️ 標籤：{tags}",
+  "archive_duplicate_unknown_title": "未知",
+  "archive_duplicate_unknown_time": "未知",
+  
+  "batch_processing_start": "📦 批量處理開始\n總數: {total} 條\n進度: 0% (0/{total})",
+  "batch_processing_progress": "📦 批量處理中\n階段: {stage}\n進度: {percentage}% ({current}/{total})\n預計剩餘: {remaining}秒",
+  "batch_processing_complete": "✅ 批量歸檔完成\n\n成功: {success} 條\n失敗: {fail} 條\n\n💡 提示: 使用 /search 搜索已歸檔內容",
+  "batch_processing_complete_no_fail": "✅ 批量歸檔完成\n\n成功: {success} 條\n\n💡 提示: 使用 /search 搜索已歸檔內容",
+  
+  "note_modified": "✅ 筆記已修改\n\n📝 歸檔 #{archive_id}",
+  "note_appended": "✅ 筆記已追加\n\n📝 歸檔 #{archive_id}",
+  "note_added_to_archive": "✅ 筆記已添加到歸檔 #{archive_id}\n\n📝 筆記ID: #{note_id}",
+  "note_add_failed_error": "❌ 筆記添加失敗",
+  "note_manager_uninitialized": "❌ 筆記管理器未初始化",
+  
+  "ai_refining_note": "🤖 正在處理...",
+  "ai_refine_note_success": "✅ **筆記已精煉**\n\n📝 歸檔 #{archive_id}\n\n精煉後內容：\n{content}",
+  "ai_refine_note_save_failed": "❌ 保存精煉後的筆記失敗",
+  "ai_refine_note_failed": "❌ AI處理失敗",
+  "ai_refine_note_error": "❌ 精煉失敗: {error}",
+  "ai_feature_disabled": "❌ AI功能未啟用",
+  
+  "progress_analyzing_content": "📋 分析內容",
+  "progress_checking_duplicates": "🔍 檢查重複文件",
+  "progress_ai_analysis": "🤖 AI智能分析",
+  "progress_ai_document_type": "📚 AI判斷文檔類型中...",
+  "progress_ai_generating_tags": "🏷️ AI生成標籤中...",
+  "progress_ai_analyzing_content": "📝 AI分析內容中...",
+  "progress_ai_analysis_complete": "✅ AI分析完成",
+  "progress_ai_generating_title": "📝 AI生成標題中...",
+  "progress_title_complete": "✅ 標題生成完成",
+  "progress_saving_archive": "💾 保存歸檔",
+  "progress_complete": "✅ 完成",
+  "progress_failed": "❌ 處理失敗",
+  
+  "batch_progress_analyzing": "分析內容",
+  "batch_progress_extracting_tags": "提取標籤",
+  "batch_progress_ai_generating_tags": "AI生成標籤",
+  "batch_progress_applying_tags": "應用標籤",
+  "batch_progress_storing": "存儲到頻道",
+  "batch_progress_complete": "完成",
+  
+  "unknown_command_message": "⚠️ 這似乎是一個命令，但格式不正確或命令不存在。\n發送 /help 查看所有可用命令。",
+  
+  "callback_closed": "已關閉",
+  "callback_tag_no_content": "標籤 #{tag} 下暫無內容",
+  "callback_tag_header": "🏷️ 標籤: #{tag}",
+  "callback_favorite_marked": "❤️ 已精選",
+  "callback_favorite_unmarked": "🤍 未精選",
+  "callback_note_has": "📝 √ 有筆記",
+  "callback_note_no": "📝 無筆記",
+  
+  "error_search_engine_not_initialized": "Search engine not initialized",
+  "error_tag_manager_not_initialized": "Tag manager not initialized",
+  "error_database_not_initialized": "Database storage not initialized"
 }

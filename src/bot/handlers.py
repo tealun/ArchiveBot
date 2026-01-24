@@ -12,11 +12,11 @@ from telegram.constants import ParseMode
 
 from ..core.analyzer import ContentAnalyzer
 from ..core.storage_manager import StorageManager
-from ..utils.i18n import get_i18n
+from ..utils.language_context import get_language_context
 from ..utils.helpers import format_file_size, truncate_text
 from .message_aggregator import MessageAggregator
 from ..core.ai_session import get_session_manager
-from .ai_chat_router import handle_chat_message
+from ..ai.chat_router import handle_chat_message
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +51,15 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         - archive_id: 归档ID（成功时）
         - duplicate_info: 重复文件信息（检测到重复时）
     """
-    i18n = get_i18n()
+    # 从 message 创建临时 update 对象以获取语言上下文
+    from telegram import Update as TelegramUpdate
+    temp_update = TelegramUpdate(update_id=0, message=message)
+    lang_ctx = get_language_context(temp_update, context)
     
     try:
         # Analyze content
         if progress_callback:
-            await progress_callback("📋 分析内容", 0.1)
+            await progress_callback(lang_ctx.t('progress_analyzing_content'), 0.1)
         
         analysis = ContentAnalyzer.analyze(message)
     
@@ -96,7 +99,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         
         # 文件去重检测（仅对有文件的内容）
         if progress_callback:
-            await progress_callback("🔍 检查重复文件", 0.2)
+            await progress_callback(lang_ctx.t('progress_checking_duplicates'), 0.2)
         
         if analysis.get('file_id'):
             db_storage = context.bot_data.get('db_storage')
@@ -114,7 +117,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         
         # AI智能处理（如果启用）
         if progress_callback:
-            await progress_callback("🤖 AI智能分析", 0.4)
+            await progress_callback(lang_ctx.t('progress_ai_analysis'), 0.4)
         
         ai_summarizer = context.bot_data.get('ai_summarizer')
         ai_available = ai_summarizer and ai_summarizer.is_available()
@@ -126,10 +129,10 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             # 1. 优先处理电子书判断（如果需要）
             if analysis.get('_needs_ai_ebook_check'):
                 if progress_callback:
-                    await progress_callback("📚 AI判断文档类型中...", 0.35)
+                    await progress_callback(lang_ctx.t('progress_ai_document_type'), 0.35)
                 try:
                     file_name = analysis.get('file_name', '')
-                    user_language = i18n.current_language
+                    user_language = lang_ctx.current_language
                     is_ebook = await ai_summarizer.is_ebook(file_name, language=user_language)
                     
                     if is_ebook:
@@ -168,7 +171,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                 # 自动生成AI标签
                 if config.ai.get('auto_generate_tags', False):
                     if progress_callback:
-                        await progress_callback("🏷️ AI生成标签中...", 0.45)
+                        await progress_callback(lang_ctx.t('progress_ai_generating_tags'), 0.45)
                     try:
                         content_for_ai = analysis.get('content') or analysis.get('title', '')
                         if content_for_ai:
@@ -187,7 +190,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                 # 自动生成摘要（仅对长文本）
                 if config.ai.get('auto_summarize', False):
                     if progress_callback:
-                        await progress_callback("📝 AI分析内容中...", 0.5)
+                        await progress_callback(lang_ctx.t('progress_ai_analyzing_content'), 0.5)
                     try:
                         content_for_ai = analysis.get('content') or ''
                         file_name = (analysis.get('file_name') or '').lower()
@@ -213,7 +216,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                         
                         if content_for_ai and len(content_for_ai) > 100:  # 降低最小长度要求
                             # 获取用户语言设置
-                            user_language = i18n.current_language
+                            user_language = lang_ctx.current_language
                             
                             # 构建上下文信息
                             context_info = {
@@ -248,7 +251,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                                 
                                 logger.info(f"AI analysis complete: summary={analysis['ai_summary'][:50]}..., category={analysis['ai_category']}")
                                 if progress_callback:
-                                    await progress_callback("✅ AI分析完成", 0.6)
+                                    await progress_callback(lang_ctx.t('progress_ai_analysis_complete'), 0.6)
                     except Exception as e:
                         logger.warning(f"AI summary generation failed: {e}")
         
@@ -258,7 +261,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             try:
                 from ..ai.fallback import AIFallbackAnalyzer
                 
-                user_language = i18n.current_language
+                user_language = lang_ctx.current_language
                 fallback_result = None
                 
                 # 根据内容类型选择降级策略
@@ -302,7 +305,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         # 如果是文本内容且需要AI标题，生成标题
         if analysis.get('_needs_ai_title') and ai_available:
             if progress_callback:
-                await progress_callback("📝 AI生成标题中...", 0.62)
+                await progress_callback(lang_ctx.t('progress_ai_generating_title'), 0.62)
             try:
                 content = analysis.get('content', '')
                 is_forwarded = bool(message.forward_origin)
@@ -328,7 +331,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                             # 隐藏用户名的转发
                             source_prefix = f"来自[{origin.sender_user_name}] "
                     
-                    user_language = i18n.current_language
+                    user_language = lang_ctx.current_language
                     # 计算标题可用长度（32 - 来源前缀长度）
                     max_title_length = 32 - len(source_prefix)
                     if max_title_length < 10:  # 如果来源太长，限制来源长度
@@ -344,13 +347,13 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                         analysis['title'] = source_prefix + ai_title
                         logger.info(f"AI generated title: {analysis['title']}")
                         if progress_callback:
-                            await progress_callback("✅ 标题生成完成", 0.65)
+                            await progress_callback(lang_ctx.t('progress_title_complete'), 0.65)
             except Exception as e:
                 logger.warning(f"AI title generation failed: {e}")
         
         # Get storage manager
         if progress_callback:
-            await progress_callback("💾 保存归档", 0.7)
+            await progress_callback(lang_ctx.t('progress_saving_archive'), 0.7)
         
         storage_manager: StorageManager = context.bot_data.get('storage_manager')
         
@@ -361,7 +364,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         success, result_msg, archive_id = await storage_manager.archive_content(message, analysis)
         
         if progress_callback:
-            await progress_callback("✅ 完成", 1.0)
+            await progress_callback(lang_ctx.t('progress_complete'), 1.0)
         
         # 自动生成关联笔记（如果归档成功）
         if success and archive_id:
@@ -376,7 +379,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         
     except Exception as e:
         if progress_callback:
-            await progress_callback("❌ 处理失败", 1.0)
+            await progress_callback(lang_ctx.t('progress_failed'), 1.0)
         raise
 
 
@@ -424,9 +427,10 @@ async def _auto_generate_note(
                 
                 if not is_short and ai_summarizer and ai_summarizer.is_available():
                     # 长文本，AI生成简洁笔记
-                    from ..utils.i18n import get_i18n
-                    i18n = get_i18n()
-                    language = i18n.current_language
+                    from telegram import Update as TelegramUpdate
+                    temp_update = TelegramUpdate(update_id=0, message=message)
+                    lang_ctx = get_language_context(temp_update, context)
+                    language = lang_ctx.current_language
                     
                     note_content = await ai_summarizer.generate_note_from_content(
                         content=content,
@@ -456,9 +460,10 @@ URL：{analysis.get('url', '')}
                 if page_content:
                     link_info += f"\n页面内容节选：\n{page_content[:1000]}"
                 
-                from ..utils.i18n import get_i18n
-                i18n = get_i18n()
-                language = i18n.current_language
+                from telegram import Update as TelegramUpdate
+                temp_update = TelegramUpdate(update_id=0, message=message)
+                lang_ctx = get_language_context(temp_update, context)
+                language = lang_ctx.current_language
                 
                 note_content = await ai_summarizer.generate_note_from_content(
                     content=link_info,
@@ -478,9 +483,10 @@ URL：{analysis.get('url', '')}
             ai_category = analysis.get('ai_category', '')
             
             if ai_summary and ai_summarizer and ai_summarizer.is_available():
-                from ..utils.i18n import get_i18n
-                i18n = get_i18n()
-                language = i18n.current_language
+                from telegram import Update as TelegramUpdate
+                temp_update = TelegramUpdate(update_id=0, message=message)
+                lang_ctx = get_language_context(temp_update, context)
+                language = lang_ctx.current_language
                 
                 title = analysis.get('title') or analysis.get('file_name', '未知文档')
                 
@@ -523,24 +529,27 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     Returns:
         [(success, result_msg), ...]
     """
-    i18n = get_i18n()
+    # 从第一条 message 创建临时 update 对象以获取语言上下文
+    from telegram import Update as TelegramUpdate
+    temp_update = TelegramUpdate(update_id=0, message=messages[0])
+    lang_ctx = get_language_context(temp_update, context)
     results = []
     total = len(messages)
     
     # 阶段1: 分析内容 (0-20%)
     if progress_callback:
-        await progress_callback(0, total, "分析内容")
+        await progress_callback(0, total, lang_ctx.t('batch_progress_analyzing'))
     
     analyses = []
     for i, message in enumerate(messages):
         analysis = ContentAnalyzer.analyze(message)
         analyses.append(analysis)
         if progress_callback and (i + 1) % max(1, total // 10) == 0:
-            await progress_callback(i + 1, total, "分析内容")
+            await progress_callback(i + 1, total, lang_ctx.t('batch_progress_analyzing'))
     
     # 阶段2: 提取共享标签 (20%)
     if progress_callback:
-        await progress_callback(total, total, "提取标签")
+        await progress_callback(total, total, lang_ctx.t('batch_progress_extracting_tags'))
     
     # 提取共享的hashtags（从merged_caption）- 这是用户主动输入的标签
     shared_hashtags = []
@@ -551,7 +560,7 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     
     # 阶段3: AI处理 (20-50%)
     if progress_callback:
-        await progress_callback(0, total, "AI生成标签")
+        await progress_callback(0, total, lang_ctx.t('batch_progress_ai_generating_tags'))
     
     # 批量AI处理 - 为每个内容独立生成AI标签（并发执行，但不共享）
     ai_summarizer = context.bot_data.get('ai_summarizer')
@@ -587,11 +596,11 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
                 logger.warning(f"Batch AI tag generation failed: {e}")
     
     if progress_callback:
-        await progress_callback(total, total, "AI生成标签")
+        await progress_callback(total, total, lang_ctx.t('batch_progress_ai_generating_tags'))
     
     # 阶段4: 应用标签 (50-60%)
     if progress_callback:
-        await progress_callback(0, total, "应用标签")
+        await progress_callback(0, total, lang_ctx.t('batch_progress_applying_tags'))
     
     # 应用共享的hashtags到所有分析结果
     for i, analysis in enumerate(analyses):
@@ -608,13 +617,13 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
                 analysis['content'] = f"📝 批注: {merged_caption}"
     
     if progress_callback:
-        await progress_callback(total, total, "应用标签")
+        await progress_callback(total, total, lang_ctx.t('batch_progress_applying_tags'))
     
     logger.info(f"Batch processing: shared hashtags={shared_hashtags}, each item has independent AI tags")
     
     # 阶段5: 批量存储 (60-100%)
     if progress_callback:
-        await progress_callback(0, total, "存储到频道")
+        await progress_callback(0, total, lang_ctx.t('batch_progress_storing'))
     
     # 批量存储（优化：使用storage_manager的批量方法）
     storage_manager: StorageManager = context.bot_data.get('storage_manager')
@@ -625,7 +634,7 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     results = await storage_manager.batch_archive_content(messages, analyses, progress_callback)
     
     if progress_callback:
-        await progress_callback(total, total, "完成")
+        await progress_callback(total, total, lang_ctx.t('batch_progress_complete'))
     
     return results
 
@@ -640,13 +649,13 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
         update: Telegram update
         context: Bot context
     """
-    i18n = get_i18n()
+    lang_ctx = get_language_context(update, context)
     
     try:
         if len(messages) == 1:
             # 单条消息处理
             message = messages[0]
-            processing_msg = await message.reply_text("⏳ 正在处理...")
+            processing_msg = await message.reply_text(lang_ctx.t('archive_processing'))
             
             try:
                 # 定义进度更新回调
@@ -656,7 +665,7 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                         progress_bar = '█' * (percentage // 5) + '░' * (20 - percentage // 5)
                         await processing_msg.edit_text(
                             f"⏳ {stage}\n"
-                            f"进度: {percentage}%\n"
+                            f"{lang_ctx.t('archive_progress', percentage=percentage)}\n"
                             f"{progress_bar}"
                         )
                     except Exception as e:
@@ -667,10 +676,10 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                 # 如果检测到重复文件，构建并发送重复提示消息
                 if duplicate_info:
                     # 构建重复文件提示消息（使用HTML格式）
-                    dup_msg = f"⚠️ 文件已存在\n\n"
+                    dup_msg = f"{lang_ctx.t('archive_duplicate_file')}\n\n"
                     
                     # 构建文件名（如果有频道链接则作为超链接）
-                    file_title = duplicate_info.get('title', '未知')
+                    file_title = duplicate_info.get('title', lang_ctx.t('archive_duplicate_unknown_title'))
                     storage_path = duplicate_info.get('storage_path')
                     storage_type = duplicate_info.get('storage_type')
                     
@@ -691,14 +700,14 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                                 message_id = storage_path
                             
                             file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                            dup_msg += f"📝 文件名：<a href='{file_link}'>{file_title}</a>\n"
+                            dup_msg += lang_ctx.t('archive_duplicate_file_name', title=f"<a href='{file_link}'>{file_title}</a>") + "\n"
                         else:
-                            dup_msg += f"📝 文件名：{file_title}\n"
+                            dup_msg += lang_ctx.t('archive_duplicate_file_name', title=file_title) + "\n"
                     else:
-                        dup_msg += f"📝 文件名：{file_title}\n"
+                        dup_msg += lang_ctx.t('archive_duplicate_file_name', title=file_title) + "\n"
                     
-                    dup_msg += f"📦 大小：{format_file_size(duplicate_info.get('file_size', 0))}\n"
-                    dup_msg += f"📅 归档时间：{duplicate_info.get('archived_at', '未知')}\n"
+                    dup_msg += lang_ctx.t('archive_duplicate_file_size', size=format_file_size(duplicate_info.get('file_size', 0))) + "\n"
+                    dup_msg += lang_ctx.t('archive_duplicate_file_archived_at', time=duplicate_info.get('archived_at', lang_ctx.t('archive_duplicate_unknown_time'))) + "\n"
                     
                     # 获取标签
                     tag_manager = context.bot_data.get('tag_manager')
@@ -706,7 +715,7 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                         tags = tag_manager.get_archive_tags(duplicate_info['id'])
                         if tags:
                             tag_str = ' '.join([f"#{tag}" for tag in tags])
-                            dup_msg += f"🏷️ 标签：{tag_str}"
+                            dup_msg += lang_ctx.t('archive_duplicate_file_tags', tags=tag_str)
                     
                     await processing_msg.edit_text(dup_msg, parse_mode='HTML')
                     return
@@ -754,7 +763,7 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
             # 批量消息处理
             first_message = messages[0]
             processing_msg = await first_message.reply_text(
-                f"📦 批量处理开始\n总数: {len(messages)} 条\n进度: 0% (0/{len(messages)})"
+                lang_ctx.t('batch_processing_start', total=len(messages))
             )
             
             # 定义进度更新回调
@@ -789,11 +798,10 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
             success_count = sum(1 for success, _ in results if success)
             fail_count = len(results) - success_count
             
-            summary_msg = f"✅ 批量归档完成\n\n"
-            summary_msg += f"成功: {success_count} 条\n"
             if fail_count > 0:
-                summary_msg += f"失败: {fail_count} 条\n"
-            summary_msg += f"\n💡 提示: 使用 /search 搜索已归档内容"
+                summary_msg = lang_ctx.t('batch_processing_complete', success=success_count, fail=fail_count)
+            else:
+                summary_msg = lang_ctx.t('batch_processing_complete_no_fail', success=success_count)
             
             await processing_msg.edit_text(summary_msg)
             logger.info(f"Batch archived: {success_count}/{len(messages)} messages")
@@ -812,7 +820,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """
     try:
         message = update.message
-        i18n = get_i18n()
+        lang_ctx = get_language_context(update, context)
         
         # 检查是否在等待添加笔记
         if context.user_data.get('waiting_note_for_archive'):
@@ -831,10 +839,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                             # 添加新笔记
                             new_note_id = note_manager.add_note(archive_id, message.text)
                             if new_note_id:
-                                await message.reply_text(f"✅ 笔记已修改\n\n📝 归档 #{archive_id}")
+                                await message.reply_text(lang_ctx.t('note_modified', archive_id=archive_id))
                                 logger.info(f"Modified note {note_id_to_modify} -> {new_note_id} for archive {archive_id}")
                             else:
-                                await message.reply_text(i18n.t('note_add_failed'))
+                                await message.reply_text(lang_ctx.t('note_add_failed'))
                         # 清除修改模式标记
                         context.user_data.pop('note_modify_mode', None)
                         context.user_data.pop('note_id_to_modify', None)
@@ -857,10 +865,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                 new_content = f"{old_content}\n\n---\n\n{message.text}"
                                 new_note_id = note_manager.add_note(archive_id, new_content)
                                 if new_note_id:
-                                    await message.reply_text(f"✅ 笔记已追加\n\n📝 归档 #{archive_id}")
+                                    await message.reply_text(lang_ctx.t('note_appended', archive_id=archive_id))
                                     logger.info(f"Appended to note {note_id_to_append} -> {new_note_id} for archive {archive_id}")
                                 else:
-                                    await message.reply_text(i18n.t('note_add_failed'))
+                                    await message.reply_text(lang_ctx.t('note_add_failed'))
                         # 清除追加模式标记
                         context.user_data.pop('note_append_mode', None)
                         context.user_data.pop('note_id_to_append', None)
@@ -868,12 +876,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         # 普通添加模式
                         note_id = note_manager.add_note(archive_id, message.text)
                         if note_id:
-                            await message.reply_text(f"✅ 笔记已添加到归档 #{archive_id}\n\n📝 笔记ID: #{note_id}")
+                            await message.reply_text(lang_ctx.t('note_added_to_archive', archive_id=archive_id, note_id=note_id))
                             logger.info(f"Added note {note_id} to archive {archive_id}")
                         else:
-                            await message.reply_text("❌ 笔记添加失败")
+                            await message.reply_text(lang_ctx.t('note_add_failed_error'))
                 else:
-                    await message.reply_text("❌ 笔记管理器未初始化")
+                    await message.reply_text(lang_ctx.t('note_manager_uninitialized'))
                 
                 # 清除等待状态
                 context.user_data['waiting_note_for_archive'] = None
@@ -894,7 +902,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 ai_summarizer = context.bot_data.get('ai_summarizer')
                 if ai_summarizer and ai_summarizer.is_available():
                     try:
-                        await message.reply_text("🤖 正在处理...")
+                        await message.reply_text(lang_ctx.t('ai_refining_note'))
                         
                         # 构造提示词
                         refine_prompt = f"""请根据用户的指令修改以下笔记：
@@ -925,24 +933,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                 
                                 if new_note_id:
                                     await message.reply_text(
-                                        f"✅ **笔记已精炼**\n\n"
-                                        f"📝 归档 #{archive_id}\n\n"
-                                        f"精炼后内容：\n{truncate_text(refined_content, 300)}",
+                                        lang_ctx.t('ai_refine_note_success', archive_id=archive_id, content=truncate_text(refined_content, 300)),
                                         parse_mode=ParseMode.MARKDOWN
                                     )
                                     logger.info(f"Refined notes for archive {archive_id}")
                                 else:
-                                    await message.reply_text("❌ 保存精炼后的笔记失败")
+                                    await message.reply_text(lang_ctx.t('ai_refine_note_save_failed'))
                             else:
-                                await message.reply_text("❌ 笔记管理器未初始化")
+                                await message.reply_text(lang_ctx.t('note_manager_uninitialized'))
                         else:
-                            await message.reply_text("❌ AI处理失败")
+                            await message.reply_text(lang_ctx.t('ai_refine_note_failed'))
                             
                     except Exception as e:
                         logger.error(f"Error refining note: {e}", exc_info=True)
-                        await message.reply_text(f"❌ 精炼失败: {str(e)}")
+                        await message.reply_text(lang_ctx.t('ai_refine_note_error', error=str(e)))
                 else:
-                    await message.reply_text("❌ AI功能未启用")
+                    await message.reply_text(lang_ctx.t('ai_feature_disabled'))
                 
                 # 清除等待状态
                 context.user_data.pop('refine_note_context', None)
@@ -971,7 +977,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     # 用户已在AI会话中，处理消息
                     try:
                         # 发送AI处理进度提示
-                        progress_msg = await message.reply_text(f"🤖 {i18n.t('ai_chat_understanding')}")
+                        progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
                         
                         # 包装handle_chat_message，添加进度回调
                         async def update_ai_progress(stage: str):
@@ -981,10 +987,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                 pass
                         
                         # Stage 1: 理解需求
-                        await update_ai_progress(i18n.t('ai_chat_analyzing'))
+                        await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
                         
                         # 调用AI处理（内部有3个阶段）
-                        ai_response = await handle_chat_message(text, session, context, update_ai_progress)
+                        ai_response = await handle_chat_message(text, session, context, lang_ctx.language, update_ai_progress)
                         
                         # 编辑消息为最终回复
                         await progress_msg.edit_text(f"🤖 {ai_response}")
@@ -997,7 +1003,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         
                     except Exception as e:
                         logger.error(f"AI chat error: {e}", exc_info=True)
-                        await message.reply_text(i18n.t('ai_chat_error_session_end'))
+                        await message.reply_text(lang_ctx.t('ai_chat_error_session_end'))
                         session_manager.clear_session(user_id)
                         # 继续正常归档流程
                 
@@ -1015,7 +1021,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     
                     try:
                         # 发送AI处理进度提示
-                        progress_msg = await message.reply_text(f"🤖 {i18n.t('ai_chat_understanding')}")
+                        progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
                         
                         # 进度更新回调
                         async def update_ai_progress(stage: str):
@@ -1025,9 +1031,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                 pass
                         
                         # Stage 1: 理解需求
-                        await update_ai_progress(i18n.t('ai_chat_analyzing'))
+                        await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
                         
-                        ai_response = await handle_chat_message(text, session, context, update_ai_progress)
+                        ai_response = await handle_chat_message(text, session, context, lang_ctx.language, update_ai_progress)
                         
                         # 编辑消息为最终回复
                         await progress_msg.edit_text(f"🤖 {ai_response}")
@@ -1040,7 +1046,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         
                     except Exception as e:
                         logger.error(f"AI chat error: {e}", exc_info=True)
-                        await message.reply_text(i18n.t('ai_chat_error'))
+                        await message.reply_text(lang_ctx.t('ai_chat_error'))
                         session_manager.clear_session(user_id)
                         # 继续正常归档流程
             
@@ -1072,7 +1078,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         
                         await message.reply_text(
-                            "💬 请问您需要做什么呢？",
+                            lang_ctx.t('short_text_prompt'),
                             reply_markup=reply_markup
                         )
                         logger.info(f"Asking user intent for short text: {text[:30]}")
@@ -1083,10 +1089,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     if note_manager:
                         note_id = note_manager.add_note(None, text)
                         if note_id:
-                            await message.reply_text(f"📝 笔记已保存 (ID: #{note_id})")
+                            await message.reply_text(lang_ctx.t('short_text_saved_note', note_id=note_id))
                             logger.info(f"Short text saved as standalone note: {note_id}")
                         else:
-                            await message.reply_text(i18n.t('note_add_failed'))
+                            await message.reply_text(lang_ctx.t('note_add_failed'))
                     return
         
         # 正常归档流程
@@ -1100,9 +1106,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
     except Exception as e:
         logger.error(f"Error handling message: {e}", exc_info=True)
-        i18n = get_i18n()
+        lang_ctx = get_language_context(update, context)
         try:
-            await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+            await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
         except:
             pass
 

@@ -176,5 +176,67 @@
   "ai_chat_understanding": "⏳ Understanding your question...",
   "ai_chat_analyzing": "🧠 Analyzing needs...",
   "ai_chat_gathering": "📊 Gathering data...",
-  "ai_chat_generating": "💬 Generating response..."
+  "ai_chat_generating": "💬 Generating response...",
+  
+  "archive_processing": "⏳ Processing...",
+  "archive_progress": "Progress: {percentage}%",
+  "archive_duplicate_file": "⚠️ File already exists",
+  "archive_duplicate_file_name": "📝 File name: {title}",
+  "archive_duplicate_file_size": "📦 Size: {size}",
+  "archive_duplicate_file_archived_at": "📅 Archived at: {time}",
+  "archive_duplicate_file_tags": "🏷️ Tags: {tags}",
+  "archive_duplicate_unknown_title": "Unknown",
+  "archive_duplicate_unknown_time": "Unknown",
+  
+  "batch_processing_start": "📦 Batch processing started\nTotal: {total} items\nProgress: 0% (0/{total})",
+  "batch_processing_progress": "📦 Batch processing\nStage: {stage}\nProgress: {percentage}% ({current}/{total})\nEst. remaining: {remaining}s",
+  "batch_processing_complete": "✅ Batch archiving complete\n\nSuccess: {success} items\nFailed: {fail} items\n\n💡 Tip: Use /search to find archived content",
+  "batch_processing_complete_no_fail": "✅ Batch archiving complete\n\nSuccess: {success} items\n\n💡 Tip: Use /search to find archived content",
+  
+  "note_modified": "✅ Note modified\n\n📝 Archive #{archive_id}",
+  "note_appended": "✅ Note appended\n\n📝 Archive #{archive_id}",
+  "note_added_to_archive": "✅ Note added to archive #{archive_id}\n\n📝 Note ID: #{note_id}",
+  "note_add_failed_error": "❌ Failed to add note",
+  "note_manager_uninitialized": "❌ Note manager not initialized",
+  
+  "ai_refining_note": "🤖 Processing...",
+  "ai_refine_note_success": "✅ **Note refined**\n\n📝 Archive #{archive_id}\n\nRefined content:\n{content}",
+  "ai_refine_note_save_failed": "❌ Failed to save refined note",
+  "ai_refine_note_failed": "❌ AI processing failed",
+  "ai_refine_note_error": "❌ Refinement failed: {error}",
+  "ai_feature_disabled": "❌ AI features not enabled",
+  
+  "progress_analyzing_content": "📋 Analyzing content",
+  "progress_checking_duplicates": "🔍 Checking duplicates",
+  "progress_ai_analysis": "🤖 AI analysis",
+  "progress_ai_document_type": "📚 AI analyzing document type...",
+  "progress_ai_generating_tags": "🏷️ AI generating tags...",
+  "progress_ai_analyzing_content": "📝 AI analyzing content...",
+  "progress_ai_analysis_complete": "✅ AI analysis complete",
+  "progress_ai_generating_title": "📝 AI generating title...",
+  "progress_title_complete": "✅ Title generation complete",
+  "progress_saving_archive": "💾 Saving archive",
+  "progress_complete": "✅ Complete",
+  "progress_failed": "❌ Processing failed",
+  
+  "batch_progress_analyzing": "Analyzing content",
+  "batch_progress_extracting_tags": "Extracting tags",
+  "batch_progress_ai_generating_tags": "AI generating tags",
+  "batch_progress_applying_tags": "Applying tags",
+  "batch_progress_storing": "Storing to channel",
+  "batch_progress_complete": "Complete",
+  
+  "unknown_command_message": "⚠️ This appears to be a command, but it's incorrect or doesn't exist.\nSend /help to see all available commands.",
+  
+  "callback_closed": "Closed",
+  "callback_tag_no_content": "No content under tag #{tag}",
+  "callback_tag_header": "🏷️ Tag: #{tag}",
+  "callback_favorite_marked": "❤️ Favorited",
+  "callback_favorite_unmarked": "🤍 Not favorited",
+  "callback_note_has": "📝 √ Has notes",
+  "callback_note_no": "📝 No notes",
+  
+  "error_search_engine_not_initialized": "Search engine not initialized",
+  "error_tag_manager_not_initialized": "Tag manager not initialized",
+  "error_database_not_initialized": "Database storage not initialized"
 }

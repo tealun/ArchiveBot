@@ -8,7 +8,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
-from ..utils.i18n import get_i18n
+from ..utils.language_context import with_language_context, get_language_context
 from ..utils.config import get_config
 from ..core.tag_manager import TagManager
 from ..core.search_engine import SearchEngine
@@ -29,6 +29,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         query = update.callback_query
         await query.answer()
         
+        lang_ctx = get_language_context(update, context)
         callback_data = query.data
         
         # 路由到具体处理函数
@@ -75,7 +76,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         elif callback_data == 'note_close':
             # 关闭笔记查看窗口
             await query.message.delete()
-            await query.answer("已关闭")
+            await query.answer(lang_ctx.t('callback_closed'))
         elif callback_data.startswith('short_text:'):
             await handle_short_text_intent_callback(update, context)
         elif callback_data.startswith('refine_note:'):
@@ -94,7 +95,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         logger.error(f"Error handling callback query: {e}", exc_info=True)
 
 
-async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     处理标签点击 - 显示该标签的内容列表
     
@@ -123,7 +125,7 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         
         if search_result.get('count', 0) == 0:
-            await query.edit_message_text(f"标签 #{tag_name} 下暂无内容")
+            await query.edit_message_text(lang_ctx.t('callback_tag_no_content', tag=tag_name))
             return
         
         # 格式化结果列表
@@ -132,7 +134,6 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         # 获取数据库实例用于查询状态
         db_storage = context.bot_data.get('db_storage')
         db = db_storage.db if db_storage else None
-        i18n = get_i18n()
         
         for idx, archive in enumerate(search_result.get('results', []), page * page_size + 1):
             emoji = get_content_type_emoji(archive.get('content_type', ''))
@@ -157,8 +158,8 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             is_favorite = db.is_favorite(archive_id) if db and archive_id else False
             
             # 构建状态图标（按照要求的顺序）
-            fav_icon = "❤️ 已精选" if is_favorite else "🤍 未精选"
-            note_icon = "📝 √ 有笔记" if has_notes else "📝 无笔记"
+            fav_icon = lang_ctx.t('callback_favorite_marked') if is_favorite else lang_ctx.t('callback_favorite_unmarked')
+            note_icon = lang_ctx.t('callback_note_has') if has_notes else lang_ctx.t('callback_note_no')
             
             # 结果文本：一行显示状态
             result_text = f"{idx}. {emoji} {title_truncated}\n   {fav_icon} | {note_icon} | 📅 {archived_at}"
@@ -170,7 +171,7 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         has_more = search_result.get('count', 0) == page_size
         total_count = search_result.get('total_count', search_result.get('count', 0))
         
-        message = f"🏷️ 标签: #{tag_name}\n\n{results_text}"
+        message = lang_ctx.t('callback_tag_header', tag=tag_name) + f"\n\n{results_text}"
         
         # 构建按钮布局：只包含分页和返回按钮（无每条记录的操作按钮）
         keyboard = []
@@ -184,19 +185,19 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             if page > 0:
                 nav_row.append(InlineKeyboardButton(
-                    i18n.t('button_previous_page'),
+                    lang_ctx.t('button_previous_page'),
                     callback_data=f"tag:{tag_name}:{page-1}"
                 ))
             
             # 显示当前页码
             nav_row.append(InlineKeyboardButton(
-                i18n.t('pagination_page_of', current=page+1, total=total_pages),
+                lang_ctx.t('pagination_page_of', current=page+1, total=total_pages),
                 callback_data="tags_noop"
             ))
             
             if page + 1 < total_pages:
                 nav_row.append(InlineKeyboardButton(
-                    i18n.t('button_next_page'),
+                    lang_ctx.t('button_next_page'),
                     callback_data=f"tag:{tag_name}:{page+1}"
                 ))
             
@@ -204,7 +205,7 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         # 返回按钮
         keyboard.append([InlineKeyboardButton(
-            i18n.t('button_back_to_tags'),
+            lang_ctx.t('button_back_to_tags'),
             callback_data="tags_page:0"
         )])
         
@@ -216,7 +217,8 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error(f"Error handling tag callback: {e}", exc_info=True)
 
 
-async def handle_tags_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_tags_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     处理标签列表分页
     
@@ -265,8 +267,6 @@ async def handle_tags_page_callback(update: Update, context: ContextTypes.DEFAUL
         if row:
             keyboard.append(row)
         
-        i18n = get_i18n()
-        
         # 分页按钮 - 只在多页时显示
         total_pages = (len(tags) + page_size - 1) // page_size
         
@@ -276,18 +276,18 @@ async def handle_tags_page_callback(update: Update, context: ContextTypes.DEFAUL
             
             if page > 0:
                 nav_row.append(InlineKeyboardButton(
-                    i18n.t('button_previous_page'),
+                    lang_ctx.t('button_previous_page'),
                     callback_data=f"tags_page:{page-1}"
                 ))
             
             nav_row.append(InlineKeyboardButton(
-                i18n.t('pagination_page_of', current=page+1, total=total_pages),
+                lang_ctx.t('pagination_page_of', current=page+1, total=total_pages),
                 callback_data="tags_noop"
             ))
             
             if end_idx < len(tags):
                 nav_row.append(InlineKeyboardButton(
-                    i18n.t('button_next_page'),
+                    lang_ctx.t('button_next_page'),
                     callback_data=f"tags_page:{page+1}"
                 ))
             
@@ -295,7 +295,7 @@ async def handle_tags_page_callback(update: Update, context: ContextTypes.DEFAUL
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        message = i18n.t('tags_button_list_header', count=len(tags))
+        message = lang_ctx.t('tags_button_list_header', count=len(tags))
         
         await query.edit_message_text(message, reply_markup=reply_markup)
         
@@ -312,7 +312,8 @@ async def handle_tag_list_page_callback(update: Update, context: ContextTypes.DE
     await handle_tags_page_callback(update, context)
 
 
-async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle language selection callback
     
@@ -330,13 +331,12 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
         if callback_data.startswith('lang_'):
             language = callback_data[5:]  # Remove 'lang_' prefix
             
-            # Set language
-            i18n = get_i18n()
-            if i18n.set_language(language):
-                # Save to config
-                config = get_config()
-                config.set('bot.language', language)
+            # Set language via config and update context
+            config = get_config()
+            if config.set('bot.language', language):
                 config.save()
+                # Update current language context
+                lang_ctx.set_language(language)
                 
                 # 同步更新用户的命令菜单语言
                 try:
@@ -396,7 +396,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                     # 不影响语言切换主流程
                 
                 # Send confirmation
-                await query.edit_message_text(i18n.t('language_changed'))
+                await query.edit_message_text(lang_ctx.t('language_changed'))
                 
                 logger.info(f"Language changed to: {language}")
             else:
@@ -419,7 +419,8 @@ async def handle_tag_list_page_callback(update: Update, context: ContextTypes.DE
     await handle_tags_page_callback(update, context)
 
 
-async def handle_search_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_search_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     处理搜索结果分页
     
@@ -471,23 +472,22 @@ async def handle_search_page_callback(update: Update, context: ContextTypes.DEFA
         total_pages = (total_count + page_size - 1) // page_size
         
         if total_pages > 1:
-            i18n = get_i18n()
             nav_row = []
             
             if page > 0:
                 nav_row.append(InlineKeyboardButton(
-                    i18n.t('button_previous_page'),
+                    lang_ctx.t('button_previous_page'),
                     callback_data=f"search_page:{encoded_query}:{page-1}"
                 ))
             
             nav_row.append(InlineKeyboardButton(
-                i18n.t('pagination_page_of', current=page+1, total=total_pages),
+                lang_ctx.t('pagination_page_of', current=page+1, total=total_pages),
                 callback_data="search_noop"
             ))
             
             if (page + 1) * page_size < total_count:
                 nav_row.append(InlineKeyboardButton(
-                    i18n.t('button_next_page'),
+                    lang_ctx.t('button_next_page'),
                     callback_data=f"search_page:{encoded_query}:{page+1}"
                 ))
             
@@ -511,7 +511,8 @@ async def handle_search_page_callback(update: Update, context: ContextTypes.DEFA
         await query.answer(f"Error: {str(e)}", show_alert=True)
 
 
-async def handle_ai_view_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_ai_view_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle AI analysis view callback
     
@@ -581,7 +582,8 @@ async def handle_ai_view_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.answer("Error showing AI analysis", show_alert=True)
 
 
-async def handle_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     处理删除归档（移动到垃圾箱）
     
@@ -590,7 +592,6 @@ async def handle_delete_callback(update: Update, context: ContextTypes.DEFAULT_T
     try:
         query = update.callback_query
         callback_data = query.data
-        i18n = get_i18n()
         
         # 解析归档ID
         archive_id = int(callback_data.split(':', 1)[1])
@@ -598,14 +599,14 @@ async def handle_delete_callback(update: Update, context: ContextTypes.DEFAULT_T
         # 获取trash_manager
         trash_manager = context.bot_data.get('trash_manager')
         if not trash_manager:
-            await query.edit_message_text(i18n.t('trash_manager_not_initialized'))
+            await query.edit_message_text(lang_ctx.t('trash_manager_not_initialized'))
             return
         
         # 移动到垃圾箱
         if trash_manager.move_to_trash(archive_id):
-            await query.edit_message_text(i18n.t('archive_moved_to_trash', archive_id=archive_id))
+            await query.edit_message_text(lang_ctx.t('archive_moved_to_trash', archive_id=archive_id))
         else:
-            await query.edit_message_text(i18n.t('archive_delete_failed', archive_id=archive_id))
+            await query.edit_message_text(lang_ctx.t('archive_delete_failed', archive_id=archive_id))
         
         logger.info(f"Archive {archive_id} moved to trash via callback")
         
@@ -613,7 +614,8 @@ async def handle_delete_callback(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"Error handling delete callback: {e}", exc_info=True)
 
 
-async def handle_trash_restore_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_trash_restore_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     处理恢复归档
     
@@ -622,7 +624,6 @@ async def handle_trash_restore_callback(update: Update, context: ContextTypes.DE
     try:
         query = update.callback_query
         callback_data = query.data
-        i18n = get_i18n()
         
         # 解析归档ID
         archive_id = int(callback_data.split(':', 1)[1])
@@ -630,14 +631,14 @@ async def handle_trash_restore_callback(update: Update, context: ContextTypes.DE
         # 获取trash_manager
         trash_manager = context.bot_data.get('trash_manager')
         if not trash_manager:
-            await query.edit_message_text(i18n.t('trash_manager_not_initialized'))
+            await query.edit_message_text(lang_ctx.t('trash_manager_not_initialized'))
             return
         
         # 恢复归档
         if trash_manager.restore_archive(archive_id):
-            await query.edit_message_text(i18n.t('trash_restore_success', archive_id=archive_id))
+            await query.edit_message_text(lang_ctx.t('trash_restore_success', archive_id=archive_id))
         else:
-            await query.edit_message_text(i18n.t('trash_restore_failed', archive_id=archive_id))
+            await query.edit_message_text(lang_ctx.t('trash_restore_failed', archive_id=archive_id))
         
         logger.info(f"Archive {archive_id} restored from trash via callback")
         
@@ -645,7 +646,8 @@ async def handle_trash_restore_callback(update: Update, context: ContextTypes.DE
         logger.error(f"Error handling restore callback: {e}", exc_info=True)
 
 
-async def handle_trash_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_trash_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     处理永久删除归档
     
@@ -654,7 +656,6 @@ async def handle_trash_delete_callback(update: Update, context: ContextTypes.DEF
     try:
         query = update.callback_query
         callback_data = query.data
-        i18n = get_i18n()
         
         # 解析归档ID
         archive_id = int(callback_data.split(':', 1)[1])
@@ -662,14 +663,14 @@ async def handle_trash_delete_callback(update: Update, context: ContextTypes.DEF
         # 获取trash_manager
         trash_manager = context.bot_data.get('trash_manager')
         if not trash_manager:
-            await query.edit_message_text(i18n.t('trash_manager_not_initialized'))
+            await query.edit_message_text(lang_ctx.t('trash_manager_not_initialized'))
             return
         
         # 永久删除
         if trash_manager.delete_permanently(archive_id):
-            await query.edit_message_text(i18n.t('trash_delete_success', archive_id=archive_id))
+            await query.edit_message_text(lang_ctx.t('trash_delete_success', archive_id=archive_id))
         else:
-            await query.edit_message_text(i18n.t('trash_delete_failed', archive_id=archive_id))
+            await query.edit_message_text(lang_ctx.t('trash_delete_failed', archive_id=archive_id))
         
         logger.info(f"Archive {archive_id} permanently deleted via callback")
         
@@ -677,7 +678,8 @@ async def handle_trash_delete_callback(update: Update, context: ContextTypes.DEF
         logger.error(f"Error handling permanent delete callback: {e}", exc_info=True)
 
 
-async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     处理回顾统计按钮点击
     
@@ -686,7 +688,6 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
     try:
         query = update.callback_query
         callback_data = query.data
-        i18n = get_i18n()
         
         # 解析: review:period
         parts = callback_data.split(':', 1)
@@ -697,55 +698,55 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        f"📅 {i18n.t('review_period_week')}",
+                        f"📅 {lang_ctx.t('review_period_week')}",
                         callback_data='review:week'
                     ),
                     InlineKeyboardButton(
-                        f"📅 {i18n.t('review_period_month')}",
+                        f"📅 {lang_ctx.t('review_period_month')}",
                         callback_data='review:month'
                     )
                 ],
                 [
                     InlineKeyboardButton(
-                        f"📅 {i18n.t('review_period_year')}",
+                        f"📅 {lang_ctx.t('review_period_year')}",
                         callback_data='review:year'
                     )
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(
-                i18n.t('review_usage'),
+                lang_ctx.t('review_usage'),
                 reply_markup=reply_markup,
                 parse_mode='HTML'
             )
             return
         
         if period not in ['week', 'month', 'year']:
-            await query.edit_message_text(i18n.t('review_invalid_period'))
+            await query.edit_message_text(lang_ctx.t('review_invalid_period'))
             return
         
         review_manager = context.bot_data.get('review_manager')
         if not review_manager:
-            await query.edit_message_text(i18n.t('review_manager_not_initialized'))
+            await query.edit_message_text(lang_ctx.t('review_manager_not_initialized'))
             return
         
         # 显示处理中
-        await query.edit_message_text(i18n.t('processing'))
+        await query.edit_message_text(lang_ctx.t('processing'))
         
         # 生成报告
         report = review_manager.build_report(period=period, include_random=True)
         
         if not report or report['totals']['archives'] == 0:
-            await query.edit_message_text(i18n.t('review_no_data'))
+            await query.edit_message_text(lang_ctx.t('review_no_data'))
             return
         
         # 构建消息
-        period_name = i18n.t(f'review_period_{period}')
-        lines = [i18n.t('review_header', period=period_name)]
+        period_name = lang_ctx.t(f'review_period_{period}')
+        lines = [lang_ctx.t('review_header', period=period_name)]
         
         # 统计概览
         totals = report['totals']
-        lines.append(i18n.t(
+        lines.append(lang_ctx.t(
             'review_totals',
             archives=totals['archives'],
             deleted=totals['deleted'],
@@ -764,7 +765,7 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
                 bar = '█' * min(count, 20)  # 简单条形图
                 trend_lines.append(f"{date}: {bar} {count}")
             if trend_lines:
-                lines.append(i18n.t('review_trend', trend='\n'.join(trend_lines)))
+                lines.append(lang_ctx.t('review_trend', trend='\n'.join(trend_lines)))
         
         # 热门标签（Top 10）
         top_tags = report.get('top_tags', [])
@@ -775,7 +776,7 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
                 tag_count = tag_item.get('count', 0)
                 tag_lines.append(f"#{tag_name} ({tag_count})")
             if tag_lines:
-                lines.append(i18n.t('review_top_tags', tags='\n'.join(tag_lines)))
+                lines.append(lang_ctx.t('review_top_tags', tags='\n'.join(tag_lines)))
         
         # 随机回顾
         random_archive = report.get('random_archive')
@@ -783,7 +784,7 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
             archive_id = random_archive.get('id')
             title = random_archive.get('title') or random_archive.get('content', '')[:50]
             tags = report.get('random_tags', [])
-            tags_str = ' '.join(f'#{t}' for t in tags) if tags else i18n.t('tags_empty')
+            tags_str = ' '.join(f'#{t}' for t in tags) if tags else lang_ctx.t('tags_empty')
             created_at = random_archive.get('created_at', 'N/A')
             
             # 构建标题链接（使用HTML格式，和搜索结果一致）
@@ -822,7 +823,7 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
             note_icon = "📝 √ 有笔记" if has_notes else "📝 无笔记"
             status_line = f"{fav_icon} | {note_icon} | 📅 {created_at}"
             
-            lines.append(i18n.t(
+            lines.append(lang_ctx.t(
                 'review_random',
                 id=archive_id,
                 title=title_display,
@@ -849,15 +850,15 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
     
     except Exception as e:
         logger.error(f"Error handling review callback: {e}", exc_info=True)
-        i18n = get_i18n()
         try:
-            await query.edit_message_text(i18n.t('error_occurred', error=str(e)))
+            await query.edit_message_text(lang_ctx.t('error_occurred', error=str(e)))
         except:
             pass
         await query.answer(f"Error: {str(e)}", show_alert=True)
 
 
-async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle note button click - 查看归档的关联笔记
     
@@ -873,7 +874,6 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         # 解析 callback data: note:archive_id
         archive_id = int(query.data.split(':')[1])
         
-        i18n = get_i18n()
         note_manager = context.bot_data.get('note_manager')
         
         if not note_manager:
@@ -938,7 +938,8 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_note_add_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_note_add_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle add note button click - 提示用户输入笔记内容
     
@@ -966,7 +967,8 @@ async def handle_note_add_callback(update: Update, context: ContextTypes.DEFAULT
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_note_edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_note_edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle edit note button click - 显示修改和追加选项
     
@@ -1002,7 +1004,8 @@ async def handle_note_edit_callback(update: Update, context: ContextTypes.DEFAUL
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_note_modify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_note_modify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle modify note - 复制笔记内容供用户修改
     
@@ -1054,7 +1057,8 @@ async def handle_note_modify_callback(update: Update, context: ContextTypes.DEFA
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_note_append_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_note_append_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle append note - 追加内容到现有笔记
     
@@ -1087,7 +1091,8 @@ async def handle_note_append_callback(update: Update, context: ContextTypes.DEFA
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_note_share_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_note_share_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle share note - 发送格式化的笔记供用户转发分享
     
@@ -1153,7 +1158,8 @@ async def handle_note_share_callback(update: Update, context: ContextTypes.DEFAU
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_note_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_note_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle delete note button click
     
@@ -1188,7 +1194,8 @@ async def handle_note_delete_callback(update: Update, context: ContextTypes.DEFA
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_refine_note_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_refine_note_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle refine note button click - prompts user for refinement instructions
     
@@ -1253,7 +1260,8 @@ async def handle_refine_note_callback(update: Update, context: ContextTypes.DEFA
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_favorite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_favorite_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle favorite/unfavorite button click
     
@@ -1283,7 +1291,6 @@ async def handle_favorite_callback(update: Update, context: ContextTypes.DEFAULT
         success = db.set_favorite(archive_id, not is_fav)
         
         if success:
-            i18n = get_i18n()
             new_status = not is_fav
             
             # 更新按钮显示
@@ -1328,7 +1335,8 @@ async def handle_favorite_callback(update: Update, context: ContextTypes.DEFAULT
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 
-async def handle_forward_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_forward_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle forward button click - 转发归档消息到频道
     
@@ -1395,7 +1403,8 @@ async def handle_forward_callback(update: Update, context: ContextTypes.DEFAULT_
         logger.error(f"Error handling forward callback: {e}", exc_info=True)
 
 
-async def handle_short_text_intent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def handle_short_text_intent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     处理短文本意图选择回调
     
@@ -1413,8 +1422,6 @@ async def handle_short_text_intent_callback(update: Update, context: ContextType
         if not text:
             await query.edit_message_text("⚠️ 会话已过期，请重新发送文本")
             return
-        
-        i18n = get_i18n()
         
         if action == 'note':
             # 保存为笔记
@@ -1435,7 +1442,7 @@ async def handle_short_text_intent_callback(update: Update, context: ContextType
             if ai_summarizer and ai_summarizer.is_available():
                 # 创建AI会话
                 from ..core.ai_session import get_session_manager
-                from ..bot.ai_chat_router import handle_chat_message
+                from ..ai.chat_router import handle_chat_message
                 
                 session_manager = get_session_manager()
                 user_id = query.from_user.id

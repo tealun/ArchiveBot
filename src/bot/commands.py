@@ -8,7 +8,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
-from ..utils.i18n import get_i18n
+from ..utils.language_context import with_language_context
 from ..utils.config import get_config
 from ..utils.helpers import format_file_size
 from ..core.search_engine import SearchEngine
@@ -19,22 +19,20 @@ from ..ai.summarizer import get_ai_summarizer
 logger = logging.getLogger(__name__)
 
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /start command
     
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
         config = get_config()
         
-        # Set language from config
-        i18n.set_language(config.language)
-        
-        welcome_msg = i18n.t('welcome')
+        welcome_msg = lang_ctx.t('welcome')
         await update.message.reply_text(welcome_msg, parse_mode=ParseMode.HTML)
         
         logger.info(f"Start command executed by user {update.effective_user.id}")
@@ -44,17 +42,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text(f"Error: {e}")
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /help command
     
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
-        help_msg = i18n.t('help')
+        help_msg = lang_ctx.t('help')
         
         await update.message.reply_text(
             help_msg,
@@ -68,33 +67,33 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(f"Error: {e}")
 
 
-async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /search command
     
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
-        
         # Get search query
         query = ' '.join(context.args) if context.args else None
         
         if not query:
-            await update.message.reply_text(i18n.t('search_no_keyword'))
+            await update.message.reply_text(lang_ctx.t('search_no_keyword'))
             return
         
         # Get search engine from context
         search_engine: SearchEngine = context.bot_data.get('search_engine')
         
         if not search_engine:
-            await update.message.reply_text("Search engine not initialized")
+            await update.message.reply_text(lang_ctx.t('error_search_engine_not_initialized'))
             return
         
         # Send processing message
-        processing_msg = await update.message.reply_text(i18n.t('processing'))
+        processing_msg = await update.message.reply_text(lang_ctx.t('processing'))
         
         # Perform search with pagination
         page_size = 10
@@ -131,18 +130,18 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             if page > 0:
                 nav_row.append(InlineKeyboardButton(
-                    i18n.t('button_previous_page'),
+                    lang_ctx.t('button_previous_page'),
                     callback_data=f"search_page:{encoded_query}:{page-1}"
                 ))
             
             nav_row.append(InlineKeyboardButton(
-                i18n.t('pagination_page_of', current=page+1, total=total_pages),
+                lang_ctx.t('pagination_page_of', current=page+1, total=total_pages),
                 callback_data="search_noop"
             ))
             
             if (page + 1) * page_size < total_count:
                 nav_row.append(InlineKeyboardButton(
-                    i18n.t('button_next_page'),
+                    lang_ctx.t('button_next_page'),
                     callback_data=f"search_page:{encoded_query}:{page+1}"
                 ))
             
@@ -164,31 +163,31 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
     except Exception as e:
         logger.error(f"Error in search_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
 
 
-async def tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /tags command - 显示标签按钮矩阵
     
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
         tag_manager: TagManager = context.bot_data.get('tag_manager')
         
         if not tag_manager:
-            await update.message.reply_text("Tag manager not initialized")
+            await update.message.reply_text(lang_ctx.t('error_tag_manager_not_initialized'))
             return
         
         # Get all tags (sorted by count descending)
         tags = tag_manager.get_all_tags(limit=100)
         
         if not tags:
-            await update.message.reply_text(i18n.t('tags_empty'))
+            await update.message.reply_text(lang_ctx.t('tags_empty'))
             return
         
         # 构建按钮矩阵（3列，分页显示）
@@ -240,7 +239,7 @@ async def tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        message = i18n.t('tags_button_list_header', count=len(tags))
+        message = lang_ctx.t('tags_button_list_header', count=len(tags))
         
         await update.message.reply_text(message, reply_markup=reply_markup)
         
@@ -248,24 +247,24 @@ async def tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         
     except Exception as e:
         logger.error(f"Error in tags_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
 
 
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /stats command
     
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
         db_storage: DatabaseStorage = context.bot_data.get('db_storage')
         
         if not db_storage:
-            await update.message.reply_text("Database storage not initialized")
+            await update.message.reply_text(lang_ctx.t('error_database_not_initialized'))
             return
         
         # Get stats from database
@@ -285,7 +284,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         db_size_formatted = format_file_size(db_size)
         last_archive = stats.get('last_archive', 'N/A')
         
-        message = i18n.t(
+        message = lang_ctx.t(
             'stats',
             total_archives=total_archives,
             total_tags=total_tags,
@@ -300,21 +299,20 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
     except Exception as e:
         logger.error(f"Error in stats_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
 
 
-async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /language command
     
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
-        
         # Create language selection keyboard
         keyboard = [
             [
@@ -329,7 +327,7 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            i18n.t('language_select'),
+            lang_ctx.t('language_select'),
             reply_markup=reply_markup
         )
         
@@ -340,51 +338,52 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text(f"Error: {e}")
 
 
-async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /ai command - 显示AI功能状态
     
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
         config = get_config()
         ai_config = config.ai
         
-        status_text = i18n.t('ai_status_title')
+        status_text = lang_ctx.t('ai_status_title')
         
         # 检查是否启用
         if ai_config.get('enabled', False):
-            status_text += i18n.t('ai_status_enabled') + "\n"
+            status_text += lang_ctx.t('ai_status_enabled') + "\n"
             
             # 获取AI总结器
             summarizer = get_ai_summarizer(ai_config)
             
             if summarizer and summarizer.is_available():
-                status_text += i18n.t('ai_status_available')
+                status_text += lang_ctx.t('ai_status_available')
                 
                 api_config = ai_config.get('api', {})
                 provider = api_config.get('provider', 'unknown')
                 model = api_config.get('model', 'unknown')
                 
-                status_text += i18n.t('ai_status_config_title')
-                status_text += i18n.t('ai_status_provider', provider=provider)
-                status_text += i18n.t('ai_status_model', model=model)
-                status_text += i18n.t('ai_status_max_tokens', max_tokens=api_config.get('max_tokens', 1000))
-                status_text += i18n.t('ai_status_timeout', timeout=api_config.get('timeout', 30))
+                status_text += lang_ctx.t('ai_status_config_title')
+                status_text += lang_ctx.t('ai_status_provider', provider=provider)
+                status_text += lang_ctx.t('ai_status_model', model=model)
+                status_text += lang_ctx.t('ai_status_max_tokens', max_tokens=api_config.get('max_tokens', 1000))
+                status_text += lang_ctx.t('ai_status_timeout', timeout=api_config.get('timeout', 30))
                 
-                status_text += i18n.t('ai_status_features_title')
+                status_text += lang_ctx.t('ai_status_features_title')
                 auto_summarize_status = '✅' if ai_config.get('auto_summarize') else '❌'
                 auto_tags_status = '✅' if ai_config.get('auto_generate_tags') else '❌'
-                status_text += i18n.t('ai_status_auto_summarize', status=auto_summarize_status)
-                status_text += i18n.t('ai_status_auto_tags', status=auto_tags_status)
+                status_text += lang_ctx.t('ai_status_auto_summarize', status=auto_summarize_status)
+                status_text += lang_ctx.t('ai_status_auto_tags', status=auto_tags_status)
             else:
-                status_text += i18n.t('ai_status_unavailable')
+                status_text += lang_ctx.t('ai_status_unavailable')
         else:
-            status_text += i18n.t('ai_status_disabled')
-            status_text += i18n.t('ai_status_enable_guide')
+            status_text += lang_ctx.t('ai_status_disabled')
+            status_text += lang_ctx.t('ai_status_enable_guide')
         
         await update.message.reply_text(
             status_text,
@@ -395,25 +394,24 @@ async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         
     except Exception as e:
         logger.error(f"Error in ai_status_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
 
 
-async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /notes command - 显示所有笔记列表
     
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
-        
         # 获取note_manager
         note_manager = context.bot_data.get('note_manager')
         if not note_manager:
-            await update.message.reply_text(i18n.t('note_manager_not_initialized'))
+            await update.message.reply_text(lang_ctx.t('note_manager_not_initialized'))
             return
         
         # 获取所有笔记（分页显示）
@@ -422,22 +420,22 @@ async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         results = note_manager.get_all_notes(limit=page_size, offset=page * page_size)
         
         if not results:
-            await update.message.reply_text(i18n.t('notes_list_empty'))
+            await update.message.reply_text(lang_ctx.t('notes_list_empty'))
             return
         
         # 构建输出
-        result_text = i18n.t('notes_list_header', count=len(results)) + "\n\n"
+        result_text = lang_ctx.t('notes_list_header', count=len(results)) + "\n\n"
         
         for note in results:
             # 笔记内容截断
             from ..utils.helpers import truncate_text
             content_preview = truncate_text(note['content'], 50)
             
-            result_text += f"📝 {i18n.t('note_id')}: #{note['id']}\n"
+            result_text += f"📝 {lang_ctx.t('note_id')}: #{note['id']}\n"
             
             # 如果关联了归档，显示归档ID
             if note.get('archive_id'):
-                result_text += f"📎 {i18n.t('archive')} #{note['archive_id']}\n"
+                result_text += f"📎 {lang_ctx.t('archive')} #{note['archive_id']}\n"
             
             result_text += f"📅 {note['created_at']}\n"
             result_text += f"💬 {content_preview}\n\n"
@@ -448,11 +446,11 @@ async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
     except Exception as e:
         logger.error(f"Error in notes_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
 
 
-async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /trash command - 管理垃圾箱
     
@@ -466,14 +464,13 @@ async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
-        
         # 获取trash_manager
         trash_manager = context.bot_data.get('trash_manager')
         if not trash_manager:
-            await update.message.reply_text(i18n.t('trash_manager_not_initialized'))
+            await update.message.reply_text(lang_ctx.t('trash_manager_not_initialized'))
             return
         
         # 解析子命令
@@ -483,55 +480,55 @@ async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             count = len(items)
             
             if count == 0:
-                await update.message.reply_text(i18n.t('trash_empty'))
+                await update.message.reply_text(lang_ctx.t('trash_empty'))
                 return
             
-            result_text = i18n.t('trash_list', count=count) + "\n\n"
+            result_text = lang_ctx.t('trash_list', count=count) + "\n\n"
             
             for item in items[:20]:  # 只显示前20条
                 result_text += f"🗑️ ID: #{item['id']}\n"
                 result_text += f"📝 {item['title']}\n"
                 result_text += f"🏷️ {', '.join(item['tags'][:3])}{'...' if len(item['tags']) > 3 else ''}\n"
-                result_text += f"🕐 {i18n.t('deleted_at')}: {item['deleted_at']}\n\n"
+                result_text += f"🕐 {lang_ctx.t('deleted_at')}: {item['deleted_at']}\n\n"
             
             if count > 20:
-                result_text += i18n.t('trash_more', count=count-20)
+                result_text += lang_ctx.t('trash_more', count=count-20)
             
             await update.message.reply_text(result_text)
             
         elif context.args[0] == 'restore':
             # 恢复归档
             if len(context.args) < 2:
-                await update.message.reply_text(i18n.t('trash_restore_usage'))
+                await update.message.reply_text(lang_ctx.t('trash_restore_usage'))
                 return
             
             try:
                 archive_id = int(context.args[1])
             except ValueError:
-                await update.message.reply_text(i18n.t('invalid_archive_id'))
+                await update.message.reply_text(lang_ctx.t('invalid_archive_id'))
                 return
             
             if trash_manager.restore_archive(archive_id):
-                await update.message.reply_text(i18n.t('trash_restore_success', archive_id=archive_id))
+                await update.message.reply_text(lang_ctx.t('trash_restore_success', archive_id=archive_id))
             else:
-                await update.message.reply_text(i18n.t('trash_restore_failed', archive_id=archive_id))
+                await update.message.reply_text(lang_ctx.t('trash_restore_failed', archive_id=archive_id))
         
         elif context.args[0] == 'delete':
             # 永久删除
             if len(context.args) < 2:
-                await update.message.reply_text(i18n.t('trash_delete_usage'))
+                await update.message.reply_text(lang_ctx.t('trash_delete_usage'))
                 return
             
             try:
                 archive_id = int(context.args[1])
             except ValueError:
-                await update.message.reply_text(i18n.t('invalid_archive_id'))
+                await update.message.reply_text(lang_ctx.t('invalid_archive_id'))
                 return
             
             if trash_manager.delete_permanently(archive_id):
-                await update.message.reply_text(i18n.t('trash_delete_success', archive_id=archive_id))
+                await update.message.reply_text(lang_ctx.t('trash_delete_success', archive_id=archive_id))
             else:
-                await update.message.reply_text(i18n.t('trash_delete_failed', archive_id=archive_id))
+                await update.message.reply_text(lang_ctx.t('trash_delete_failed', archive_id=archive_id))
         
         elif context.args[0] == 'empty':
             # 清空垃圾箱
@@ -540,28 +537,28 @@ async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 try:
                     days_old = int(context.args[1])
                 except ValueError:
-                    await update.message.reply_text(i18n.t('invalid_days'))
+                    await update.message.reply_text(lang_ctx.t('invalid_days'))
                     return
             
             count = trash_manager.empty_trash(days_old)
             
             if days_old:
-                await update.message.reply_text(i18n.t('trash_empty_success_days', count=count, days=days_old))
+                await update.message.reply_text(lang_ctx.t('trash_empty_success_days', count=count, days=days_old))
             else:
-                await update.message.reply_text(i18n.t('trash_empty_success', count=count))
+                await update.message.reply_text(lang_ctx.t('trash_empty_success', count=count))
         
         else:
-            await update.message.reply_text(i18n.t('trash_invalid_command'))
+            await update.message.reply_text(lang_ctx.t('trash_invalid_command'))
         
         logger.info(f"Trash command executed: {' '.join(context.args) if context.args else 'list'}")
         
     except Exception as e:
         logger.error(f"Error in trash_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
 
 
-async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /export command - 导出数据
     
@@ -574,18 +571,17 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     Args:
         update: Telegram update
         context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
-        
         # 获取export_manager
         export_manager = context.bot_data.get('export_manager')
         if not export_manager:
-            await update.message.reply_text(i18n.t('export_manager_not_initialized'))
+            await update.message.reply_text(lang_ctx.t('export_manager_not_initialized'))
             return
         
         # 发送处理中提示
-        processing_msg = await update.message.reply_text(i18n.t('export_processing'))
+        processing_msg = await update.message.reply_text(lang_ctx.t('export_processing'))
         
         # 解析命令参数
         format_type = 'markdown'  # 默认格式
@@ -595,7 +591,7 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             if context.args[0] == 'tag':
                 # 按标签导出
                 if len(context.args) < 2:
-                    await processing_msg.edit_text(i18n.t('export_tag_usage'))
+                    await processing_msg.edit_text(lang_ctx.t('export_tag_usage'))
                     return
                 tag_name = context.args[1]
                 format_type = context.args[2] if len(context.args) > 2 else 'markdown'
@@ -605,7 +601,7 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         # 验证格式
         if format_type not in ['markdown', 'json', 'csv', 'md']:
-            await processing_msg.edit_text(i18n.t('export_invalid_format'))
+            await processing_msg.edit_text(lang_ctx.t('export_invalid_format'))
             return
         
         # 导出数据
@@ -626,7 +622,7 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             filename = "archives_export"
         
         if not data:
-            await processing_msg.edit_text(i18n.t('export_failed'))
+            await processing_msg.edit_text(lang_ctx.t('export_failed'))
             return
         
         # 确定文件扩展名
@@ -650,7 +646,7 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_document(
             document=file_data,
             filename=full_filename,
-            caption=i18n.t('export_success', filename=full_filename, size=len(data))
+            caption=lang_ctx.t('export_success', filename=full_filename, size=len(data))
         )
         
         # 删除处理中提示
@@ -660,14 +656,14 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
     except Exception as e:
         logger.error(f"Error in export_command: {e}", exc_info=True)
-        i18n = get_i18n()
         try:
-            await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+            await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
         except:
             pass
 
 
-async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /backup command - 备份与恢复
     
@@ -678,25 +674,29 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         /backup delete <file>  - 删除备份
         /backup cleanup [keep] - 只保留最近N个（默认10）
         /backup status       - 查看数据库状态
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
         backup_manager = context.bot_data.get('backup_manager')
 
         if not backup_manager:
-            await update.message.reply_text(i18n.t('backup_manager_not_initialized'))
+            await update.message.reply_text(lang_ctx.t('backup_manager_not_initialized'))
             return
 
         # 无参数 -> 列表
         if not context.args:
             backups = backup_manager.list_backups()
             if not backups:
-                await update.message.reply_text(i18n.t('backup_none'))
+                await update.message.reply_text(lang_ctx.t('backup_none'))
                 return
 
-            lines = [i18n.t('backup_list_header', count=len(backups))]
+            lines = [lang_ctx.t('backup_list_header', count=len(backups))]
             for b in backups[:10]:
-                lines.append(i18n.t(
+                lines.append(lang_ctx.t(
                     'backup_list_item',
                     filename=b.get('filename'),
                     created_at=b.get('created_at'),
@@ -704,7 +704,7 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     description=b.get('description', '')
                 ))
             if len(backups) > 10:
-                lines.append(i18n.t('backup_list_more', count=len(backups) - 10))
+                lines.append(lang_ctx.t('backup_list_more', count=len(backups) - 10))
 
             await update.message.reply_text('\n'.join(lines))
             return
@@ -715,33 +715,33 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             desc = ' '.join(context.args[1:]) if len(context.args) > 1 else ''
             result = backup_manager.create_backup(description=desc)
             if result:
-                await update.message.reply_text(i18n.t('backup_created', filename=result))
+                await update.message.reply_text(lang_ctx.t('backup_created', filename=result))
             else:
-                await update.message.reply_text(i18n.t('backup_create_failed'))
+                await update.message.reply_text(lang_ctx.t('backup_create_failed'))
             return
 
         if subcmd == 'restore':
             if len(context.args) < 2:
-                await update.message.reply_text(i18n.t('backup_restore_usage'))
+                await update.message.reply_text(lang_ctx.t('backup_restore_usage'))
                 return
             filename = context.args[1]
             ok = backup_manager.restore_backup(filename)
             if ok:
-                await update.message.reply_text(i18n.t('backup_restored', filename=filename))
+                await update.message.reply_text(lang_ctx.t('backup_restored', filename=filename))
             else:
-                await update.message.reply_text(i18n.t('backup_restore_failed', filename=filename))
+                await update.message.reply_text(lang_ctx.t('backup_restore_failed', filename=filename))
             return
 
         if subcmd == 'delete':
             if len(context.args) < 2:
-                await update.message.reply_text(i18n.t('backup_delete_usage'))
+                await update.message.reply_text(lang_ctx.t('backup_delete_usage'))
                 return
             filename = context.args[1]
             ok = backup_manager.delete_backup(filename)
             if ok:
-                await update.message.reply_text(i18n.t('backup_deleted', filename=filename))
+                await update.message.reply_text(lang_ctx.t('backup_deleted', filename=filename))
             else:
-                await update.message.reply_text(i18n.t('backup_delete_failed', filename=filename))
+                await update.message.reply_text(lang_ctx.t('backup_delete_failed', filename=filename))
             return
 
         if subcmd == 'cleanup':
@@ -750,18 +750,18 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 try:
                     keep = int(context.args[1])
                 except ValueError:
-                    await update.message.reply_text(i18n.t('backup_invalid_keep'))
+                    await update.message.reply_text(lang_ctx.t('backup_invalid_keep'))
                     return
             deleted = backup_manager.cleanup_old_backups(keep_count=keep)
-            await update.message.reply_text(i18n.t('backup_cleanup_done', deleted=deleted, keep=keep))
+            await update.message.reply_text(lang_ctx.t('backup_cleanup_done', deleted=deleted, keep=keep))
             return
 
         if subcmd == 'status':
             stats = backup_manager.get_database_stats()
             if not stats:
-                await update.message.reply_text(i18n.t('backup_status_failed'))
+                await update.message.reply_text(lang_ctx.t('backup_status_failed'))
                 return
-            msg = i18n.t(
+            msg = lang_ctx.t(
                 'backup_status',
                 size=stats.get('size', 0),
                 archives=stats.get('archives_count', 0),
@@ -773,27 +773,31 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
 
         # 未知子命令
-        await update.message.reply_text(i18n.t('backup_invalid_command'))
+        await update.message.reply_text(lang_ctx.t('backup_invalid_command'))
 
     except Exception as e:
         logger.error(f"Error in backup_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
 
 
-async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+@with_language_context
+async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /review command - 活动回顾与统计
     
     Usage:
         /review              - 显示期间选择按钮
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
     """
     try:
-        i18n = get_i18n()
         review_manager = context.bot_data.get('review_manager')
 
         if not review_manager:
-            await update.message.reply_text(i18n.t('review_manager_not_initialized'))
+            await update.message.reply_text(lang_ctx.t('review_manager_not_initialized'))
             return
 
         # 显示期间选择按钮
@@ -802,17 +806,17 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         keyboard = [
             [
                 InlineKeyboardButton(
-                    f"📅 {i18n.t('review_period_week')}",
+                    f"📅 {lang_ctx.t('review_period_week')}",
                     callback_data='review:week'
                 ),
                 InlineKeyboardButton(
-                    f"📅 {i18n.t('review_period_month')}",
+                    f"📅 {lang_ctx.t('review_period_month')}",
                     callback_data='review:month'
                 )
             ],
             [
                 InlineKeyboardButton(
-                    f"📅 {i18n.t('review_period_year')}",
+                    f"📅 {lang_ctx.t('review_period_year')}",
                     callback_data='review:year'
                 )
             ]
@@ -820,12 +824,11 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            i18n.t('review_usage'),
+            lang_ctx.t('review_usage'),
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
 
     except Exception as e:
         logger.error(f"Error in review_command: {e}", exc_info=True)
-        i18n = get_i18n()
-        await update.message.reply_text(i18n.t('error_occurred', error=str(e)))
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
