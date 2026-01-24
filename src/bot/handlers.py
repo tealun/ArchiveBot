@@ -4,6 +4,7 @@ Handles incoming messages for archiving
 """
 
 import logging
+import time
 from typing import List, Optional
 from telegram import Update, Message
 from telegram.ext import ContextTypes
@@ -18,7 +19,6 @@ from ..core.ai_session import get_session_manager
 from .ai_chat_router import handle_chat_message
 
 logger = logging.getLogger(__name__)
-import time
 
 # 全局消息聚合器
 _message_aggregator: Optional[MessageAggregator] = None
@@ -759,7 +759,6 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
             
             # 定义进度更新回调
             last_update_time = [0]  # 使用列表存储以便在闭包中修改
-            import time
             
             async def update_progress(current, total, stage):
                 """更新进度消息"""
@@ -958,6 +957,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             config = get_config()
             ai_config = config.ai
             chat_enabled = ai_config.get('chat_enabled', False)
+            chat_threshold = int(ai_config.get('chat_threshold_chars', 30))
             
             if chat_enabled:
                 # 检查是否已有活跃会话
@@ -970,10 +970,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 if session:
                     # 用户已在AI会话中，处理消息
                     try:
+                        # 发送"正在思考"提示
+                        thinking_msg = await message.reply_text("🤔 正在思考...")
+                        
                         ai_response = await handle_chat_message(text, session, context)
                         
-                        # 带🤖标识回复
-                        await message.reply_text(f"🤖 {ai_response}")
+                        # 编辑消息为最终回复
+                        await thinking_msg.edit_text(f"🤖 {ai_response}")
                         
                         # 更新会话（保存上下文）
                         session_manager.update_session(user_id, session.get('context', {}))
@@ -984,6 +987,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     except Exception as e:
                         logger.error(f"AI chat error: {e}", exc_info=True)
                         await message.reply_text("❌ AI处理出错，已退出会话")
+                        session_manager.clear_session(user_id)
+                        # 继续正常归档流程
+                
+                # 检查是否应自动触发AI会话（短消息且无media）
+                elif (len(text) < chat_threshold and 
+                      not message.media_group_id and
+                      not message.photo and 
+                      not message.document and 
+                      not message.video and
+                      not message.audio):
+                    
+                    # 自动创建AI会话
+                    session = session_manager.create_session(user_id)
+                    logger.info(f"AI chat session auto-created for user {user_id}")
+                    
+                    try:
+                        # 发送"正在思考"提示
+                        thinking_msg = await message.reply_text("🤔 正在思考...")
+                        
+                        ai_response = await handle_chat_message(text, session, context)
+                        
+                        # 编辑消息为最终回复
+                        await thinking_msg.edit_text(f"🤖 {ai_response}")
+                        
+                        # 更新会话
+                        session_manager.update_session(user_id, session.get('context', {}))
+                        
+                        logger.info(f"AI chat auto-triggered for user {user_id}")
+                        return
+                        
+                    except Exception as e:
+                        logger.error(f"AI chat error: {e}", exc_info=True)
+                        await message.reply_text("❌ AI处理出错")
                         session_manager.clear_session(user_id)
                         # 继续正常归档流程
             

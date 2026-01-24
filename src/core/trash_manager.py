@@ -26,7 +26,18 @@ class TrashManager:
             db: Database instance
         """
         self.db = db
+        self.ai_cache = None  # Will be set by main.py
         logger.info("TrashManager initialized")
+    
+    def set_ai_cache(self, ai_cache):
+        """Set AI data cache instance"""
+        self.ai_cache = ai_cache
+    
+    def _invalidate_ai_cache(self):
+        """失效AI数据缓存"""
+        if self.ai_cache:
+            self.ai_cache.invalidate('statistics', 'recent_samples')
+            logger.debug("AI cache invalidated (trash operation)")
     
     def move_to_trash(self, archive_id: int) -> bool:
         """
@@ -56,6 +67,9 @@ class TrashManager:
                     (now, archive_id)
                 )
                 self.db.commit()
+                
+                # 触发AI缓存失效
+                self._invalidate_ai_cache()
                 
                 logger.info(f"Archive {archive_id} moved to trash")
                 return True
@@ -91,6 +105,9 @@ class TrashManager:
                     (archive_id,)
                 )
                 self.db.commit()
+                
+                # 触发AI缓存失效
+                self._invalidate_ai_cache()
                 
                 logger.info(f"Archive {archive_id} restored from trash")
                 return True

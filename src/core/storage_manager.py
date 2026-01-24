@@ -45,7 +45,18 @@ class StorageManager:
         self.db_storage = db_storage
         self.tag_manager = tag_manager
         self.telegram_storage = telegram_storage
+        self.ai_cache = None  # Will be set by main.py
         self.i18n = get_i18n()
+    
+    def set_ai_cache(self, ai_cache):
+        """Set AI data cache instance (called after initialization)"""
+        self.ai_cache = ai_cache
+    
+    def _invalidate_ai_cache(self):
+        """失效AI数据缓存"""
+        if self.ai_cache:
+            self.ai_cache.invalidate('statistics', 'recent_samples', 'tag_analysis')
+            logger.debug("AI cache invalidated")
     
     async def batch_archive_content(self, messages: list, analyses: list, progress_callback=None) -> list:
         """
@@ -241,6 +252,9 @@ class StorageManager:
                 ai_key_points=analysis.get('ai_key_points'),
                 ai_category=analysis.get('ai_category')
             )
+            
+            # 触发AI数据缓存失效（新归档添加）
+            self._invalidate_ai_cache()
             
             # Generate and add tags
             all_tags = []

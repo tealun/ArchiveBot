@@ -36,6 +36,7 @@ from src.core.trash_manager import TrashManager
 from src.core.export_manager import ExportManager
 from src.core.backup_manager import BackupManager
 from src.core.review_manager import ReviewManager
+from src.core.ai_data_cache import AIDataCache
 
 from src.bot import commands, handlers, callbacks
 from src.bot.unknown_command import handle_unknown_command
@@ -163,8 +164,8 @@ def main():
             telegram_config = {
                 'enabled': True,
                 'channel_id': config.telegram_channel_id,  # 向后兼容
-                'channels': config.get('telegram_channels', {}),
-                'type_mapping': config.get('telegram_type_mapping', {})
+                'channels': config.telegram_channels,
+                'type_mapping': config.telegram_type_mapping
             }
             
             telegram_storage = TelegramStorage(
@@ -173,7 +174,7 @@ def main():
             )
             
             # 获取配置的频道数量
-            channels_count = len(telegram_config.get('channels', {}))
+            channels_count = len(telegram_config['channels'])
             if channels_count > 0:
                 logger.info(f"Telegram storage enabled: {channels_count} channels configured")
             else:
@@ -186,6 +187,13 @@ def main():
         trash_manager = TrashManager(db)
         export_manager = ExportManager(db, note_manager)
         review_manager = ReviewManager(db_storage, tag_manager)
+        
+        # Initialize AI data cache for efficient data gathering
+        ai_data_cache = AIDataCache(db_storage)
+        
+        # 将缓存实例传递给需要的管理器（事件驱动失效）
+        storage_manager.set_ai_cache(ai_data_cache)
+        trash_manager.set_ai_cache(ai_data_cache)
         
         # Initialize AI summarizer if enabled
         ai_summarizer = None
@@ -215,6 +223,7 @@ def main():
         application.bot_data['storage_manager'] = storage_manager
         application.bot_data['search_engine'] = search_engine
         application.bot_data['ai_summarizer'] = ai_summarizer
+        application.bot_data['ai_data_cache'] = ai_data_cache  # AI数据缓存
         
         # Register command handlers (with owner check)
         application.add_handler(CommandHandler("start", owner_only(commands.start_command)))
