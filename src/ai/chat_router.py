@@ -188,6 +188,7 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
     try:
         search_engine = context.bot_data.get('search_engine')
         ai_cache = context.bot_data.get('ai_data_cache')
+        db_storage = context.bot_data.get('db_storage')
         
         if not ai_cache:
             logger.warning("AI data cache not available")
@@ -220,6 +221,117 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
             data['tag_analysis'] = tag_analysis
             logger.info(f"✓ Analyzed {len(tag_analysis)} tags")
         
+        # 资源查询（用于直接返回文件）
+        resource_query = need_data.get('resource_query', {})
+        if resource_query and resource_query.get('enabled') and db_storage:
+            query_type = resource_query.get('type', 'random')
+            content_types = resource_query.get('content_types')
+            keywords = resource_query.get('keywords')
+            tags = resource_query.get('tags')
+            favorite_only = resource_query.get('favorite_only', False)
+            limit = resource_query.get('limit', 1)
+            
+            resources = []
+            
+            if query_type == 'random':
+                # 随机获取
+                import random
+                filters = {}
+                if content_types:
+                    filters['content_types'] = content_types
+                if favorite_only:
+                    filters['favorite_only'] = True
+                
+                # 从数据库获取符合条件的归档
+                all_matches = db_storage.db.get_archives(
+                    content_type=content_types[0] if content_types and len(content_types) == 1 else None,
+                    favorite_only=favorite_only,
+                    limit=100  # 先取100条，然后随机
+                )
+                
+                if all_matches:
+                    # 如果有多个类型筛选，进一步过滤
+                    if content_types and len(content_types) > 1:
+                        all_matches = [a for a in all_matches if a.get('content_type') in content_types]
+                    
+                    # 随机选取
+                    random.shuffle(all_matches)
+                    resources = all_matches[:limit]
+                    
+            elif query_type == 'search' and keywords:
+                # 搜索模式
+                if search_engine:
+                    search_results = search_engine.search(keywords, limit=limit * 2)
+                    candidates = search_results.get('results', [])
+                    
+                    # 应用筛选
+                    if content_types:
+                        candidates = [a for a in candidates if a.get('content_type') in content_types]
+                    if favorite_only and db_storage:
+                        candidates = [a for a in candidates if db_storage.db.is_favorite(a.get('id'))]
+                    
+                    resources = candidates[:limit]
+                    
+                    # 添加tags字段（如果没有）
+                    tag_manager = context.bot_data.get('tag_manager')
+                    if tag_manager:
+                        for resource in resources:
+                            if 'tags' not in resource:
+                                resource['tags'] = tag_manager.get_archive_tags(resource.get('id'))
+                    
+            elif query_type == 'filter':
+                # 筛选模式
+                filters = {}
+                if favorite_only:
+                    filters['favorite_only'] = True
+                if tags:
+                    # 标签筛选
+                    tag_manager = context.bot_data.get('tag_manager')
+                    if tag_manager:
+                        # 去掉#前缀
+                        clean_tags = [t.lstrip('#') for t in tags]
+                        # 获取有这些标签的归档
+                        tag_archives = set()
+                        for tag in clean_tags:
+                            archives = tag_manager.get_archives_by_tag(tag, limit=50)
+                            tag_archives.update([a['id'] for a in archives])
+                        
+                        # 获取详细信息
+                        resources = [db_storage.get_archive(aid) for aid in tag_archives]
+                        resources = [r for r in resources if r]  # 过滤None
+                else:
+                    # 没有标签筛选，获取最近的
+                    resources = db_storage.db.get_archives(
+                        content_type=content_types[0] if content_types and len(content_types) == 1 else None,
+                        favorite_only=favorite_only,
+                        limit=limit * 2
+                    )
+                
+                # 应用类型筛选
+                if content_types and len(content_types) > 1:
+                    resources = [a for a in resources if a.get('content_type') in content_types]
+                
+                resources = resources[:limit]
+            
+            # 确保资源有storage_path（只有telegram存储的才能发送）
+            resources = [r for r in resources if r.get('storage_type') == 'telegram' and r.get('storage_path')]
+            
+            # 添加tags字段（如果没有）
+            if resources:
+                tag_manager = context.bot_data.get('tag_manager')
+                if tag_manager:
+                    for resource in resources:
+                        if 'tags' not in resource:
+                            resource['tags'] = tag_manager.get_archive_tags(resource.get('id'))
+                        if not resource.get('tags'):
+                            resource['tags'] = []
+            
+            if resources:
+                data['resources'] = resources
+                logger.info(f"✓ Found {len(resources)} resources for {query_type} query")
+            else:
+                logger.info(f"✗ No resources found for {query_type} query")
+        
     except Exception as e:
         logger.error(f"Data gathering error: {e}", exc_info=True)
     
@@ -246,9 +358,34 @@ async def generate_response(
         language: 用户语言
         
     Returns:
-        最终回复
+        最终回复（文本或JSON结构）
     """
     try:
+        response_strategy = plan.get('response_strategy', '')
+        
+        # 检测是否为资源回复策略
+        if 'resource_reply' in response_strategy.lower():
+            resources = data_context.get('resources', [])
+            
+            if resources:
+                # 返回JSON结构，由handlers处理
+                import json
+                return json.dumps({
+                    'type': 'resources',
+                    'strategy': 'single' if len(resources) == 1 else 'list',
+                    'count': len(resources),
+                    'items': resources
+                }, ensure_ascii=False)
+            else:
+                # 没有找到资源，返回提示
+                if language == 'en':
+                    return "🔍 No matching resources found in your archives."
+                elif language == 'zh-TW':
+                    return "🔍 沒有在您的歸檔中找到符合條件的資源。"
+                else:
+                    return "🔍 没有在您的归档中找到符合条件的资源。"
+        
+        # 非resource_reply策略，正常生成文本回复
         from ..utils.config import get_config
         
         config = get_config()

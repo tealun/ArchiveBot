@@ -128,52 +128,37 @@ async def handle_tag_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             await query.edit_message_text(lang_ctx.t('callback_tag_no_content', tag=tag_name))
             return
         
-        # 格式化结果列表
-        formatted_results = []
+        # 使用MessageBuilder统一格式化列表
+        from ..utils.message_builder import MessageBuilder
         
         # 获取数据库实例用于查询状态
         db_storage = context.bot_data.get('db_storage')
         db = db_storage.db if db_storage else None
         
-        for idx, archive in enumerate(search_result.get('results', []), page * page_size + 1):
-            emoji = get_content_type_emoji(archive.get('content_type', ''))
-            title = archive.get('title', 'Untitled')
-            title_truncated = truncate_text(title, 40)
-            archive_id = archive.get('id')
-            
-            # 构建跳转链接
-            storage_path = archive.get('storage_path')
-            if storage_path:
-                parts = storage_path.split(':')
-                if len(parts) >= 2:
-                    channel_id = parts[0].replace('-100', '')
-                    message_id = parts[1]
-                    link = f"https://t.me/c/{channel_id}/{message_id}"
-                    title_truncated = f"<a href='{link}'>{title_truncated}</a>"
-            
-            archived_at = format_datetime(archive.get('archived_at', ''))
-            
-            # 检查状态
-            has_notes = db.has_notes(archive_id) if db and archive_id else False
-            is_favorite = db.is_favorite(archive_id) if db and archive_id else False
-            
-            # 构建状态图标（按照要求的顺序）
-            fav_icon = lang_ctx.t('callback_favorite_marked') if is_favorite else lang_ctx.t('callback_favorite_unmarked')
-            note_icon = lang_ctx.t('callback_note_has') if has_notes else lang_ctx.t('callback_note_no')
-            
-            # 结果文本：一行显示状态
-            result_text = f"{idx}. {emoji} {title_truncated}\n   {fav_icon} | {note_icon} | 📅 {archived_at}"
-            formatted_results.append(result_text)
+        archives = search_result.get('results', [])
         
-        results_text = '\n---------------------\n'.join(formatted_results)
+        # 添加tags字段（如果没有）
+        for archive in archives:
+            if 'tags' not in archive:
+                tag_manager = context.bot_data.get('tag_manager')
+                if tag_manager:
+                    archive['tags'] = tag_manager.get_archive_tags(archive.get('id'))
+                else:
+                    archive['tags'] = []
+        
+        results_text = MessageBuilder.format_archive_list(
+            archives,
+            lang_ctx,
+            db_instance=db,
+            with_links=True
+        )
         
         # 获取总数
-        has_more = search_result.get('count', 0) == page_size
         total_count = search_result.get('total_count', search_result.get('count', 0))
         
         message = lang_ctx.t('callback_tag_header', tag=tag_name) + f"\n\n{results_text}"
         
-        # 构建按钮布局：只包含分页和返回按钮（无每条记录的操作按钮）
+        # 构建按钮布局：只包含分页和返回按钮
         keyboard = []
         
         # 构建分页按钮 - 只在多页时显示

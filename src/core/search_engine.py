@@ -7,7 +7,6 @@ import logging
 from typing import List, Dict, Any, Optional
 
 from ..storage.database import DatabaseStorage
-from ..utils.helpers import truncate_text, format_datetime, get_content_type_emoji
 from ..utils.i18n import get_i18n
 
 logger = logging.getLogger(__name__)
@@ -129,62 +128,22 @@ class SearchEngine:
         if count == 0:
             return self.i18n.t('search_no_results', keyword=search_result.get('query', '')), []
         
-        # Format each result
-        formatted_results = []
-        keyboards_per_item = []
+        # 使用MessageBuilder统一格式化
+        from ..utils.message_builder import MessageBuilder
         
-        for idx, archive in enumerate(search_result.get('results', []), 1):
-            archive_id = archive.get('id')
-            emoji = get_content_type_emoji(archive.get('content_type', ''))
-            title = archive.get('title', 'Untitled')
-            title_truncated = truncate_text(title, 50)
-            
-            # 构建跳转链接（如果有storage_path）
-            storage_path = archive.get('storage_path')
-            storage_type = archive.get('storage_type')
-            if with_links and storage_path and storage_type == 'telegram':
-                # 解析 storage_path: 可能是 "message_id" 或 "channel_id:message_id" 或 "channel_id:message_id:file_id"
-                parts = storage_path.split(':')
-                if len(parts) >= 2:
-                    # 格式: channel_id:message_id[:file_id]
-                    channel_id = parts[0].replace('-100', '')  # 移除-100前缀
-                    message_id = parts[1]
-                else:
-                    # 格式: message_id（需要从配置获取channel_id）
-                    from ..utils.config import get_config
-                    config = get_config()
-                    channel_id = str(config.telegram_channel_id).replace('-100', '')
-                    message_id = storage_path
-                
-                # Telegram链接格式：https://t.me/c/{channel_id}/{message_id}
-                link = f"https://t.me/c/{channel_id}/{message_id}"
-                title_truncated = f"<a href='{link}'>{title_truncated}</a>"
-            
-            # Get tags for this archive
-            tags = self.db_storage.get_archive_tags(archive_id)
-            tags_str = ' '.join(f"#{tag}" for tag in tags) if tags else ''
-            
-            archived_at = archive.get('archived_at', '')
-            
-            # 检查精选和笔记状态
-            is_favorite = db_instance.is_favorite(archive_id) if db_instance else False
-            has_notes = db_instance.has_notes(archive_id) if db_instance else False
-            
-            # 构建状态图标（按照要求的顺序）
-            fav_icon = "❤️ 已精选" if is_favorite else "🤍 未精选"
-            note_icon = "📝 √ 有笔记" if has_notes else "📝 无笔记"
-            
-            # 格式化结果为一行
-            result_text = f"{idx}. {emoji} {title_truncated}"
-            if tags_str:
-                result_text += f"\n   {tags_str}"
-            result_text += f"\n   {fav_icon} | {note_icon} | 📅 {archived_at}"
-            
-            # 不再添加按钮，返回空的按钮列表
-            keyboards_per_item.append([])
-            formatted_results.append(result_text)
+        archives = search_result.get('results', [])
         
-        results_text = '\n---------------------\n'.join(formatted_results)
+        # 添加tags字段（如果没有）
+        for archive in archives:
+            if 'tags' not in archive:
+                archive['tags'] = self.db_storage.get_archive_tags(archive.get('id'))
+        
+        results_text = MessageBuilder.format_archive_list(
+            archives,
+            self.i18n,
+            db_instance=db_instance,
+            with_links=with_links
+        )
         
         final_text = self.i18n.t(
             'search_results',
@@ -192,5 +151,8 @@ class SearchEngine:
             keyword=search_result.get('query', ''),
             results=results_text
         )
+        
+        # 返回空的按钮列表（保持接口兼容）
+        keyboards_per_item = [[] for _ in archives]
         
         return final_text, keyboards_per_item

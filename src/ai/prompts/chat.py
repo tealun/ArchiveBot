@@ -53,9 +53,18 @@ class ChatPrompts:
         "search_keywords": "如果需要搜尋，提取關鍵詞；否則null",
         "need_statistics": true/false,
         "need_sample_archives": true/false,
-        "need_tags_analysis": true/false
+        "need_tags_analysis": true/false,
+        "resource_query": {{  # 如果用戶需要實際文件/圖片/視頻等資源
+            "enabled": true/false,
+            "type": "random|search|filter",  # 隨機/搜尋/篩選
+            "content_types": ["photo", "video", "document"],  # 類型篩選，null表示不限
+            "keywords": "搜尋關鍵詞",  # 僅type=search時
+            "tags": ["#標籤"],  # 標籤篩選，null表示不限
+            "favorite_only": true/false,  # 僅精選
+            "limit": 1  # 返回數量
+        }}
     }},
-    "response_strategy": "回覆方式（30字內）：直接回答/數據分析/搜尋結果/澄清引導",
+    "response_strategy": "回覆方式：direct_answer|data_analysis|search_results|resource_reply|clarify",
     "reasoning": "分析理由（50字內）"
 }}
 
@@ -66,6 +75,12 @@ class ChatPrompts:
 2. 精準問題只返回所需數據，不過度引申
 3. 開放問題可以分析趨勢、提供洞察
 4. 專業友好，不過度熱情
+
+【重要】響應策略選擇：
+- 如果用戶明確要求返回「圖片」「視頻」「文件」等實際資源，必須使用 resource_reply 策略
+- resource_reply 時必須啟用 resource_query，系統會查詢真實文件並直接發送
+- 絕對禁止虛構URL、文件名、file_id等不存在的內容
+- 如果查詢不到結果，會如實告知用戶「未找到」，不得編造
 
 只返回JSON。"""
         else:
@@ -82,9 +97,18 @@ class ChatPrompts:
         "search_keywords": "如果需要搜索，提取关键词；否则null",
         "need_statistics": true/false,
         "need_sample_archives": true/false,
-        "need_tags_analysis": true/false
+        "need_tags_analysis": true/false,
+        "resource_query": {{  # 如果用户需要实际文件/图片/视频等资源
+            "enabled": true/false,
+            "type": "random|search|filter",  # 随机/搜索/筛选
+            "content_types": ["photo", "video", "document"],  # 类型筛选，null表示不限
+            "keywords": "搜索关键词",  # 仅type=search时
+            "tags": ["#标签"],  # 标签筛选，null表示不限
+            "favorite_only": true/false,  # 仅精选
+            "limit": 1  # 返回数量
+        }}
     }},
-    "response_strategy": "回复方式（30字内）：直接回答/数据分析/搜索结果/澄清引导",
+    "response_strategy": "回复方式：direct_answer|data_analysis|search_results|resource_reply|clarify",
     "reasoning": "分析理由（50字内）"
 }}
 
@@ -95,6 +119,12 @@ class ChatPrompts:
 2. 精准问题只返回所需数据，不过度引申
 3. 开放问题可以分析趋势、提供洞察
 4. 专业友好，不过度热情
+
+【重要】响应策略选择：
+- 如果用户明确要求返回「图片」「视频」「文件」等实际资源，必须使用 resource_reply 策略
+- resource_reply 时必须启用 resource_query，系统会查询真实文件并直接发送
+- 绝对禁止虚构URL、文件名、file_id等不存在的内容
+- 如果查询不到结果，会如实告知用户「未找到」，不得编造
 
 只返回JSON。"""
     
@@ -117,9 +147,18 @@ Please understand the user's need and plan the response. Return JSON (no markdow
         "search_keywords": "If search needed, extract keywords; otherwise null",
         "need_statistics": true/false,
         "need_sample_archives": true/false,
-        "need_tags_analysis": true/false
+        "need_tags_analysis": true/false,
+        "resource_query": {{  # If user needs actual files/photos/videos/resources
+            "enabled": true/false,
+            "type": "random|search|filter",  # random/search/filter
+            "content_types": ["photo", "video", "document"],  # type filter, null=any
+            "keywords": "search keywords",  # only when type=search
+            "tags": ["#tag"],  # tag filter, null=any
+            "favorite_only": true/false,  # favorites only
+            "limit": 1  # count to return
+        }}
     }},
-    "response_strategy": "Response approach (30 chars): direct answer/data analysis/search results/clarification",
+    "response_strategy": "Response type: direct_answer|data_analysis|search_results|resource_reply|clarify",
     "reasoning": "Analysis rationale (50 chars)"
 }}
 
@@ -130,6 +169,12 @@ Planning guidelines:
 2. Precise questions return only required data, don't over-extend
 3. Open questions can analyze trends and provide insights
 4. Professional and friendly, not overly enthusiastic
+
+【CRITICAL】Response strategy selection:
+- If user explicitly requests actual "photos", "videos", "files" or other resources, MUST use resource_reply strategy
+- When using resource_reply, MUST enable resource_query - system will query real files and send directly
+- ABSOLUTELY FORBIDDEN to fabricate URLs, filenames, file_ids or any non-existent content
+- If no results found, system will honestly tell user "not found" - DO NOT make up content
 
 Return JSON only."""
     

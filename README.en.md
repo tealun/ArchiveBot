@@ -35,7 +35,8 @@ ArchiveBot is an open-source Telegram Bot that helps you intelligently categoriz
 - 🔄 **Auto Backup**: Scheduled automatic database backups for data security
 - 🤖 **AI Enhancement**: Grok-4 intelligent analysis (summary/key points/classification/tags)
 - 💬 **AI Chat**: Natural language interaction with automatic intent and language detection
-- 🌏 **Multi-language**: English/Simplified Chinese/Traditional Chinese (with regional terms)
+- � **Smart Resource Reply**: Intelligently identifies intent and directly returns resource files (no fabricated URLs)
+- �🌏 **Multi-language**: English/Simplified Chinese/Traditional Chinese (with regional terms)
 - 🔗 **Smart Links**: Automatic extraction of webpage titles, descriptions, and metadata
 - 💾 **Simplified Storage**: Local storage for small data → Channel storage for large files → Reference-only for huge files (three-tier strategy)
 - 🔒 **Privacy Protection**: Completely private data, single-user mode
@@ -62,17 +63,20 @@ ArchiveBot is an open-source Telegram Bot that helps you intelligently categoriz
 ### Installation
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/tealun/ArchiveBot.git
 cd ArchiveBot
 ```
 
-2. **Install dependencies**
+1. **Install dependencies**
+
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Configure the Bot**
+1. **Configure the Bot**
+
 ```bash
 # Copy config template
 cp config/config.template.yaml config/config.yaml
@@ -82,16 +86,18 @@ nano config/config.yaml
 ```
 
 **Required configuration**:
+
 - `bot_token`: Obtain from @BotFather
 - `owner_id`: Your Telegram User ID (get from @userinfobot)
 - `storage.telegram.channels.default`: Default private channel ID (for file storage, supports multi-channel categorized storage)
 
-4. **Start the Bot**
+1. **Start the Bot**
+
 ```bash
 python main.py
 ```
 
-5. **Start using**
+1. **Start using**
 
 Find your Bot on Telegram and send `/start` to begin!
 
@@ -108,6 +114,7 @@ ArchiveBot uses a simplified three-tier storage strategy, fully leveraging Teleg
 | Huge files | >2GB | Reference info only | No space occupied, depends on original message |
 
 **Key advantages**:
+
 - ✅ No download/upload needed, direct file_id forwarding
 - ✅ Channel message file_id permanently valid
 - ✅ Full 2GB limit support
@@ -150,6 +157,7 @@ Supported content types:
 ```
 
 **Add tags**:
+
 ```text
 Include #tag when sending:
 
@@ -184,7 +192,7 @@ https://github.com #tech #opensource
 
 ### Architecture Design
 
-```
+```text
 ArchiveBot/
 ├── main.py                      # Entry point
 ├── src/
@@ -227,6 +235,7 @@ ArchiveBot/
 │   │   ├── logger.py            # Logging system
 │   │   ├── i18n.py              # Internationalization
 │   │   ├── language_context.py  # Language context
+│   │   ├── message_builder.py   # Message builder framework
 │   │   ├── validators.py        # Input validation
 │   │   ├── helpers.py           # Helper functions
 │   │   ├── constants.py         # Constants
@@ -303,6 +312,7 @@ If you choose not to enable AI features, the following functions will be **unava
 1. **Configure API key**
 
 Edit `config/config.yaml`:
+
 ```yaml
 ai:
   enabled: true              # Enable AI features
@@ -337,6 +347,7 @@ ai:
     max_tokens: 1000
     timeout: 30
 ```
+
 </details>
 
 <details>
@@ -356,6 +367,7 @@ ai:
     max_tokens: 1000
     timeout: 30
 ```
+
 </details>
 
 <details>
@@ -375,20 +387,23 @@ ai:
     max_tokens: 1000
     timeout: 30
 ```
+
 </details>
 
-2. **Restart the Bot**
+1. **Restart the Bot**
+
 ```bash
 python main.py
 ```
 
-3. **Verify AI status**
+1. **Verify AI status**
+
 ```bash
 # Send command to Bot in Telegram to check AI status
 /ai
 ```
 
-4. **Start using AI features**
+1. **Start using AI features**
 
 Send any content to the Bot (text/links/images/documents, etc.), and AI will automatically analyze it in the background. When using `/search`, content with AI analysis will show a 🤖 button that you can click to view the full AI analysis (summary/key points/tags/classification).
 
@@ -409,6 +424,7 @@ Send any content to the Bot (text/links/images/documents, etc.), and AI will aut
 ## 🎯 Roadmap
 
 ### ✅ Phase 1 (Completed)
+
 - ✅ Basic Bot framework and command system
 - ✅ Smart content analysis and archiving
 - ✅ Full-text search engine (FTS5)
@@ -427,6 +443,7 @@ Send any content to the Bot (text/links/images/documents, etc.), and AI will aut
 - ✅ Simplified Telegram storage strategy
 
 ### ✅ Phase 2 (Completed)
+
 - ✅ Note and annotation system
   - ✅ Standalone and linked notes
   - ✅ Note mode for quick additions
@@ -452,6 +469,7 @@ Send any content to the Bot (text/links/images/documents, etc.), and AI will aut
   - ✅ Configurable backup intervals
 
 ### ✅ Phase 3 (Completed)
+
 - ✅ User experience optimization
   - ✅ Command aliases (/s = /search, /t = /tags, /st = /stats, /lang = /language)
   - ✅ Auto-deduplication (file MD5 detection to prevent duplicate archiving)
@@ -472,6 +490,7 @@ Send any content to the Bot (text/links/images/documents, etc.), and AI will aut
   - 🚧 Content type filtering
 
 ### 📝 Phase 4 (Future Plans)
+
 - 🔮 **AI Enhancement**
   - Voice to text (Whisper API)
   - OCR image text recognition
@@ -522,7 +541,7 @@ This project is licensed under the [MIT License](LICENSE)
 
 - **GitHub Issues**: [Submit Issue](https://github.com/tealun/ArchiveBot/issues)
 - **X (Twitter)**: [@TealunDu](https://x.com/TealunDu)
-- **Email**: tealun@gmail.com
+- **Email**: <tealun@gmail.com>
 
 ### Community Groups
 
@@ -542,24 +561,24 @@ This project is licensed under the [MIT License](LICENSE)
 
 ### Third-Party Services
 
-5. **AI Services**: When using AI features, your content will be sent to third-party AI service providers (xAI/OpenAI/Anthropic/Alibaba Cloud). Please ensure compliance with these providers' terms of use and privacy policies
-6. **API Usage**: Users must apply for and legally use API keys for various third-party services. Users bear consequences of API abuse
+1. **AI Services**: When using AI features, your content will be sent to third-party AI service providers (xAI/OpenAI/Anthropic/Alibaba Cloud). Please ensure compliance with these providers' terms of use and privacy policies
+2. **API Usage**: Users must apply for and legally use API keys for various third-party services. Users bear consequences of API abuse
 
 ### Intellectual Property & Privacy
 
-7. **Copyright Protection**: Do not use this project to archive copyrighted content or materials that infringe on others' intellectual property rights
-8. **Privacy Respect**: Do not archive others' private information or conversation content without authorization
-9. **Open Source License**: This project is licensed under MIT License but provides no warranties or guarantees
+1. **Copyright Protection**: Do not use this project to archive copyrighted content or materials that infringe on others' intellectual property rights
+2. **Privacy Respect**: Do not archive others' private information or conversation content without authorization
+3. **Open Source License**: This project is licensed under MIT License but provides no warranties or guarantees
 
 ### No Warranty Statement
 
-10. **Provided As-Is**: This software is provided "as is" without any express or implied warranties, including but not limited to merchantability, fitness for a particular purpose, and non-infringement
-11. **Use at Your Own Risk**: Developers assume no responsibility for any direct or indirect losses (including but not limited to data loss, service interruptions, business losses, etc.) resulting from using this project
-12. **Security Risks**: While security measures are implemented, any software may have unknown vulnerabilities. Users should assess security risks themselves
+1. **Provided As-Is**: This software is provided "as is" without any express or implied warranties, including but not limited to merchantability, fitness for a particular purpose, and non-infringement
+2. **Use at Your Own Risk**: Developers assume no responsibility for any direct or indirect losses (including but not limited to data loss, service interruptions, business losses, etc.) resulting from using this project
+3. **Security Risks**: While security measures are implemented, any software may have unknown vulnerabilities. Users should assess security risks themselves
 
 ### Legal Compliance
 
-13. **Local Laws**: Ensure that using this project complies with local laws and regulations in your region
-14. **No Illegal Use**: Strictly prohibited from using this project for any illegal activities, including but not limited to spreading illegal information, privacy infringement, network attacks, etc.
+1. **Local Laws**: Ensure that using this project complies with local laws and regulations in your region
+2. **No Illegal Use**: Strictly prohibited from using this project for any illegal activities, including but not limited to spreading illegal information, privacy infringement, network attacks, etc.
 
 ---
