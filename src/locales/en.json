@@ -172,5 +172,9 @@
   "ai_chat_help": "🤖 AI Assistant Features:\n\n• Smart Chat: Tell me what you want to know\n• Search Archives: Find content by topic\n• View Stats: Check archive statistics\n• Content Analysis: Deep dive into your archives\n• Exit: Send 'exit' to end session\n\nNote: Session expires after 10 minutes of inactivity",
   "ai_chat_thinking": "🤔 Thinking...",
   "ai_chat_error": "❌ AI processing error",
-  "ai_chat_error_session_end": "❌ AI error, session ended"
+  "ai_chat_error_session_end": "❌ AI error, session ended",
+  "ai_chat_understanding": "⏳ Understanding your question...",
+  "ai_chat_analyzing": "🧠 Analyzing needs...",
+  "ai_chat_gathering": "📊 Gathering data...",
+  "ai_chat_generating": "💬 Generating response..."
 }

@@ -970,13 +970,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 if session:
                     # 用户已在AI会话中，处理消息
                     try:
-                        # 发送"正在思考"提示
-                        thinking_msg = await message.reply_text(i18n.t('ai_chat_thinking'))
+                        # 发送AI处理进度提示
+                        progress_msg = await message.reply_text(f"🤖 {i18n.t('ai_chat_understanding')}")
                         
-                        ai_response = await handle_chat_message(text, session, context)
+                        # 包装handle_chat_message，添加进度回调
+                        async def update_ai_progress(stage: str):
+                            try:
+                                await progress_msg.edit_text(f"🤖 {stage}")
+                            except Exception:
+                                pass
+                        
+                        # Stage 1: 理解需求
+                        await update_ai_progress(i18n.t('ai_chat_analyzing'))
+                        
+                        # 调用AI处理（内部有3个阶段）
+                        ai_response = await handle_chat_message(text, session, context, update_ai_progress)
                         
                         # 编辑消息为最终回复
-                        await thinking_msg.edit_text(f"🤖 {ai_response}")
+                        await progress_msg.edit_text(f"🤖 {ai_response}")
                         
                         # 更新会话（保存上下文）
                         session_manager.update_session(user_id, session.get('context', {}))
@@ -1003,13 +1014,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     logger.info(f"AI chat session auto-created for user {user_id}")
                     
                     try:
-                        # 发送"正在思考"提示
-                        thinking_msg = await message.reply_text(i18n.t('ai_chat_thinking'))
+                        # 发送AI处理进度提示
+                        progress_msg = await message.reply_text(f"🤖 {i18n.t('ai_chat_understanding')}")
                         
-                        ai_response = await handle_chat_message(text, session, context)
+                        # 进度更新回调
+                        async def update_ai_progress(stage: str):
+                            try:
+                                await progress_msg.edit_text(f"🤖 {stage}")
+                            except Exception:
+                                pass
+                        
+                        # Stage 1: 理解需求
+                        await update_ai_progress(i18n.t('ai_chat_analyzing'))
+                        
+                        ai_response = await handle_chat_message(text, session, context, update_ai_progress)
                         
                         # 编辑消息为最终回复
-                        await thinking_msg.edit_text(f"🤖 {ai_response}")
+                        await progress_msg.edit_text(f"🤖 {ai_response}")
                         
                         # 更新会话
                         session_manager.update_session(user_id, session.get('context', {}))

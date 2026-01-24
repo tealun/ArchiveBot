@@ -52,21 +52,24 @@ async def understand_and_plan(user_message: str, context: Any) -> Dict[str, Any]
 
 {{
     "user_goal": "用户的真实需求（一句话）",
+    "question_type": "precise|open",  # precise=具体精准问题, open=开放式问题
     "need_data": {{
         "search_keywords": "如果需要搜索，提取关键词；否则null",
         "need_statistics": true/false,
         "need_sample_archives": true/false,
         "need_tags_analysis": true/false
     }},
-    "response_strategy": "回复方式（30字内）：数据分析/搜索结果/澄清引导/简单回答",
+    "response_strategy": "回复方式（30字内）：直接回答/数据分析/搜索结果/澄清引导",
     "reasoning": "分析理由（50字内）"
 }}
 
 规划要点：
-1. 准确判断用户想要什么
-2. 如果问题模糊，规划引导澄清
-3. 判断需要哪些数据支撑
-4. 回复要专业友好，但不要过度热情
+1. 判断问题类型
+   - 精准问题：有明确目标、具体范围、特定需求（如"有多少条归档"、"找关于python的内容"）→ 直接专注回答
+   - 开放问题：探索性、无明确范围、启发性（如"我归档了什么"、"分析下我的兴趣"）→ 可适度发散
+2. 精准问题只返回所需数据，不过度引申
+3. 开放问题可以分析趋势、提供洞察
+4. 专业友好，不过度热情
 
 只返回JSON。"""
         
@@ -114,7 +117,8 @@ async def understand_and_plan(user_message: str, context: Any) -> Dict[str, Any]
 async def handle_chat_message(
     user_message: str,
     session_data: Dict[str, Any],
-    context: Any
+    context: Any,
+    progress_callback=None
 ) -> str:
     """
     Handle message in AI chat mode - 智能理解与响应流程
@@ -127,6 +131,7 @@ async def handle_chat_message(
         user_message: User's message text
         session_data: Current session context
         context: Bot context (has bot_data with managers)
+        progress_callback: Optional callback for progress updates
         
     Returns:
         AI response text
@@ -140,6 +145,8 @@ async def handle_chat_message(
     
     # Stage 1: AI理解需求并规划
     logger.info(f"🧠 Stage 1: Understanding user need...")
+    if progress_callback:
+        await progress_callback("🧠 分析需求...")
     plan = await understand_and_plan(user_message, context)
     
     user_goal = plan.get('user_goal', '')
@@ -150,10 +157,18 @@ async def handle_chat_message(
     
     # Stage 2: 根据规划获取数据
     logger.info(f"📊 Stage 2: Gathering data...")
+    if progress_callback:
+        from ..utils.i18n import get_i18n
+        i18n = get_i18n()
+        await progress_callback(i18n.t('ai_chat_gathering'))
     data_context = await gather_data(plan.get('need_data', {}), context)
     
     # Stage 3: AI生成最终回复
     logger.info(f"💬 Stage 3: Generating response...")
+    if progress_callback:
+        from ..utils.i18n import get_i18n
+        i18n = get_i18n()
+        await progress_callback(i18n.t('ai_chat_generating'))
     return await generate_response(user_message, plan, data_context, session_data, context)
 
 
@@ -283,20 +298,40 @@ async def generate_response(
         
         # 获取对话历史
         conversation_history = session_data.get('context', {}).get('history', [])
+        
+        # 根据问题类型调整系统提示
+        question_type = plan.get('question_type', 'open')
+        if question_type == 'precise':
+            # 精准问题：专注、简洁、直接
+            style_guide = """风格要求（精准问题模式）：
+- 直接回答用户的具体问题，不发散
+- 只提供所需数据，不额外延伸
+- 简洁明了，控制在50-80字
+- 如果数据充分，直接给结论；如果不足，明确说明
+- 适度使用emoji（1个）"""
+        else:
+            # 开放问题：可以分析、洞察、适度发散
+            style_guide = """风格要求（开放探索模式）：
+- 可以从数据中发现趋势和规律
+- 适度发散，提供洞察和建议
+- 字数60-100字，分3-4个小段
+- 善于总结和归纳
+- 适度使用emoji（1-2个）"""
+        
         messages = [
             {
                 "role": "system",
                 "content": f"""你是归档助手，帮用户管理和分析归档内容。
 
 用户需求：{plan.get('user_goal', '未知')}
+问题类型：{question_type}
 回复策略：{plan.get('response_strategy', '友好回复')}
 
-风格要求：
+{style_guide}
+
+通用要求：
 - 专业但不刻板，友好但有分寸
-- 直接回答问题，少寒暄
 - 不用"嘿"、"哥们儿"等过分随意的称呼
-- 善于从数据中发现规律
-- 适度使用emoji（1-2个）让表达更清晰
 
 回复格式（重要）：
 1. 分段表达，不要大段文字堆砌
