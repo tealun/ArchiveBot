@@ -2,6 +2,8 @@
 
 # Config files (contains sensitive info)
 config/config.yaml
+.env                # 环境变量文件
+docker-compose.override.yml  # 本地覆盖配置（不提交）
 
 # Data directory
 data/

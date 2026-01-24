@@ -1,5 +1,7 @@
 """
 Configuration management module
+Supports environment variable override for sensitive information
+Priority: Environment Variables > YAML Config
 """
 
 import os
@@ -94,14 +96,56 @@ class Config:
     def get(self, key: str, default: Any = None) -> Any:
         """
         Get configuration value by dot-separated key path
+        Supports environment variable override for sensitive fields
+        
+        Priority: Environment Variables > YAML Config
+        
+        Supported environment variables:
+        - BOT_TOKEN: Bot token
+        - OWNER_ID: Owner Telegram ID
+        - CHANNEL_ID: Default Telegram channel ID
+        - AI_API_KEY: AI API key
+        - AI_API_URL: AI API URL
+        - AI_MODEL: AI model name
         
         Args:
             key: Dot-separated key path (e.g., 'bot.token')
             default: Default value if key not found
             
         Returns:
-            Configuration value
+            Configuration value (from env or YAML)
         """
+        # 环境变量映射（仅敏感信息）
+        env_mapping = {
+            'bot.token': 'BOT_TOKEN',
+            'bot.owner_id': 'OWNER_ID',
+            'storage.telegram.channel_id': 'CHANNEL_ID',
+            'storage.telegram.channels.default': 'CHANNEL_ID',
+            'ai.api.api_key': 'AI_API_KEY',
+            'ai.api.api_url': 'AI_API_URL',
+            'ai.api.model': 'AI_MODEL',
+        }
+        
+        # 检查是否有对应的环境变量
+        env_var = env_mapping.get(key)
+        if env_var:
+            env_value = os.getenv(env_var)
+            if env_value is not None:
+                # 类型转换
+                if key == 'bot.owner_id':
+                    try:
+                        return int(env_value)
+                    except ValueError:
+                        logger.warning(f"Invalid OWNER_ID value: {env_value}, using YAML config")
+                elif key in ['storage.telegram.channel_id', 'storage.telegram.channels.default']:
+                    try:
+                        return int(env_value)
+                    except ValueError:
+                        logger.warning(f"Invalid CHANNEL_ID value: {env_value}, using YAML config")
+                else:
+                    return env_value
+        
+        # 从 YAML 配置读取
         keys = key.split('.')
         value = self._config
         

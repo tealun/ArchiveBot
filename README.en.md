@@ -54,13 +54,66 @@ ArchiveBot is an open-source Telegram Bot that helps you intelligently categoriz
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option 1: Docker Deployment (Recommended)
+
+**Easiest way - no need to configure Python environment**
+
+#### Prerequisites
+
+- Install [Docker](https://www.docker.com/get-started) and Docker Compose
+- Telegram account
+- Bot Token (obtain from [@BotFather](https://t.me/BotFather))
+
+#### Deployment Steps
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/tealun/ArchiveBot.git
+cd ArchiveBot
+
+# 2. Configure the Bot
+cp config/config.template.yaml config/config.yaml
+nano config/config.yaml  # Fill in bot_token, owner_id, channel_id
+
+# 3. Start (one-command deployment)
+docker-compose up -d --build
+
+# 4. View logs
+docker-compose logs -f
+```
+
+**Done!** Find your Bot on Telegram and send `/start` to begin.
+
+#### Common Commands
+
+```bash
+docker-compose restart          # Restart
+docker-compose logs -f          # View logs
+docker-compose down             # Stop
+git pull && docker-compose up -d --build  # Update to latest version
+```
+
+#### Configuration Methods
+
+**Method 1: Config File (Recommended)**
+- Edit `config/config.yaml`
+- All settings in the file
+
+**Method 2: Environment Variables (For CI/CD)**
+- Edit environment section in `docker-compose.yml`
+- Priority: Environment Variables > Config File
+
+---
+
+### Option 2: Traditional Deployment
+
+#### Prerequisites
 
 - Python 3.9+
 - Telegram account
-- Bot Token (obtain from @BotFather)
+- Bot Token (obtain from [@BotFather](https://t.me/BotFather))
 
-### Installation
+#### Installation
 
 1. **Clone the repository**
 
@@ -69,13 +122,13 @@ git clone https://github.com/tealun/ArchiveBot.git
 cd ArchiveBot
 ```
 
-1. **Install dependencies**
+2. **Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-1. **Configure the Bot**
+3. **Configure the Bot**
 
 ```bash
 # Copy config template
@@ -87,17 +140,17 @@ nano config/config.yaml
 
 **Required configuration**:
 
-- `bot_token`: Obtain from @BotFather
-- `owner_id`: Your Telegram User ID (get from @userinfobot)
+- `bot_token`: Obtain from [@BotFather](https://t.me/BotFather)
+- `owner_id`: Your Telegram User ID (get from [@userinfobot](https://t.me/userinfobot))
 - `storage.telegram.channels.default`: Default private channel ID (for file storage, supports multi-channel categorized storage)
 
-1. **Start the Bot**
+4. **Start the Bot**
 
 ```bash
 python main.py
 ```
 
-1. **Start using**
+5. **Start using**
 
 Find your Bot on Telegram and send `/start` to begin!
 

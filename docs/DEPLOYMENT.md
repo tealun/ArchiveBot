@@ -8,12 +8,211 @@
 
 | 部署方式 | 适用场景 | 优点 | 缺点 | 成本 |
 |---------|---------|------|------|------|
+| **Docker (推荐)** | 任何环境 | 一键部署、环境隔离、易迁移升级 | 需要学习Docker | 免费 |
 | 本地电脑 | 测试、开发 | 简单快速 | 需要电脑一直开机 | 免费 |
 | 云服务器 | 长期使用 | 稳定可靠、7×24运行 | 需要基础Linux知识 | ¥10-30/月 |
-| Docker | 容器化部署 | 环境隔离、易迁移 | 需要学习Docker | 免费（需服务器） |
 | 宝塔面板 | 可视化管理 | 图形界面、易操作 | 需要安装宝塔 | 面板免费 |
 
-## 💻 方案一：本地电脑部署
+---
+
+## 🐳 方案一：Docker 部署（推荐）
+
+### 为什么推荐 Docker？
+
+- ✅ **一键部署**：无需手动配置 Python 环境
+- ✅ **环境隔离**：不污染系统环境，卸载干净
+- ✅ **易于升级**：一条命令更新到最新版
+- ✅ **跨平台**：Windows/macOS/Linux 统一部署方式
+- ✅ **数据持久化**：数据库和配置自动保存到宿主机
+
+### 前置要求
+
+安装 Docker 和 Docker Compose：
+
+- **Windows/macOS**：下载 [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- **Linux**：
+  ```bash
+  # Ubuntu/Debian
+  curl -fsSL https://get.docker.com | sh
+  sudo systemctl start docker
+  sudo systemctl enable docker
+  
+  # 安装 Docker Compose（如果没有）
+  sudo apt install docker-compose-plugin
+  ```
+
+### 快速开始
+
+#### 1. 克隆项目
+
+```bash
+git clone https://github.com/tealun/ArchiveBot.git
+cd ArchiveBot
+```
+
+#### 2. 配置 Bot
+
+**方式一：使用配置文件（推荐）**
+
+```bash
+# 复制配置模板
+cp config/config.template.yaml config/config.yaml
+
+# 编辑配置文件
+nano config/config.yaml  # 或用其他编辑器
+```
+
+填写以下必填项：
+- `bot.token`: 从 [@BotFather](https://t.me/BotFather) 获取
+- `bot.owner_id`: 你的 Telegram ID（[@userinfobot](https://t.me/userinfobot) 查询）
+- `storage.telegram.channels.default`: 私有频道 ID
+- `ai.api.api_key`: AI API 密钥（可选）
+
+**方式二：使用环境变量（适合CI/CD）**
+
+编辑 `docker-compose.yml`，取消注释并填写环境变量：
+
+```yaml
+environment:
+  - BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+  - OWNER_ID=123456789
+  - CHANNEL_ID=-1001234567890
+  - AI_API_KEY=your_api_key_here
+```
+
+> 💡 **提示**：环境变量优先级 > 配置文件，可以混合使用
+
+#### 3. 验证配置（推荐）
+
+在启动前验证配置是否正确：
+
+```bash
+python verify_docker.py
+```
+
+如果看到 `✅ 所有检查通过！` 则可以继续。
+
+#### 4. 启动 Bot
+
+```bash
+# 构建并启动（后台运行）
+docker-compose up -d --build
+
+# 查看日志
+docker-compose logs -f
+
+# 停止运行
+docker-compose down
+```
+
+### 常用命令
+
+```bash
+# 查看运行状态
+docker-compose ps
+
+# 查看实时日志
+docker-compose logs -f archivebot
+
+# 重启 Bot
+docker-compose restart
+
+# 停止 Bot
+docker-compose stop
+
+# 完全删除容器（不删除数据）
+docker-compose down
+
+# 更新到最新版本
+git pull
+docker-compose down
+docker-compose up -d --build
+```
+
+### 数据管理
+
+数据持久化在以下目录（自动挂载到宿主机）：
+
+- `./data/`：数据库、备份、缓存
+- `./config/`：配置文件
+
+**备份数据**：
+
+```bash
+# 备份整个数据目录
+tar -czf archivebot-backup-$(date +%Y%m%d).tar.gz data/ config/
+
+# 或使用 Bot 内置的备份功能（/backup 命令）
+```
+
+**恢复数据**：
+
+```bash
+# 解压备份
+tar -xzf archivebot-backup-20260125.tar.gz
+
+# 重启容器
+docker-compose restart
+```
+
+### 故障排查
+
+#### 容器无法启动
+
+```bash
+# 查看错误日志
+docker-compose logs archivebot
+
+# 常见问题：
+# 1. config.yaml 不存在 → 检查是否复制了配置文件
+# 2. 权限问题 → 检查 data/ 和 config/ 目录权限
+# 3. 端口占用 → Bot 不需要端口，通常不会有此问题
+```
+
+#### 配置更新后不生效
+
+```bash
+# 重启容器
+docker-compose restart
+
+# 或重新构建
+docker-compose up -d --build
+```
+
+#### 查看详细日志
+
+```bash
+# 查看最近 100 行日志
+docker-compose logs --tail=100 archivebot
+
+# 持续查看日志（Ctrl+C 退出）
+docker-compose logs -f archivebot
+```
+
+### 安全建议
+
+1. ⚠️ **不要提交敏感信息到 Git**：
+   ```bash
+   # config.yaml 和真实配置的 docker-compose.yml 已在 .gitignore 中
+   # 如果修改了 docker-compose.yml 并填写了真实密钥，不要提交
+   ```
+
+2. ✅ **使用环境变量文件**（更安全的方式）：
+   ```bash
+   # 创建 .env 文件（不提交到 Git）
+   echo "BOT_TOKEN=your_token" > .env
+   echo "OWNER_ID=123456789" >> .env
+   
+   # docker-compose.yml 中引用
+   env_file:
+     - .env
+   ```
+
+3. ✅ **定期备份**：使用 Bot 的 `/backup` 命令或手动备份 `data/` 目录
+
+---
+
+## 💻 方案二：本地电脑部署
 
 ### Windows
 
@@ -84,7 +283,7 @@ ps aux | grep main.py
 kill $(ps aux | grep 'python3 main.py' | grep -v grep | awk '{print $2}')
 ```
 
-## 🌐 方案二：云服务器部署（推荐）
+## 🌐 方案三：云服务器部署
 
 ### 服务器选择
 
@@ -126,6 +325,33 @@ python3 --version
 ```
 
 #### 3. 部署 Bot
+
+**推荐使用 Docker 部署**（更简单）：
+
+```bash
+# 克隆项目
+cd /opt
+git clone https://github.com/tealun/ArchiveBot.git
+cd ArchiveBot
+
+# 安装 Docker（如果未安装）
+curl -fsSL https://get.docker.com | sh
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# 配置 Bot
+cp config/config.template.yaml config/config.yaml
+nano config/config.yaml
+# 填入你的Bot Token、User ID、Channel ID
+
+# 启动（使用 Docker）
+docker-compose up -d --build
+
+# 查看日志
+docker-compose logs -f
+```
+
+**或使用传统方式部署**：
 
 ```bash
 # 克隆项目

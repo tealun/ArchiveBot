@@ -1,0 +1,65 @@
+# Docker 构建排除文件
+# 减小镜像体积，提高构建速度
+
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv
+
+# 数据文件（由用户挂载）
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# 配置文件（用户自己提供）
+config/config.yaml
+config.yaml
+
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 文档（可选，如果想减小镜像体积）
+# docs/
+# *.md
+# README.*
+
+# 测试
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker 自身
+Dockerfile
+docker-compose.yml
+.dockerignore
