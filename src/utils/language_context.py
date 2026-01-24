@@ -45,7 +45,7 @@ class LanguageContext:
         # Fallback to default
         if not self._language:
             config = get_config()
-            self._language = config.bot.get('language', 'zh-CN')
+            self._language = config.language
     
     def _load_user_language(self, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
         """Load user's language preference from storage"""

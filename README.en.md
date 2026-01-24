@@ -476,6 +476,12 @@ Send any content to the Bot (text/links/images/documents, etc.), and AI will aut
   - Voice to text (Whisper API)
   - OCR image text recognition
   - Smart content similarity analysis
+  - Exclude specific archive channels from AI reference content
+  - Exclude specific tags and categories from AI reference content
+- 🔮 **Archive Enhancement**
+  - Specify archive channel based on forward source
+  - Specify archive channel for personally sent documents
+  - Specify archive channel based on tags
 - 🔮 **Extended Features**
   - Web management interface
   - RESTful API
