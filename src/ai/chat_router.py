@@ -88,7 +88,7 @@ async def handle_chat_message(
     user_message: str,
     session_data: Dict[str, Any],
     context: Any,
-    language: str,
+    language: str = 'auto',
     progress_callback=None
 ) -> str:
     """
@@ -102,21 +102,26 @@ async def handle_chat_message(
         user_message: User's message text
         session_data: Current session context
         context: Bot context (has bot_data with managers)
-        language: User's language preference
+        language: User's language preference ('auto' = AI自动判断语言)
         progress_callback: Optional callback for progress updates
         
     Returns:
         AI response text
     """
     from ..utils.i18n import I18n
-    i18n = I18n(language)
+    # 对于AI聊天，使用'auto'允许AI自动判断回复语言
+    # 只有在退出/帮助等固定消息时才需要i18n
+    i18n = I18n(language if language != 'auto' else 'zh-CN')
     
     # 简单命令直接处理
     text_lower = user_message.lower().strip()
     if text_lower in ['退出', '結束', '结束', 'exit', 'quit', 'bye', '再见', '再見']:
-        return handle_exit(language)
+        # 对于退出消息，使用用户实际的语言（如果是auto则用zh-CN）
+        actual_lang = language if language != 'auto' else 'zh-CN'
+        return handle_exit(actual_lang)
     if text_lower in ['帮助', '幫助', 'help', '?', '？']:
-        return handle_help(language)
+        actual_lang = language if language != 'auto' else 'zh-CN'
+        return handle_help(actual_lang)
     
     # Stage 1: AI理解需求并规划
     logger.info(f"🧠 Stage 1: Understanding user need...")

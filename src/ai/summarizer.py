@@ -564,13 +564,14 @@ class AISummarizer:
             logger.error(f"Generate tags error: {e}")
             return []
     
-    async def batch_generate_tags(self, contents: list, max_tags: int = 5):
+    async def batch_generate_tags(self, contents: list, max_tags: int = 5, language: str = 'zh-CN'):
         """
         批量生成标签（并发处理）
         
         Args:
             contents: 内容列表
             max_tags: 每个内容的最大标签数
+            language: 输出语言
         
         Returns:
             标签列表的列表
@@ -579,7 +580,7 @@ class AISummarizer:
             return [[] for _ in contents]
         
         start = time.time()
-        tasks = [self.generate_tags(content, max_tags) for content in contents]
+        tasks = [self.generate_tags(content, max_tags, language) for content in contents]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         try:
             self._last_call_info = {'provider': 'BATCH', 'duration': time.time() - start}

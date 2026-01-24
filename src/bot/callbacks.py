@@ -1464,17 +1464,17 @@ async def handle_short_text_intent_callback(update: Update, context: ContextType
                 
                 # 如果有待处理文本，处理它
                 if text:
-                    # 创建伪造的message对象来处理初始消息
-                    from telegram import Message, Chat, User
-                    fake_message = Message(
-                        message_id=query.message.message_id,
-                        date=query.message.date,
-                        chat=query.message.chat,
-                        from_user=query.from_user,
-                        text=text
-                    )
-                    fake_update = Update(update_id=update.update_id, message=fake_message)
-                    await handle_chat_message(fake_update, context)
+                    # 获取会话数据
+                    session = session_manager.get_session(user_id)
+                    
+                    # 调用AI处理（使用'auto'让AI自动判断语言）
+                    ai_response = await handle_chat_message(text, session, context, 'auto')
+                    
+                    # 发送AI回复
+                    await query.message.reply_text(f"🤖 {ai_response}")
+                    
+                    # 更新会话
+                    session_manager.update_session(user_id, session.get('context', {}))
             else:
                 await query.edit_message_text(
                     "❌ AI功能未启用\n\n"

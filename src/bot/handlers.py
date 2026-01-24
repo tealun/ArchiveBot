@@ -132,7 +132,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                     await progress_callback(lang_ctx.t('progress_ai_document_type'), 0.35)
                 try:
                     file_name = analysis.get('file_name', '')
-                    user_language = lang_ctx.current_language
+                    user_language = lang_ctx.language
                     is_ebook = await ai_summarizer.is_ebook(file_name, language=user_language)
                     
                     if is_ebook:
@@ -176,7 +176,8 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                         content_for_ai = analysis.get('content') or analysis.get('title', '')
                         if content_for_ai:
                             start = time.time()
-                            ai_tags = await ai_summarizer.generate_tags(content_for_ai, 5)
+                            user_language = lang_ctx.language
+                            ai_tags = await ai_summarizer.generate_tags(content_for_ai, 5, language=user_language)
                             duration = time.time() - start
                             provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'unknown')
                             logger.info(f"AI generate_tags provider={provider}, duration={duration:.2f}s")
@@ -216,7 +217,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                         
                         if content_for_ai and len(content_for_ai) > 100:  # 降低最小长度要求
                             # 获取用户语言设置
-                            user_language = lang_ctx.current_language
+                            user_language = lang_ctx.language
                             
                             # 构建上下文信息
                             context_info = {
@@ -261,7 +262,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             try:
                 from ..ai.fallback import AIFallbackAnalyzer
                 
-                user_language = lang_ctx.current_language
+                user_language = lang_ctx.language
                 fallback_result = None
                 
                 # 根据内容类型选择降级策略
@@ -331,7 +332,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                             # 隐藏用户名的转发
                             source_prefix = f"来自[{origin.sender_user_name}] "
                     
-                    user_language = lang_ctx.current_language
+                    user_language = lang_ctx.language
                     # 计算标题可用长度（32 - 来源前缀长度）
                     max_title_length = 32 - len(source_prefix)
                     if max_title_length < 10:  # 如果来源太长，限制来源长度
@@ -430,7 +431,7 @@ async def _auto_generate_note(
                     from telegram import Update as TelegramUpdate
                     temp_update = TelegramUpdate(update_id=0, message=message)
                     lang_ctx = get_language_context(temp_update, context)
-                    language = lang_ctx.current_language
+                    language = lang_ctx.language
                     
                     note_content = await ai_summarizer.generate_note_from_content(
                         content=content,
@@ -463,7 +464,7 @@ URL：{analysis.get('url', '')}
                 from telegram import Update as TelegramUpdate
                 temp_update = TelegramUpdate(update_id=0, message=message)
                 lang_ctx = get_language_context(temp_update, context)
-                language = lang_ctx.current_language
+                language = lang_ctx.language
                 
                 note_content = await ai_summarizer.generate_note_from_content(
                     content=link_info,
@@ -486,7 +487,7 @@ URL：{analysis.get('url', '')}
                 from telegram import Update as TelegramUpdate
                 temp_update = TelegramUpdate(update_id=0, message=message)
                 lang_ctx = get_language_context(temp_update, context)
-                language = lang_ctx.current_language
+                language = lang_ctx.language
                 
                 title = analysis.get('title') or analysis.get('file_name', '未知文档')
                 
@@ -579,7 +580,7 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
                 
                 # 批量并发调用AI（但每个内容获得独立标签）
                 start = time.time()
-                batch_ai_tags = await ai_summarizer.batch_generate_tags(contents_for_ai, 3)
+                batch_ai_tags = await ai_summarizer.batch_generate_tags(contents_for_ai, 3, language=lang_ctx.language)
                 duration = time.time() - start
                 provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'batch')
                 logger.info(f"AI batch_generate_tags provider={provider}, duration={duration:.2f}s")
@@ -918,7 +919,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         refined_content = await ai_summarizer.summarize_content(
                             content=refine_prompt,
                             content_type='note_refinement',
-                            max_tokens=500
+                            max_tokens=500,
+                            language=lang_ctx.language
                         )
                         
                         if refined_content:
@@ -990,7 +992,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
                         
                         # 调用AI处理（内部有3个阶段）
-                        ai_response = await handle_chat_message(text, session, context, lang_ctx.language, update_ai_progress)
+                        # 使用'auto'让AI自动判断回复语言，不受界面语言约束
+                        ai_response = await handle_chat_message(text, session, context, 'auto', update_ai_progress)
                         
                         # 编辑消息为最终回复
                         await progress_msg.edit_text(f"🤖 {ai_response}")
@@ -1033,7 +1036,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         # Stage 1: 理解需求
                         await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
                         
-                        ai_response = await handle_chat_message(text, session, context, lang_ctx.language, update_ai_progress)
+                        # 使用'auto'让AI自动判断回复语言
+                        ai_response = await handle_chat_message(text, session, context, 'auto', update_ai_progress)
                         
                         # 编辑消息为最终回复
                         await progress_msg.edit_text(f"🤖 {ai_response}")
