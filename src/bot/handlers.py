@@ -971,7 +971,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     # 用户已在AI会话中，处理消息
                     try:
                         # 发送"正在思考"提示
-                        thinking_msg = await message.reply_text("🤔 正在思考...")
+                        thinking_msg = await message.reply_text(i18n.t('ai_chat_thinking'))
                         
                         ai_response = await handle_chat_message(text, session, context)
                         
@@ -986,7 +986,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         
                     except Exception as e:
                         logger.error(f"AI chat error: {e}", exc_info=True)
-                        await message.reply_text("❌ AI处理出错，已退出会话")
+                        await message.reply_text(i18n.t('ai_chat_error_session_end'))
                         session_manager.clear_session(user_id)
                         # 继续正常归档流程
                 
@@ -1004,7 +1004,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     
                     try:
                         # 发送"正在思考"提示
-                        thinking_msg = await message.reply_text("🤔 正在思考...")
+                        thinking_msg = await message.reply_text(i18n.t('ai_chat_thinking'))
                         
                         ai_response = await handle_chat_message(text, session, context)
                         
@@ -1019,7 +1019,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         
                     except Exception as e:
                         logger.error(f"AI chat error: {e}", exc_info=True)
-                        await message.reply_text("❌ AI处理出错")
+                        await message.reply_text(i18n.t('ai_chat_error'))
                         session_manager.clear_session(user_id)
                         # 继续正常归档流程
             

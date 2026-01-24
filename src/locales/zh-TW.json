@@ -167,5 +167,11 @@
   "short_text_archiving": "📦 正在歸檔...",
   "short_text_archived": "✅ 已歸檔 (ID: #{archive_id})\n\n內容：{content}",
   "short_text_archive_failed": "❌ 歸檔失敗",
-  "short_text_expired": "⚠️ 會話已過期，請重新發送文本"
+  "short_text_expired": "⚠️ 會話已過期，請重新發送文本",
+  
+  "ai_chat_exit": "👋 已退出AI助手模式",
+  "ai_chat_help": "🤖 AI助手功能：\n\n• 智慧對話：直接告訴我你想了解什麼\n• 搜尋歸檔：找某個主題的內容\n• 查看統計：了解歸檔資料\n• 分析內容：深入了解歸檔特點\n• 退出：發送"退出"結束會話\n\n提示：會話10分鐘無活動自動結束",
+  "ai_chat_thinking": "🤔 正在思考...",
+  "ai_chat_error": "❌ AI處理出錯",
+  "ai_chat_error_session_end": "❌ AI處理出錯，已退出會話"
 }

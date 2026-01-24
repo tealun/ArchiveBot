@@ -167,5 +167,11 @@
   "short_text_archiving": "📦 正在归档...",
   "short_text_archived": "✅ 已归档 (ID: #{archive_id})\n\n内容：{content}",
   "short_text_archive_failed": "❌ 归档失败",
-  "short_text_expired": "⚠️ 会话已过期，请重新发送文本"
+  "short_text_expired": "⚠️ 会话已过期，请重新发送文本",
+  
+  "ai_chat_exit": "👋 已退出AI助手模式",
+  "ai_chat_help": "🤖 AI助手功能：\n\n• 智能对话：直接告诉我你想了解什么\n• 搜索归档：找某个主题的内容\n• 查看统计：了解归档数据\n• 分析内容：深入了解归档特点\n• 退出：发送"退出"结束会话\n\n提示：会话10分钟无活动自动结束",
+  "ai_chat_thinking": "🤔 正在思考...",
+  "ai_chat_error": "❌ AI处理出错",
+  "ai_chat_error_session_end": "❌ AI处理出错，已退出会话"
 }

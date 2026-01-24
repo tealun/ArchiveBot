@@ -166,5 +166,11 @@
   "short_text_archiving": "📦 Archiving...",
   "short_text_archived": "✅ Archived (ID: #{archive_id})\n\nContent: {content}",
   "short_text_archive_failed": "❌ Archive failed",
-  "short_text_expired": "⚠️ Session expired, please resend"
+  "short_text_expired": "⚠️ Session expired, please resend",
+  
+  "ai_chat_exit": "👋 AI chat mode ended",
+  "ai_chat_help": "🤖 AI Assistant Features:\n\n• Smart Chat: Tell me what you want to know\n• Search Archives: Find content by topic\n• View Stats: Check archive statistics\n• Content Analysis: Deep dive into your archives\n• Exit: Send 'exit' to end session\n\nNote: Session expires after 10 minutes of inactivity",
+  "ai_chat_thinking": "🤔 Thinking...",
+  "ai_chat_error": "❌ AI processing error",
+  "ai_chat_error_session_end": "❌ AI error, session ended"
 }

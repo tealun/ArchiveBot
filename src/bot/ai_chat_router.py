@@ -159,20 +159,16 @@ async def handle_chat_message(
 
 def handle_exit() -> str:
     """Handle exit intent"""
-    return "👋 已退出AI助手模式"
+    from ..utils.i18n import get_i18n
+    i18n = get_i18n()
+    return i18n.t('ai_chat_exit')
 
 
 def handle_help() -> str:
     """Handle help intent"""
-    return """🤖 AI助手功能：
-
-• 智能对话：直接告诉我你想了解什么
-• 搜索归档：找某个主题的内容
-• 查看统计：了解归档数据
-• 分析内容：深入了解归档特点
-• 退出：发送"退出"结束会话
-
-提示：会话10分钟无活动自动结束"""
+    from ..utils.i18n import get_i18n
+    i18n = get_i18n()
+    return i18n.t('ai_chat_help')
 
 
 async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]:
