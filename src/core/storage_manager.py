@@ -493,10 +493,32 @@ class StorageManager:
                     sources = mapping.get('sources', [])
                     channel_id = mapping.get('channel_id')
                     if channel_id and sources:
-                        # 检查名称或ID匹配
-                        if source_name in sources or source_id in sources:
-                            logger.info(f"Channel determined by source mapping: {channel_id} (source: {source_name or source_id})")
+                        # 检查名称匹配
+                        if source_name in sources:
+                            logger.info(f"Channel determined by source mapping (name): {channel_id} (source: {source_name})")
                             return channel_id
+                        
+                        # 检查ID匹配（支持多种格式）
+                        if source_id:
+                            for src in sources:
+                                if isinstance(src, int):
+                                    # 直接匹配
+                                    if source_id == src:
+                                        logger.info(f"Channel determined by source mapping (id): {channel_id} (source_id: {source_id})")
+                                        return channel_id
+                                    
+                                    # 尝试-100格式转换匹配
+                                    # 配置: -1003024714275, API返回可能是: -1003024714275 或 3024714275 或 -3024714275
+                                    src_str = str(src)
+                                    source_id_str = str(source_id)
+                                    
+                                    # 去掉-100前缀比较
+                                    src_without_100 = src_str.replace('-100', '') if src_str.startswith('-100') else src_str
+                                    source_without_100 = source_id_str.replace('-100', '') if source_id_str.startswith('-100') else source_id_str
+                                    
+                                    if src_without_100.lstrip('-') == source_without_100.lstrip('-'):
+                                        logger.info(f"Channel determined by source mapping (id normalized): {channel_id} (config: {src}, actual: {source_id})")
+                                        return channel_id
                 
                 logger.debug(f"No source mapping matched for source: {source_name or source_id}")
         
