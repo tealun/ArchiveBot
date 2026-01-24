@@ -1,198 +1,253 @@
-# ArchiveBot 快速开始指南
+# ArchiveBot 快速开始 - 5分钟上手指南
 
-5分钟完成部署，开始使用你的个人归档助手！
+本指南帮助你快速了解如何**使用** ArchiveBot。
 
-## 📋 准备工作
+> 📌 **还没部署？** 请先查看 [部署指南](DEPLOYMENT.md) 完成安装配置，然后回到本指南学习使用。
 
-你需要准备：
-- Python 3.9+ 环境
-- Telegram 账号
-- 5分钟时间 ⏰
+## 📖 核心功能
 
-## 🚀 三步快速部署
+ArchiveBot 是你的个人知识管理助手：
+- 📦 **一键归档** - 发送任何内容即自动保存
+- 🔍 **全文搜索** - 快速找到历史内容
+- 🏷️ **智能标签** - 自动分类和手动标签
+- 📝 **笔记系统** - 为内容添加想法和批注
+- 🤖 **AI增强** - 自动摘要、提取关键点（可选）
 
-### 第一步：获取必要信息
+## 🎯 第一步：获取必要信息
 
-#### 1.1 创建你的 Bot
-1. 在 Telegram 找到 [@BotFather](https://t.me/BotFather)
-2. 发送 `/newbot` 创建新 Bot
-3. 输入 Bot 名称（如：`My Archive Bot`）
-4. 输入 Bot 用户名（必须以 bot 结尾，如：`myarchive_bot`）
-5. **保存** BotFather 返回的 Token（类似：`1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`）
+### 1.1 创建 Bot Token
 
-#### 1.2 获取你的 Telegram ID
-1. 在 Telegram 找到 [@userinfobot](https://t.me/userinfobot)
-2. 点击 **Start** 或发送任意消息
-3. **保存** 返回的数字 ID（如：`123456789`）
+1. 在 Telegram 搜索 [@BotFather](https://t.me/BotFather)
+2. 发送 `/newbot`
+3. 输入 Bot 名称（如：`我的归档助手`）
+4. 输入用户名（必须以bot结尾，如：`my_archive_bot`）
+5. **保存** Token（类似：`1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`）
 
-#### 1.3 创建私有频道（存储媒体文件）
-1. 创建新频道（设置为**私有**）
-2. 频道名称随意（如：`My Archive Storage`）
-3. 将你的 Bot 添加为**管理员**（搜索你的 Bot 用户名）
-4. 赋予 Bot **发送消息**权限
-5. 在频道发送任意消息，然后转发给 [@userinfobot](https://t.me/userinfobot)
-6. **保存** 返回的频道 ID（负数，类似：`-1001234567890`）
+### 1.2 获取你的 User ID
 
-### 第二步：安装配置
+1. 搜索 [@userinfobot](https://t.me/userinfobot)
+2. 发送任意消息
+3. **保存** 返回的 ID（如：`123456789`）
 
-#### 2.1 克隆项目
-```bash
-git clone https://github.com/tealun/ArchiveBot.git
-cd ArchiveBot
-```
+### 1.3 创建存储频道
 
-#### 2.2 安装依赖
-```bash
-pip install -r requirements.txt
-```
+1. 创建**私有频道**（名称随意，如：`我的归档存储`）
+2. 将你的 Bot 添加为**管理员**
+3. 赋予**发送消息**权限
+4. 在频道发送任意消息，转发给 [@userinfobot](https://t.me/userinfobot)
+5. **保存** 频道 ID（负数，如：`-1001234567890`）
 
-#### 2.3 配置 Bot
-```bash
-# 复制配置模板
-cp config/config.template.yaml config/config.yaml
+💡 **为什么需要频道？** 用于永久存储图片、视频、文档等大文件。
 
-# 编辑配置（Windows 用 notepad，Mac/Linux 用 nano）
-notepad config/config.yaml  # Windows
-nano config/config.yaml     # Mac/Linux
-```
+<details>
+<summary>📂 多频道分类存储（可选）</summary>
 
-**填入第一步获取的信息**：
+你可以创建多个频道，按内容类型自动分类存储：
+
+**配置示例**：
 ```yaml
-bot:
-  token: "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"  # 你的 Bot Token
-  owner_id: 123456789                              # 你的 Telegram ID
-  language: "zh-CN"                                # 界面语言
-
 storage:
   telegram:
-    channel_id: -1001234567890  # 你的频道 ID（必填）
-
-# AI 功能（可选）
-ai:
-  enabled: false  # 暂时不启用，后续可配置
+    channels:
+      default: -1001234567890    # 默认频道（文本、链接）
+      images: -1001234567891     # 图片频道
+      videos: -1001234567892     # 视频频道
+      documents: -1001234567893  # 文档频道
 ```
 
-💡 **提示**：只需填写 `bot_token`、`owner_id` 和 `channel_id` 三项即可，其他保持默认。
+**好处**：
+- ✅ **分类清晰** - 不同类型内容存储在不同频道
+- ✅ **便于管理** - 可以单独查看某类内容
+- ✅ **易于备份** - 可以选择性导出特定类型的文件
+- ✅ **节省空间** - 频道存储无限制，合理分类不影响检索速度
 
-### 第三步：启动使用
+**注意事项**：
+- 所有频道都需要添加 Bot 为管理员
+- 如果某类型频道未配置，会使用 `default` 频道
+- 内容始终可以通过 Bot 统一搜索，无需关心存储位置
+
+</details>
+
+## 📱 第二步：开始使用
+
+> 💡 **前提**：确保 Bot 已经完成部署并正常运行。如果还没有，请先查看 [部署指南](DEPLOYMENT.md)。
+
+### 初始化
+
+在 Telegram 找到你的 Bot，发送 `/start`
+
+### 归档内容
+
+**直接发送任何内容即可归档！**
+
+```
+✅ 文本消息
+✅ 链接（自动提取标题和描述）
+✅ 图片、视频、文档
+✅ 音频、语音
+✅ 贴纸、动图
+```
+
+### 添加标签
+
+在内容中加 `#标签` 即可分类：
+
+```
+这篇文章讲解了 Python 装饰器 #Python #编程
+https://github.com/example/repo #开源 #学习
+```
+
+### 搜索归档
 
 ```bash
-python main.py
+/search Python         # 全文搜索 (可用 /s 简写)
+/search #Python        # 标签搜索
+/search #Python 装饰器  # 组合搜索
 ```
 
-看到以下信息表示启动成功：
-```
-Bot is ready! Starting polling...
-```
+### 查看统计
 
-## 🎮 开始使用
-
-### 1. 初始化 Bot
-在 Telegram 中找到你的 Bot，点击 **Start** 或发送 `/start`
-
-### 2. 发送内容归档
-
-**直接发送任何内容即可自动归档！**
-
-支持的内容类型：
-- 📝 文本消息
-- 🔗 链接（自动提取标题）
-- 🖼️ 图片
-- 🎬 视频
-- 📄 文档  
-- 🎵 音频
-- 🎤 语音消息
-- 🎭 贴纸/动图
-
-### 3. 添加标签
-
-发送内容时加上 `#标签` 即可：
-```
-这是一篇关于 Python 的文章 #Python #编程 #学习
-https://github.com #技术 #开源
+```bash
+/stats                 # 归档统计 (可用 /st 简写)
+/tags                  # 所有标签 (可用 /t 简写)
 ```
 
-### 4. 搜索归档
+### 管理笔记
 
-```
-/search Python        # 关键词搜索
-/search #Python       # 标签搜索
-/search #Python 教程   # 组合搜索
+```bash
+/notes                 # 查看所有笔记
 ```
 
-## 📱 常用命令
+在搜索结果中点击 `📝+` 按钮可直接添加笔记。
 
-| 命令 | 功能 |
-|------|------|
-| `/start` | 显示欢迎信息 |
-| `/help` | 查看帮助 |
-| `/search <关键词>` | 搜索归档内容 |
-| `/tags` | 查看所有标签及统计 |
-| `/stats` | 查看归档统计信息 |
-| `/language` | 切换界面语言 |
+### 精选收藏
 
-## 🌍 多语言支持
+点击搜索结果中的 `🤍` 按钮标记精选，再次点击取消。
 
-支持三种语言：
-- 🇬🇧 **English** (en)
-- 🇨🇳 **简体中文** (zh-CN)
-- 🇹🇼 **繁體中文** (zh-TW)
+## 🤖 启用 AI 功能（可选）
 
-使用 `/language` 命令切换。
+AI 功能可以自动生成摘要、提取关键点、智能标签。
+
+### 支持的 AI 服务
+
+- **Grok (xAI)** - 当前默认，多语言能力强
+- **OpenAI GPT-4/3.5** - 效果最好
+- **Claude** - 性价比高
+- **通义千问** - 国内稳定
+
+### 快速配置
+
+编辑 `config/config.yaml`：
+
+```yaml
+ai:
+  enabled: true
+  auto_summarize: true        # 自动生成摘要
+  auto_generate_tags: true    # 自动生成标签
+  
+  api:
+    provider: openai
+    api_key: 'your-api-key'   # 你的 API Key
+    model: gpt-3.5-turbo
+    timeout: 30
+```
+
+重启 Bot 即可生效。
+
+### AI 命令
+
+```bash
+/ai                    # 查看 AI 状态
+/summarize            # 手动生成摘要（回复归档消息）
+```
+
+搜索结果中点击 `🤖` 按钮可查看 AI 分析详情。
+
+## 🌏 切换语言
+
+```bash
+/language              # 选择语言 (可用 /lang 简写)
+
+支持：
+- 🇬🇧 English
+- 🇨🇳 简体中文
+- 🇹🇼 繁體中文
+```
+
+## 💡 使用技巧
+
+### 1. 批量归档
+
+批量发送多条消息，Bot 会自动检测并合并处理（支持相册、媒体组等）。
+
+### 2. 转发归档
+
+转发 Telegram 任何频道/群组的消息到 Bot 即可归档。
+
+### 3. 长文本处理
+
+发送长文本时，AI 会自动生成标题和摘要（需启用 AI）。
+
+### 4. 链接预览
+
+发送链接后，Bot 自动提取网页标题、描述、作者等元数据。
+
+### 5. 回收站
+
+删除功能待开发界面，删除的内容会进入回收站，30天内可恢复：
+
+```bash
+/trash                 # 查看回收站列表
+/trash restore <ID>    # 恢复指定归档
+/trash delete <ID>     # 永久删除
+/trash empty          # 清空回收站
+/trash empty 30       # 删除30天前的内容
+```
+
+### 6. 数据导出和备份
+
+```bash
+/export                # 导出归档数据（Markdown/JSON/CSV格式）
+/backup                # 创建数据库备份
+```
 
 ## 🔧 常见问题
 
-### Q1: Bot 无法启动？
-**检查清单**：
-- ✅ Bot Token 是否正确填写
-- ✅ owner_id 是否正确填写
-- ✅ channel_id 是否正确填写
-- ✅ Bot 是否已添加到频道且有管理员权限
-- ✅ Python 版本是否 3.9+
+### Bot 不响应？
 
-**查看日志**：
+1. 确认你的 User ID 与配置中 `owner_id` 一致
+2. 检查 Bot 是否正常运行（查看终端输出）
+3. 查看日志：`cat data/bot.log`
+
+### 归档失败？
+
+1. 确认 Bot 已添加到频道
+2. 确认 Bot 有管理员和发送消息权限
+3. 频道 ID 格式正确（负数，如：`-1001234567890`）
+
+### 搜索不到内容？
+
+1. 内容必须先归档才能搜索
+2. 使用 `/stats` 查看归档数量
+3. 尝试不同的关键词
+
+### 如何重置？
+
 ```bash
-# Windows
-type data\bot.log
+# 停止 Bot (Ctrl+C)
+# 删除数据库
+rm data/archive.db
 
-# Mac/Linux
-cat data/bot.log
-```
-
-### Q2: Bot 不响应消息？
-确认你的 Telegram ID 与配置文件中的 `owner_id` 完全一致。
-
-### Q3: 频道 ID 怎么获取？
-1. 在频道发送任意消息
-2. 将消息转发给 [@userinfobot](https://t.me/userinfobot)
-3. Bot 会返回频道信息，其中包含 ID
-
-### Q4: 如何重置数据库？
-```bash
-# 停止 Bot（Ctrl+C）
-# 删除数据库文件
-rm data/archive.db  # Mac/Linux
-del data\archive.db # Windows
-# 重新启动 Bot
+# 重新启动
 python main.py
 ```
 
-## 🎯 下一步
+## 💬 获得帮助
 
-### 启用 AI 功能（可选）
-如需自动摘要和智能标签，请参考：
-📖 [AI 功能配置指南](docs/AI_SETUP.md)
-
-### 生产环境部署
-如需长期稳定运行，请参考：
-🚀 [部署指南](DEPLOYMENT.md)
-
-### 了解技术细节
-如有兴趣了解系统架构，请参考：
-🏗️ [架构设计文档](docs/ARCHITECTURE.md)
+- 📖 在 Bot 中发送 `/help` 查看完整命令列表
+- 🐛 [提交 Issue](https://github.com/tealun/ArchiveBot/issues)
+- ⭐ 如果有帮助，请给项目一个星标！
 
 ---
 
-**🎉 恭喜！你已成功部署 ArchiveBot**
-
-开始享受你的个人知识归档系统吧！
+**🎉 开始享受你的个人知识归档系统吧！**
