@@ -1026,7 +1026,7 @@ async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAUL
                 await message.reply_text(
                     f"⚠️ 已达到笔记消息上限（{MAX_NOTE_MESSAGES}条）\n"
                     f"请使用 /cancel 保存当前笔记",
-                    quote=True
+                    reply_to_message_id=message.message_id
                 )
                 return
             
@@ -1037,13 +1037,13 @@ async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAUL
                 note_messages.append(truncated_text)
                 await message.reply_text(
                     f"⚠️ 消息过长已截断\n✅ 已记录 ({len(note_messages)} 条)",
-                    quote=True
+                    reply_to_message_id=message.message_id
                 )
             else:
                 note_messages.append(message.text)
                 await message.reply_text(
                     f"✅ 已记录 ({len(note_messages)} 条)",
-                    quote=True
+                    reply_to_message_id=message.message_id
                 )
             
             context.user_data['note_messages'] = note_messages
@@ -1062,7 +1062,7 @@ async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAUL
                     await message.reply_text(
                         f"⚠️ 已达到笔记归档上限（{MAX_NOTE_ARCHIVES}个）\n"
                         f"请使用 /cancel 保存当前笔记",
-                        quote=True
+                        reply_to_message_id=message.message_id
                     )
                     return
                 
@@ -1084,23 +1084,23 @@ async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAUL
                     await message.reply_text(
                         f"✅ 媒体已归档 (#{archive_id})\n"
                         f"📊 已归档：{len(note_archives)} 个",
-                        quote=True
+                        reply_to_message_id=message.message_id
                     )
                     logger.info(f"Note mode: archived media as #{archive_id}")
                 else:
                     await message.reply_text(
                         "❌ 媒体归档失败",
-                        quote=True
+                        reply_to_message_id=message.message_id
                     )
             else:
                 await message.reply_text(
                     "❌ 存储管理器未初始化",
-                    quote=True
+                    reply_to_message_id=message.message_id
                 )
         else:
             await message.reply_text(
                 "⚠️ 不支持的消息类型",
-                quote=True
+                reply_to_message_id=message.message_id
             )
         
     except Exception as e:
@@ -1130,7 +1130,7 @@ async def note_timeout_callback(context: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = job_data['chat_id']
         
         # 检查用户是否还在笔记模式
-        if not context.user_data.get('note_mode'):
+        if not context.user_data or not context.user_data.get('note_mode'):
             return
         
         # 生成并保存笔记

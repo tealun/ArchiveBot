@@ -63,6 +63,12 @@ def owner_only(func):
     async def wrapper(update: Update, context):
         config = get_config()
         owner_id = config.owner_id
+        
+        # Check if effective_user exists
+        if not update.effective_user:
+            logger.warning("Update has no effective_user, skipping authorization check")
+            return
+        
         user_id = update.effective_user.id
         
         if user_id != owner_id:
