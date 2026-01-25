@@ -68,3 +68,4 @@ reset_*.py
 docs/DEVELOPMENT.md
 docs/ARCHITECTURE.md
 docs/SPONSORSHIP_GUIDE.md
+.env
