@@ -2,13 +2,15 @@
 # Copy this file to config.yaml and fill in your values
 
 bot:
-  token: "YOUR_BOT_TOKEN_HERE"  # Get from @BotFather
-  owner_id: 0  # Your Telegram ID from @userinfobot
+  token: BOT_TOKEN  # Get from @BotFather (Recommended: use env var BOT_TOKEN)
+  owner_id: OWNER_ID  # Your Telegram ID from @userinfobot (Recommended: use env var OWNER_ID)
   language: "en"  # Interface language: en, zh-CN, zh-TW
   polling_interval: 1  # Polling interval in seconds
+  feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # User feedback link
 
 features:
   auto_tag: true  # Automatically generate type tags
+  auto_file_type_tag: false  # Automatically generate file type tags (e.g., #image, #video), default false
   enable_fts: true  # Enable full-text search
   enable_ocr: false  # Enable OCR for images
 
@@ -16,17 +18,17 @@ ai:
   enabled: false  # Enable AI features
   auto_summarize: false  # Automatically summarize new archives
   auto_generate_tags: false  # Automatically generate AI tags
+  max_generated_tags: 8  # Maximum number of AI-generated tags (5-10 recommended, default 8)
 
   # Unified AI configuration (recommended). To avoid hardcoding secrets, 
   # set API keys via environment variables and reference the variable name in api.api_key_env
   api:
-    provider: openai  # Provider: openai, claude, gemini, grok, etc.
-    # Recommended: use environment variable name, e.g. ARCHIVEBOT_OPENAI_KEY
-    api_key_env: ""  # e.g. ARCHIVEBOT_OPENAI_KEY (recommended)
-    # Backward compatibility: if api_key_env is empty, code falls back to api_key (not recommended)
-    api_key: ''  # (Deprecated) Direct API key - avoid committing secrets to config files
-    api_url: ''  # Custom API URL (optional)
-    model: gpt-3.5-turbo  # Model: gpt-3.5-turbo, gpt-4, grok-beta, etc.
+    provider: AI_API_PROVIDER  # Provider: openai, claude, gemini, grok, etc.
+    api_key_env: AI_API_KEY  # Environment variable name (recommended)
+    api_url: AI_API_URL  # Custom API URL (optional, or use env var AI_API_URL)
+    model: AI_MODEL  # Model (or use env var AI_MODEL)
+    reasoning_model: AI_REASONING_MODEL  # Reasoning model for intent analysis (or use env var AI_REASONING_MODEL)
+    temperature: 0.7  # Generation diversity (between 0-1)
     max_tokens: 1000  # Maximum tokens
     timeout: 30  # Timeout in seconds
 
@@ -42,14 +44,21 @@ ai:
   
   # AI Chat Mode (interactive conversation)
   chat_enabled: false           # Enable automatic AI chat mode for short messages
-  chat_threshold_chars: 30      # Trigger chat mode when user message is shorter than this (excludes forwarded messages)
   chat_session_ttl_seconds: 600 # Session timeout (default 10 minutes)
+  chat_history_length: 10       # Number of message pairs to keep in session history (default 10, i.e., 20 messages)
   chat_allow_write_ops: false   # Allow AI to execute write operations (archive/delete/tag) - keep false for safety
+  chat_use_reasoning: true      # Enable reasoning model for intent analysis (default enabled)
+  
+  # Text length thresholds configuration (unified management)
+  text_thresholds:
+    short_text: 50         # Short text threshold (trigger AI chat or intent inquiry)
+    note_chinese: 150      # Chinese note threshold (distinguish long text for note or chat in AI mode)
+    note_english: 250      # English note threshold (distinguish long text for note or chat in AI mode)
   
   # AI reference content exclusion configuration (for filtering context data in AI interaction mode)
   exclude_from_context:
-    channel_ids: []  # List of archive channel IDs to exclude, e.g.: [-1001234567890, -1009876543210]
-    tags: []         # List of tags to exclude, e.g.: ['private', 'draft', 'temp', 'no-archive', 'exclude', 'skip']
+    channel_ids: AI_EXCLUDE_CHANNELS  # List of archive channel IDs to exclude, e.g.: [-1001234567890, -1009876543210]
+    tags: AI_EXCLUDE_TAGS  # List of tags to exclude, e.g.: ['private', 'draft', 'temp', 'no-archive', 'exclude', 'skip']
 
 logging:
   level: "INFO"  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -66,18 +75,18 @@ storage:
     keep_count: 10           # Number of backups to keep (default 10 most recent)
   
   telegram:
-    # Backward compatibility: old single channel configuration (optional, ignored if channels.default is set)
-    channel_id: 0  # Deprecated, please use channels.default below
     enabled: true  # Enable Telegram storage
+    # Backward compatibility: old single channel config (ignored if channels.default is set)
+    channel_id: CHANNEL_DEFAULT  # Read from environment variable
     
-    # New multi-channel configuration
+    # Multi-channel configuration (Recommended: use env vars)
     channels:
-      default: 0      # Default channel ID (required, format: -1001234567890)
-      text: 0         # Text channel (optional, uses default if not set)
-      ebook: 0        # E-book channel (optional)
-      document: 0     # Document channel (optional)
-      image: 0        # Image channel (optional)
-      media: 0        # Media channel for videos and audio (optional)
+      default: CHANNEL_DEFAULT  # Read from environment variable (required)
+      text: CHANNEL_TEXT  # Read from environment variable (optional)
+      ebook: CHANNEL_EBOOK  # Read from environment variable (optional)
+      document: CHANNEL_DOCUMENT  # Read from environment variable (optional)
+      image: CHANNEL_IMAGE  # Read from environment variable (optional)
+      media: CHANNEL_MEDIA  # Read from environment variable (optional)
     
     # Type to channel mapping rules
     type_mapping:
