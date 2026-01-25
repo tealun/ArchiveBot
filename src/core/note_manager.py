@@ -29,7 +29,7 @@ class NoteManager:
         self.db = db
         logger.info("NoteManager initialized")
     
-    def add_note(self, archive_id: Optional[int], content: str, title: Optional[str] = None) -> Optional[int]:
+    def add_note(self, archive_id: Optional[int], content: str, title: Optional[str] = None, storage_path: Optional[str] = None) -> Optional[int]:
         """
         Add a note (with optional archive link)
         
@@ -37,6 +37,7 @@ class NoteManager:
             archive_id: Archive ID (None for standalone note)
             content: Note content
             title: Note title (optional)
+            storage_path: Telegram channel message link (optional)
             
         Returns:
             Note ID if successful, None otherwise
@@ -57,16 +58,16 @@ class NoteManager:
                 now = format_datetime()
                 cursor = self.db.execute(
                     """
-                    INSERT INTO notes (archive_id, content, title, created_at)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO notes (archive_id, content, title, storage_path, created_at)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (archive_id, content, title, now)
+                    (archive_id, content, title, storage_path, now)
                 )
                 
                 self.db.commit()
                 note_id = cursor.lastrowid
                 
-                logger.info(f"Note added: id={note_id}, archive_id={archive_id}, title={title}")
+                logger.info(f"Note added: id={note_id}, archive_id={archive_id}, title={title}, has_link={bool(storage_path)}")
                 return note_id
                 
         except Exception as e:

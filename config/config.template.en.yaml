@@ -91,8 +91,7 @@ storage:
     # Type to channel mapping rules
     type_mapping:
       text: text           # Plain text → text channel
-      link: text           # Links → text channel
-      ebook: ebook         # E-books → ebook channel
+      link: text           # Links → text channel      note: text           # Note → Text channel (if note channel not configured)      ebook: ebook         # E-books → ebook channel
       document: document   # Documents → document channel
       image: image         # Images → image channel
       animation: image     # Animated GIFs → image channel

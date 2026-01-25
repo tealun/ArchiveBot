@@ -89,8 +89,7 @@ storage:
     # 類型到頻道的對映規則
     type_mapping:
       text: text           # 純文字 → 文字頻道
-      link: text           # 連結 → 文字頻道
-      ebook: ebook         # 電子書 → 電子書頻道
+      link: text           # 連結 → 文字頻道      note: text           # 筆記 → 文字頻道（如果未配置note頻道）      ebook: ebook         # 電子書 → 電子書頻道
       document: document   # 文件 → 文件頻道
       image: image         # 圖片 → 圖片頻道
       animation: image     # 動畫GIF → 圖片頻道

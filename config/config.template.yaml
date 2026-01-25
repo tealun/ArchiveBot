@@ -95,6 +95,7 @@ storage:
     type_mapping:
       text: text           # 纯文本 → 文本频道
       link: text           # 链接 → 文本频道
+      note: text           # 笔记 → 文本频道（如果未配置note频道）
       ebook: ebook         # 电子书 → 电子书频道
       document: document   # 文档 → 文档频道
       image: image         # 图片 → 图片频道

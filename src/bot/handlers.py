@@ -1035,18 +1035,31 @@ async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAUL
             if len(message.text) > MAX_MESSAGE_LENGTH:
                 truncated_text = message.text[:MAX_MESSAGE_LENGTH] + "...[已截断]"
                 note_messages.append(truncated_text)
-                await message.reply_text(
-                    f"⚠️ 消息过长已截断\n✅ 已记录 ({len(note_messages)} 条)",
-                    reply_to_message_id=message.message_id
-                )
             else:
                 note_messages.append(message.text)
-                await message.reply_text(
-                    f"✅ 已记录 ({len(note_messages)} 条)",
-                    reply_to_message_id=message.message_id
-                )
             
             context.user_data['note_messages'] = note_messages
+            
+            # 添加"结束记录"按钮
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = [[
+                InlineKeyboardButton("🔚 结束记录并保存", callback_data="note_finish")
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            if len(message.text) > MAX_MESSAGE_LENGTH:
+                await message.reply_text(
+                    f"⚠️ 消息过长已截断\n✅ 已记录 ({len(note_messages)} 条)",
+                    reply_to_message_id=message.message_id,
+                    reply_markup=reply_markup
+                )
+            else:
+                await message.reply_text(
+                    f"✅ 已记录 ({len(note_messages)} 条)",
+                    reply_to_message_id=message.message_id,
+                    reply_markup=reply_markup
+                )
+            
             logger.debug(f"Note mode: recorded text message ({len(note_messages)} total)")
         
         elif _is_media_message(message):
@@ -1081,10 +1094,18 @@ async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAUL
                         note_messages.append(f"[媒体] {caption}")
                         context.user_data['note_messages'] = note_messages
                     
+                    # 添加"结束记录"按钮
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    keyboard = [[
+                        InlineKeyboardButton("🔚 结束记录并保存", callback_data="note_finish")
+                    ]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
                     await message.reply_text(
                         f"✅ 媒体已归档 (#{archive_id})\n"
                         f"📊 已归档：{len(note_archives)} 个",
-                        reply_to_message_id=message.message_id
+                        reply_to_message_id=message.message_id,
+                        reply_markup=reply_markup
                     )
                     logger.info(f"Note mode: archived media as #{archive_id}")
                 else:
@@ -1164,12 +1185,97 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
             # 合并所有文本消息（使用生成器减少内存）
             note_content = '\n\n'.join(messages)
             
+            # 生成AI标题（如果AI可用）
+            note_title = None
+            ai_summarizer = context.bot_data.get('ai_summarizer')
+            if ai_summarizer and ai_summarizer.is_available():
+                try:
+                    # 获取用户语言设置
+                    from ..utils.config import get_config
+                    config = get_config()
+                    user_language = context.user_data.get('language', config.bot.get('language', 'zh-CN'))
+                    
+                    # 使用AI生成标题（32字以内）
+                    note_title = await ai_summarizer.generate_title_from_text(
+                        note_content, 
+                        max_length=32,
+                        language=user_language
+                    )
+                    logger.info(f"Generated AI title for note: {note_title}")
+                except Exception as e:
+                    logger.warning(f"Failed to generate AI title: {e}")
+            
+            # 转发笔记到Telegram频道
+            storage_path = None
+            telegram_storage = context.bot_data.get('telegram_storage')
+            if telegram_storage:
+                try:
+                    from ..utils.config import get_config
+                    config = get_config()
+                    
+                    # 获取笔记频道ID：NOTE -> TEXT -> default
+                    channels_config = config.storage.get('telegram', {}).get('channels', {})
+                    type_mapping = config.storage.get('telegram', {}).get('type_mapping', {})
+                    
+                    # 优先使用NOTE频道
+                    note_channel_key = type_mapping.get('note', 'text')  # 默认映射到text
+                    note_channel_id = channels_config.get(note_channel_key, 0)
+                    
+                    # 如果NOTE频道未配置，降级到TEXT频道
+                    if not note_channel_id:
+                        note_channel_id = channels_config.get('text', 0)
+                    
+                    # 如果TEXT频道也未配置，使用默认频道
+                    if not note_channel_id:
+                        note_channel_id = channels_config.get('default', 0)
+                        if not note_channel_id:
+                            # 兼容旧配置
+                            note_channel_id = config.storage.get('telegram', {}).get('channel_id', 0)
+                    
+                    if note_channel_id:
+                        # 准备转发的消息内容
+                        forward_content = f"📝 笔记\n"
+                        if note_title:
+                            forward_content += f"标题：{note_title}\n\n"
+                        forward_content += note_content
+                        
+                        # 限制消息长度（Telegram限制）
+                        if len(forward_content) > 4000:
+                            forward_content = forward_content[:3997] + "..."
+                        
+                        # 发送到频道
+                        channel_msg = await context.bot.send_message(
+                            chat_id=note_channel_id,
+                            text=forward_content,
+                            parse_mode=None
+                        )
+                        
+                        # 生成频道消息链接
+                        channel_username = str(note_channel_id)
+                        if channel_username.startswith('-100'):
+                            channel_id_numeric = channel_username[4:]
+                        else:
+                            channel_id_numeric = channel_username.lstrip('-')
+                        
+                        storage_path = f"https://t.me/c/{channel_id_numeric}/{channel_msg.message_id}"
+                        logger.info(f"Note forwarded to channel: {storage_path}")
+                    else:
+                        logger.warning("No Telegram channel configured for notes")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to forward note to channel: {e}", exc_info=True)
+            
             # 保存笔记
             note_manager = context.bot_data.get('note_manager')
             if note_manager:
                 # 如果有归档，关联第一个归档
                 archive_id = archives[0] if archives else None
-                note_id = note_manager.add_note(archive_id, note_content)
+                note_id = note_manager.add_note(
+                    archive_id, 
+                    note_content, 
+                    title=note_title,
+                    storage_path=storage_path
+                )
                 
                 if note_id:
                     reason_map = {
@@ -1181,16 +1287,29 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                     
                     # 构建简洁的结果消息
                     result_parts = [
-                        f"✅ 笔记已保存 (#{note_id})",
-                        f"📊 文本: {len(messages)} | 媒体: {len(archives)}"
+                        f"✅ 笔记已保存",
+                        f"📝 笔记 #{note_id}"
                     ]
+                    
+                    if note_title:
+                        result_parts.append(f"📌 {note_title}")
+                    
+                    result_parts.append(f"📊 文本: {len(messages)} | 媒体: {len(archives)}")
+                    
                     if archive_id:
                         result_parts.append(f"📎 关联: #{archive_id}")
+                    
+                    # 添加频道链接（使用HTML格式）
+                    if storage_path:
+                        result_parts.append(f'🔗 <a href="{storage_path}">查看频道消息</a>')
+                    
                     result_parts.append(f"🔚 {reason_text}")
                     
                     await context.bot.send_message(
                         chat_id=chat_id,
-                        text='\n'.join(result_parts)
+                        text='\n'.join(result_parts),
+                        parse_mode='HTML',
+                        disable_web_page_preview=True
                     )
                 else:
                     await context.bot.send_message(
