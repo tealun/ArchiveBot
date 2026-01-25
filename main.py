@@ -175,6 +175,7 @@ def main():
                     'document': config.get('storage.telegram.channels.document'),
                     'image': config.get('storage.telegram.channels.image'),
                     'media': config.get('storage.telegram.channels.media'),
+                    'note': config.get('storage.telegram.channels.note'),
                 },
                 'type_mapping': config.get('storage.telegram.type_mapping', {})
             }
@@ -225,6 +226,7 @@ def main():
         # Store managers in bot_data for access in handlers
         application.bot_data['db_storage'] = db_storage
         application.bot_data['database'] = db  # Add database reference
+        application.bot_data['telegram_storage'] = telegram_storage  # Add telegram storage for note forwarding
         application.bot_data['note_manager'] = note_manager
         application.bot_data['trash_manager'] = trash_manager
         application.bot_data['export_manager'] = export_manager
@@ -244,7 +246,7 @@ def main():
         application.add_handler(CommandHandler("ai", owner_only(commands.ai_status_command)))
         application.add_handler(CommandHandler(["stats", "st"], owner_only(commands.stats_command)))
         application.add_handler(CommandHandler(["language", "lang"], owner_only(commands.language_command)))
-        application.add_handler(CommandHandler("note", owner_only(commands.note_command)))
+        application.add_handler(CommandHandler(["note", "n"], owner_only(commands.note_command)))  # /n as short alias
         application.add_handler(CommandHandler("notes", owner_only(commands.notes_command)))
         application.add_handler(CommandHandler("cancel", owner_only(commands.cancel_command)))
         application.add_handler(CommandHandler("trash", owner_only(commands.trash_command)))

@@ -145,6 +145,20 @@ class Database:
             except sqlite3.OperationalError:
                 pass
             
+            # Add storage_path column to notes if missing (for channel message link)
+            try:
+                cursor.execute("ALTER TABLE notes ADD COLUMN storage_path TEXT")
+                logger.info("Added storage_path column to notes table")
+            except sqlite3.OperationalError:
+                pass
+            
+            # Add title column to notes if missing (for AI-generated titles)
+            try:
+                cursor.execute("ALTER TABLE notes ADD COLUMN title TEXT")
+                logger.info("Added title column to notes table")
+            except sqlite3.OperationalError:
+                pass
+            
             # Migrate notes table to allow NULL archive_id (for standalone notes)
             # Check if migration is needed
             cursor.execute("PRAGMA table_info(notes)")

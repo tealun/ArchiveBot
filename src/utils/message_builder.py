@@ -9,6 +9,7 @@ from telegram import Bot, Message
 from telegram.constants import ParseMode
 
 from ..utils.helpers import truncate_text, get_content_type_emoji
+from ..utils.config import get_config
 
 logger = logging.getLogger(__name__)
 

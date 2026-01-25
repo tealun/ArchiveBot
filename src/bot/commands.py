@@ -491,6 +491,8 @@ async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
     """
     Handle /note command - 进入笔记模式
     
+    支持命令后直接跟文本：/note 这是第一条笔记
+    
     Args:
         update: Telegram update
         context: Bot context
@@ -510,6 +512,20 @@ async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         context.user_data['note_messages'] = []  # 收集的消息
         context.user_data['note_archives'] = []  # 归档的媒体ID
         context.user_data['note_start_time'] = update.message.date
+        
+        # 检查命令后是否有文本内容
+        command_text = update.message.text or ""
+        # 提取命令后的文本（支持 /note 或 /n）
+        first_message = None
+        if command_text.startswith('/note '):
+            first_message = command_text[6:].strip()  # 去掉 "/note "
+        elif command_text.startswith('/n '):
+            first_message = command_text[3:].strip()  # 去掉 "/n "
+        
+        # 如果有文本，作为第一条笔记
+        if first_message:
+            context.user_data['note_messages'].append(first_message)
+            logger.info(f"Note mode: recorded first message from command: {first_message[:50]}")
         
         # 设置15分钟后的超时任务
         # 移除之前的超时任务（如果有）
@@ -535,13 +551,20 @@ async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         )
         context.user_data['note_timeout_job'] = job
         
-        await update.message.reply_text(
-            "📝 已进入笔记模式\n\n"
-            "💬 现在发送的所有消息都会被记录为笔记\n"
-            "📎 发送的媒体文件会自动归档并关联到笔记\n\n"
-            "⏱️ 15分钟内无新消息将自动生成笔记\n"
+        # 构建回复消息
+        reply_parts = ["📝 已进入笔记模式\n"]
+        
+        if first_message:
+            reply_parts.append(f"✅ 已记录第一条内容 (1 条)\n")
+        
+        reply_parts.extend([
+            "💬 现在发送的所有消息都会被记录为笔记",
+            "📎 发送的媒体文件会自动归档并关联到笔记\n",
+            "⏱️ 15分钟内无新消息将自动生成笔记",
             "🚫 发送 /cancel 可立即退出并保存笔记"
-        )
+        ])
+        
+        await update.message.reply_text('\n'.join(reply_parts))
         
         logger.info(f"User {update.effective_user.id} entered note mode")
         

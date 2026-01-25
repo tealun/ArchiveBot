@@ -135,6 +135,7 @@ class Config:
             'storage.telegram.channels.document': 'CHANNEL_DOCUMENT',
             'storage.telegram.channels.image': 'CHANNEL_IMAGE',
             'storage.telegram.channels.media': 'CHANNEL_MEDIA',
+            'storage.telegram.channels.note': 'CHANNEL_NOTE',
             'storage.telegram.direct_send.channels.default': 'CHANNEL_DIRECT_DEFAULT',
             'ai.api.provider': 'AI_API_PROVIDER',
             'ai.api.api_key': 'AI_API_KEY',

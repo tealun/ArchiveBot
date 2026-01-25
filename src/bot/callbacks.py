@@ -65,6 +65,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_note_view_callback(update, context)
         elif callback_data.startswith('note_exit_save:'):
             await handle_note_exit_save_callback(update, context)
+        elif callback_data == 'note_finish':
+            await handle_note_finish_callback(update, context)
         elif callback_data == 'note_continue':
             await handle_note_continue_callback(update, context)
         elif callback_data.startswith('note_add:'):
@@ -1045,6 +1047,37 @@ async def handle_note_exit_save_callback(update: Update, context: ContextTypes.D
         
     except Exception as e:
         logger.error(f"Error handling note exit save callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_note_finish_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle note finish button click - 结束笔记记录并保存
+    
+    Callback data format: note_finish
+    """
+    query = update.callback_query
+    
+    try:
+        # 导入handlers中的_finalize_note_internal
+        from ..bot.handlers import _finalize_note_internal
+        
+        # 保存笔记
+        await _finalize_note_internal(context, update.effective_chat.id, reason="manual")
+        
+        await query.answer("✅ 笔记已保存")
+        
+        # 删除原消息（包含按钮）
+        try:
+            await query.message.delete()
+        except Exception:
+            pass  # 消息可能已被删除
+        
+        logger.info("Note mode finished via button")
+        
+    except Exception as e:
+        logger.error(f"Error handling note finish callback: {e}", exc_info=True)
         await query.answer(f"错误: {str(e)}", show_alert=True)
 
 

@@ -29,13 +29,14 @@ class NoteManager:
         self.db = db
         logger.info("NoteManager initialized")
     
-    def add_note(self, archive_id: Optional[int], content: str) -> Optional[int]:
+    def add_note(self, archive_id: Optional[int], content: str, title: Optional[str] = None) -> Optional[int]:
         """
         Add a note (with optional archive link)
         
         Args:
             archive_id: Archive ID (None for standalone note)
             content: Note content
+            title: Note title (optional)
             
         Returns:
             Note ID if successful, None otherwise
@@ -56,16 +57,16 @@ class NoteManager:
                 now = format_datetime()
                 cursor = self.db.execute(
                     """
-                    INSERT INTO notes (archive_id, content, created_at)
-                    VALUES (?, ?, ?)
+                    INSERT INTO notes (archive_id, content, title, created_at)
+                    VALUES (?, ?, ?, ?)
                     """,
-                    (archive_id, content, now)
+                    (archive_id, content, title, now)
                 )
                 
                 self.db.commit()
                 note_id = cursor.lastrowid
                 
-                logger.info(f"Note added: id={note_id}, archive_id={archive_id}")
+                logger.info(f"Note added: id={note_id}, archive_id={archive_id}, title={title}")
                 return note_id
                 
         except Exception as e:
