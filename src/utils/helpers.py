@@ -7,6 +7,7 @@ import re
 from datetime import datetime
 from typing import List, Optional
 from urllib.parse import urlparse
+from .config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -82,17 +83,22 @@ def should_create_note(content: str) -> tuple:
     if not content:
         return False, 'none'
     
+    # 从配置获取阈值
+    config = get_config()
+    ai_config = config.get('ai', {})
+    text_thresholds = ai_config.get('text_thresholds', {})
+    
     # 检测中英文字符
     chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', content))
     english_chars = len(re.findall(r'[a-zA-Z]', content))
     
     # 判断阈值（聊天友好型）
     if chinese_chars > english_chars:
-        # 中文为主：150字符
-        threshold = 150
+        # 中文为主
+        threshold = int(text_thresholds.get('note_chinese', 150))
     else:
-        # 英文为主：250字符
-        threshold = 250
+        # 英文为主
+        threshold = int(text_thresholds.get('note_english', 250))
     
     char_count = len(content)
     

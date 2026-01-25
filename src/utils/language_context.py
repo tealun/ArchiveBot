@@ -80,8 +80,12 @@ class LanguageContext:
     @language.setter
     def language(self, lang: str):
         """Set language and save preference"""
-        if lang in ['zh-CN', 'en', 'zh-TW']:
-            self._language = lang
+        # 尝试映射简化的语言代码
+        from .i18n import I18n
+        mapped_lang = I18n.LANGUAGE_CODE_MAPPING.get(lang, lang)
+        
+        if mapped_lang in ['zh-CN', 'en', 'zh-TW']:
+            self._language = mapped_lang
             self._i18n = None  # Reset i18n instance
             if self._context:
                 self._save_user_language(self._context)

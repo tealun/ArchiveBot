@@ -9,6 +9,7 @@ from ..storage.database import DatabaseStorage
 from ..utils.helpers import extract_hashtags
 from ..utils.validators import sanitize_tag_name
 from ..utils.i18n import get_i18n
+from ..utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,13 @@ class TagManager:
         Returns:
             List of tag names
         """
+        # 检查是否启用文件类型标签
+        config = get_config()
+        auto_file_type_tag = config.get('features.auto_file_type_tag', False)
+        
+        if not auto_file_type_tag:
+            return []
+        
         # Get localized tag name
         tag_key = f"tag_{content_type}"
         tag_name = self.i18n.t(tag_key)

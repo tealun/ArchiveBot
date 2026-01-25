@@ -2,14 +2,15 @@
 # 复制此文件为 config.yaml 并填写你的值
 
 bot:
-  token: "YOUR_BOT_TOKEN_HERE"  # 从 @BotFather 获取
-  owner_id: 0  # 你的 Telegram ID，从 @userinfobot 获取
+  token: BOT_TOKEN  # 从 @BotFather 获取（推荐使用环境变量 BOT_TOKEN）
+  owner_id: OWNER_ID  # 你的 Telegram ID，从 @userinfobot 获取（推荐使用环境变量 OWNER_ID）
   language: "zh-CN"  # 界面语言: en, zh-CN, zh-TW
   polling_interval: 1  # 轮询间隔（秒）
   feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # 用户反馈链接
 
 features:
   auto_tag: true  # 自动生成类型标签
+  auto_file_type_tag: false  # 是否自动生成文件类型标签（如#图片、#视频等），默认false
   extract_tags_from_caption: false  # 从转发消息caption中提取#标签（默认关闭，避免标签污染）
   enable_fts: true  # 启用全文搜索
   enable_ocr: false  # 启用图片OCR识别
@@ -23,13 +24,12 @@ ai:
   # 统一AI配置（推荐）。为避免硬编码密钥，建议通过环境变量设置API密钥
   # 并在 api.api_key_env 中引用环境变量名称
   api:
-    provider: openai  # 供应商: openai, claude, gemini, grok 等
-    # 推荐使用环境变量名称，例如: ARCHIVEBOT_OPENAI_KEY
-    api_key_env: ""  # 例如 ARCHIVEBOT_OPENAI_KEY（推荐）
-    # 向后兼容：如果 api_key_env 为空，代码会回退到 api_key（不推荐）
-    api_key: ''  # （已废弃）直接配置API密钥 - 避免将密钥提交到配置文件
-    api_url: ''  # 自定义API地址（可选）
-    model: gpt-3.5-turbo  # 模型: gpt-3.5-turbo, gpt-4, grok-beta 等
+    provider: AI_API_PROVIDER  # 供应商: openai, claude, gemini, grok 等
+    api_key_env: AI_API_KEY  # 环境变量名称（推荐使用）
+    api_url: AI_API_URL  # 自定义API地址（可选，或使用环境变量 AI_API_URL）
+    model: AI_MODEL  # 模型（或使用环境变量 AI_MODEL）
+    reasoning_model: AI_REASONING_MODEL  # 用于意图分析的推理模型（或使用环境变量 AI_REASONING_MODEL）
+    temperature: 0.7  # 生成多样性（0-1之间）
     max_tokens: 1000  # 最大token数
     timeout: 30  # 超时时间（秒）
 
@@ -45,15 +45,21 @@ ai:
   
   # AI聊天模式（交互式对话）
   chat_enabled: false           # 启用短消息自动AI聊天模式
-  chat_threshold_chars: 30      # 当用户消息短于此长度时触发聊天模式（排除转发消息）
   chat_session_ttl_seconds: 600 # 会话超时时间（默认10分钟）
   chat_history_length: 10       # 会话历史保留消息对数（默认10，即20条消息）
   chat_allow_write_ops: false   # 允许AI执行写操作（归档/删除/标签）- 为安全起见保持false
+  chat_use_reasoning: true      # 启用推理模型进行意图分析（默认启用）
+  
+  # 文本长度阈值配置（统一管理）
+  text_thresholds:
+    short_text: 50         # 短文本判断阈值（触发AI对话或意图询问）
+    note_chinese: 150      # 中文笔记判断阈值(AI互动模式下用于区分长文本是否要做笔记还是继续对话)
+    note_english: 250      # 英文笔记判断阈值(AI互动模式下用于区分长文本是否要做笔记还是继续对话)
   
   # AI参考内容排除配置（用于AI互动模式的上下文数据过滤）
   exclude_from_context:
-    channel_ids: []  # 排除的存档频道ID列表，例如: [-1001234567890, -1009876543210]
-    tags: []         # 排除的标签列表，例如: ['私密', '草稿', '临时', '不存档', 'exclude', 'skip']
+    channel_ids: AI_EXCLUDE_CHANNELS  # 排除的存档频道ID列表，例如: [-1001234567890, -1009876543210]
+    tags: AI_EXCLUDE_TAGS         # 排除的标签列表，例如: ['私密', '草稿', '临时', '不存档', 'exclude', 'skip']
 
 logging:
   level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -70,18 +76,18 @@ storage:
     keep_count: 10           # 保留备份数量，默认保留最近10个
   
   telegram:
-    # 向后兼容：旧的单频道配置（可选，如果配置了channels.default则此项被忽略）
-    channel_id: 0  # 已废弃，请使用下面的 channels.default
     enabled: true  # 启用Telegram存储
+    # 向后兼容：旧的单频道配置（如果配置了channels.default则此项被忽略）
+    channel_id: CHANNEL_DEFAULT  # 从环境变量读取
     
-    # 新的多频道配置
+    # 多频道配置（推荐使用环境变量）
     channels:
-      default: 0      # 默认频道ID（必填，格式: -1001234567890）
-      text: 0         # 文本频道（可选，不配置则使用default）
-      ebook: 0        # 电子书频道（可选）
-      document: 0     # 文档频道（可选）
-      image: 0        # 图片频道（可选）
-      media: 0        # 媒体频道-视频音频（可选）
+      default: CHANNEL_DEFAULT  # 从环境变量读取（必填）
+      text: CHANNEL_TEXT  # 从环境变量读取（可选）
+      ebook: CHANNEL_EBOOK  # 从环境变量读取（可选）
+      document: CHANNEL_DOCUMENT  # 从环境变量读取（可选）
+      image: CHANNEL_IMAGE  # 从环境变量读取（可选）
+      media: CHANNEL_MEDIA  # 从环境变量读取（可选）
     
     # 类型到频道的映射规则
     type_mapping:
@@ -122,13 +128,13 @@ storage:
     direct_send:
       # 个人直发的频道配置（可选，不配置则使用系统channels）
       channels:
-        # 示例（可以配置与系统不同的频道）：
-        # default: -1003675667626  # 默认频道
-        # text: -1003779168344     # 文本频道
-        # ebook: -1003859375248    # 电子书频道
-        # document: -1003869785901 # 文档频道
-        # image: -1003534777860    # 图片频道
-        # media: -1003843636869    # 媒体频道
+        default: CHANNEL_DIRECT_DEFAULT  # 从环境变量读取（可选）
+        # 其他频道可选配置：
+        # text: CHANNEL_TEXT
+        # ebook: CHANNEL_EBOOK
+        # document: CHANNEL_DOCUMENT
+        # image: CHANNEL_IMAGE
+        # media: CHANNEL_MEDIA
       
       # 个人直发的类型映射规则（可选，不配置则使用系统type_mapping）
       type_mapping:

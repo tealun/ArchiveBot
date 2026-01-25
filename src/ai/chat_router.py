@@ -33,12 +33,12 @@ async def understand_and_plan(user_message: str, language: str, context: Any, st
         AI规划结果
     """
     try:
-        from ..utils.config import get_config
-        
         config = get_config()
-        api_key = config.ai.get('api', {}).get('api_key')
-        api_url = config.ai.get('api', {}).get('api_url', 'https://api.x.ai/v1/chat/completions')
-        reasoning_model = config.ai.get('api', {}).get('reasoning_model', 'grok-4-1-fast-reasoning')
+        # 使用 config.get() 方法以支持环境变量（AI_API_KEY）
+        api_key = config.get('ai.api.api_key') or config.ai.get('api', {}).get('api_key')
+        api_url = config.get('ai.api.api_url') or config.ai.get('api', {}).get('api_url', 'https://api.x.ai/v1/chat/completions')
+        reasoning_model = config.get('ai.api.reasoning_model') or config.ai.get('api', {}).get('reasoning_model', 'grok-4-1-fast-reasoning')
+        temperature = config.get('ai.api.temperature', 0.7)  # 从配置读取，默认0.7
         
         # 使用提示词模板
         understanding_prompt = ChatPrompts.get_understanding_prompt(user_message, language, stats)
@@ -54,7 +54,7 @@ async def understand_and_plan(user_message: str, language: str, context: Any, st
                     "model": reasoning_model,
                     "messages": [{"role": "user", "content": understanding_prompt}],
                     "max_tokens": 300,
-                    "temperature": 0.4
+                    "temperature": temperature * 0.57  # 意图分析需要更低的温度（0.7 * 0.57 ≈ 0.4）
                 }
             )
             
@@ -424,9 +424,10 @@ async def generate_response(
         from .knowledge_base import get_knowledge_base
         
         config = get_config()
-        api_key = config.ai.get('api', {}).get('api_key')
-        api_url = config.ai.get('api', {}).get('api_url', 'https://api.x.ai/v1/chat/completions')
-        fast_model = 'grok-4-1-fast-non-reasoning'
+        # 使用 config.get() 方法以支持环境变量（AI_API_KEY）
+        api_key = config.get('ai.api.api_key') or config.ai.get('api', {}).get('api_key')
+        api_url = config.get('ai.api.api_url') or config.ai.get('api', {}).get('api_url', 'https://api.x.ai/v1/chat/completions')
+        fast_model = config.get('ai.api.model') or 'grok-4-1-fast-non-reasoning'
         
         # 判断是否需要引入知识库
         kb = get_knowledge_base()
@@ -491,6 +492,11 @@ async def generate_response(
         
         logger.info(f"📤 Generating with {len(messages)} messages")
         
+        # 从配置读取temperature
+        from ..utils.config import get_config
+        config = get_config()
+        temperature = config.get('ai.api.temperature', 0.7)
+        
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 api_url,
@@ -502,7 +508,7 @@ async def generate_response(
                     "model": fast_model,
                     "messages": messages,
                     "max_tokens": 220,
-                    "temperature": 0.7
+                    "temperature": temperature  # 使用配置的温度
                 }
             )
             

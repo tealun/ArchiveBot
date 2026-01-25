@@ -61,6 +61,12 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_review_callback(update, context)
         elif callback_data.startswith('note:'):
             await handle_note_callback(update, context)
+        elif callback_data.startswith('note_view:'):
+            await handle_note_view_callback(update, context)
+        elif callback_data.startswith('note_exit_save:'):
+            await handle_note_exit_save_callback(update, context)
+        elif callback_data == 'note_continue':
+            await handle_note_continue_callback(update, context)
         elif callback_data.startswith('note_add:'):
             await handle_note_add_callback(update, context)
         elif callback_data.startswith('note_edit:'):
@@ -87,6 +93,10 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_favorite_callback(update, context)
         elif callback_data.startswith('forward:'):
             await handle_forward_callback(update, context)
+        elif callback_data.startswith('backup_keep:'):
+            await handle_backup_keep_callback(update, context)
+        elif callback_data == 'backup_delete_all':
+            await handle_backup_delete_all_callback(update, context)
         elif callback_data == 'noop':
             # 不做任何操作（日期显示按钮）
             pass
@@ -917,6 +927,157 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 @with_language_context
+async def handle_note_view_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle note view button click - 查看笔记详情
+    
+    Callback data format: note_view:note_id
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
+    """
+    query = update.callback_query
+    
+    try:
+        # 解析 callback data: note_view:note_id
+        note_id = int(query.data.split(':')[1])
+        
+        note_manager = context.bot_data.get('note_manager')
+        
+        if not note_manager:
+            await query.answer(lang_ctx.t('note_manager_not_initialized'), show_alert=True)
+            logger.error("Note manager not initialized")
+            return
+        
+        # 获取笔记详情
+        note = note_manager.get_note(note_id)
+        
+        if not note:
+            await query.answer("笔记不存在", show_alert=True)
+            return
+        
+        # 构建详情显示
+        content = note['content']
+        created_at = note['created_at']
+        archive_id = note.get('archive_id')
+        
+        detail_text = f"📝 笔记详情 #{note_id}\n\n"
+        detail_text += f"📅 创建时间：{created_at}\n\n"
+        
+        if archive_id:
+            detail_text += f"📎 所属归档：#{archive_id}\n\n"
+        else:
+            detail_text += f"📎 独立笔记\n\n"
+        
+        detail_text += f"💬 内容：\n{content}"
+        
+        # 添加操作按钮
+        keyboard = []
+        if archive_id:
+            keyboard.append([
+                InlineKeyboardButton("✏️ 编辑", callback_data=f"note_edit:{archive_id}:{note_id}"),
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_delete:{note_id}")
+            ])
+            keyboard.append([
+                InlineKeyboardButton("📤 分享", callback_data=f"note_share:{archive_id}:{note_id}")
+            ])
+        else:
+            keyboard.append([
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_delete:{note_id}")
+            ])
+        
+        keyboard.append([InlineKeyboardButton("✖️ 关闭", callback_data="note_close")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Answer并发送详情
+        await query.answer()
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=detail_text,
+            reply_markup=reply_markup
+        )
+        
+        logger.info(f"Displayed note detail for note_id={note_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling note view callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_note_exit_save_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle note exit and save button click - 退出笔记模式并保存，然后执行命令
+    
+    Callback data format: note_exit_save:/command
+    """
+    query = update.callback_query
+    
+    try:
+        # 解析命令
+        parts = query.data.split(':', 1)
+        command = parts[1] if len(parts) > 1 else None
+        
+        # 导入handlers中的_finalize_note_internal
+        from ..bot.handlers import _finalize_note_internal
+        
+        # 保存笔记
+        await _finalize_note_internal(context, update.effective_chat.id, reason="command")
+        
+        await query.answer("✅ 笔记已保存")
+        await query.message.delete()
+        
+        # 执行命令（如果有）
+        if command:
+            # 需要重新解析和分发命令
+            await query.message.reply_text(f"正在执行命令：{command}")
+            logger.info(f"Executing pending command after note mode: {command}")
+            # TODO: 这里应该调用相应的命令处理器
+            # 由于我们无法直接调用命令处理器，建议用户重新输入命令
+            await query.message.reply_text(
+                f"请重新发送命令：{command}"
+            )
+        
+        logger.info("Note mode exited with save")
+        
+    except Exception as e:
+        logger.error(f"Error handling note exit save callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_note_continue_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle note continue button click - 继续记录笔记，忽略命令
+    
+    Callback data format: note_continue
+    """
+    query = update.callback_query
+    
+    try:
+        # 清除待处理的命令
+        if 'pending_command' in context.user_data:
+            del context.user_data['pending_command']
+        
+        await query.answer("✍️ 继续记录笔记")
+        await query.message.delete()
+        
+        await query.message.reply_text(
+            "✍️ 已继续笔记模式\n\n"
+            "💬 继续发送消息进行记录"
+        )
+        
+        logger.info("User chose to continue note mode")
+        
+    except Exception as e:
+        logger.error(f"Error handling note continue callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
 async def handle_note_add_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle add note button click - 提示用户输入笔记内容
@@ -1463,32 +1624,71 @@ async def handle_short_text_intent_callback(update: Update, context: ContextType
             # 归档为内容
             await query.edit_message_text("📦 正在归档...")
             
-            # 创建归档
-            storage_manager = context.bot_data.get('storage_manager')
-            if storage_manager:
-                from ..utils.helpers import format_datetime
+            try:
+                # 使用ContentAnalyzer分析文本
+                from ..core.analyzer import ContentAnalyzer
+                from telegram import Message
                 
-                result = storage_manager.create_archive(
-                    content_type='text',
-                    title=text[:50] + ('...' if len(text) > 50 else ''),
-                    content=text,
-                    file_id=None,
-                    tags=[],
-                    source='telegram',
-                    ai_analysis=None
-                )
+                # 创建一个虚拟消息对象用于分析
+                # 由于是用户输入的文本，我们直接构建分析结果
+                analysis = {
+                    'content_type': 'text',
+                    'title': text[:50] + ('...' if len(text) > 50 else ''),
+                    'content': text,
+                    'file_id': None,
+                    'file_size': None,
+                    'file_name': None,
+                    'mime_type': None,
+                    'url': None,
+                    'hashtags': [],
+                    'source': '用户输入',
+                    'created_at': None
+                }
                 
-                if result:
-                    archive_id = result.get('id')
-                    await query.edit_message_text(
-                        f"✅ 已归档 (ID: #{archive_id})\n\n"
-                        f"内容：{truncate_text(text, 100)}"
+                # 使用archive_content方法归档
+                storage_manager = context.bot_data.get('storage_manager')
+                if storage_manager:
+                    # 由于archive_content需要message对象，我们直接使用db_storage
+                    archive_id = storage_manager.db_storage.create_archive(
+                        content_type='text',
+                        storage_type='database',
+                        title=analysis['title'],
+                        content=analysis['content'],
+                        file_id=None,
+                        storage_provider=None,
+                        storage_path=None,
+                        file_size=None,
+                        source=analysis['source'],
+                        metadata={},
+                        ai_summary=None,
+                        ai_key_points=None,
+                        ai_category=None
                     )
-                    logger.info(f"User chose to archive text: {archive_id}")
+                    
+                    if archive_id:
+                        # 添加自动标签
+                        tag_manager = context.bot_data.get('tag_manager')
+                        if tag_manager:
+                            auto_tags = tag_manager.generate_auto_tags('text')
+                            if auto_tags:
+                                tag_manager.add_tags_to_archive(archive_id, auto_tags, 'auto')
+                        
+                        # 失效AI缓存
+                        storage_manager._invalidate_ai_cache()
+                        
+                        await query.edit_message_text(
+                            f"✅ 已归档 (ID: #{archive_id})\n\n"
+                            f"内容：{text[:100] + ('...' if len(text) > 100 else '')}"
+                        )
+                        logger.info(f"User chose to archive text: {archive_id}")
+                    else:
+                        await query.edit_message_text("❌ 归档失败")
                 else:
-                    await query.edit_message_text("❌ 归档失败")
-            else:
-                await query.edit_message_text("❌ 存储管理器未初始化")
+                    await query.edit_message_text("❌ 存储管理器未初始化")
+                    
+            except Exception as e:
+                logger.error(f"Error archiving text: {e}", exc_info=True)
+                await query.edit_message_text(f"❌ 归档失败: {str(e)}")
         
         # 清除待处理文本
         context.user_data.pop('pending_short_text', None)
@@ -1625,3 +1825,135 @@ async def handle_long_text_intent_callback(update: Update, context: ContextTypes
         logger.error(f"Error handling long text intent callback: {e}", exc_info=True)
         await query.edit_message_text(f"❌ Processing failed: {str(e)}")
         await query.answer(f"Error: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_backup_keep_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle backup keep button click - 保留指定数量的备份
+    
+    Callback data format: backup_keep:N
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
+    """
+    query = update.callback_query
+    
+    try:
+        # 解析保留数量
+        keep_count = int(query.data.split(':')[1])
+        
+        backup_manager = context.bot_data.get('backup_manager')
+        
+        if not backup_manager:
+            await query.answer(lang_ctx.t('backup_manager_not_initialized'), show_alert=True)
+            return
+        
+        # 执行清理
+        deleted = backup_manager.cleanup_old_backups(keep_count=keep_count)
+        
+        await query.answer(
+            f"✅ 已删除 {deleted} 个旧备份，保留最新 {keep_count} 份",
+            show_alert=True
+        )
+        
+        # 刷新备份列表
+        backups = backup_manager.list_backups()
+        lines = [lang_ctx.t('backup_list_header', count=len(backups))]
+        for b in backups[:10]:
+            lines.append(lang_ctx.t(
+                'backup_list_item',
+                filename=b.get('filename'),
+                created_at=b.get('created_at'),
+                size=b.get('size'),
+                description=b.get('description', '')
+            ))
+        if len(backups) > 10:
+            lines.append(lang_ctx.t('backup_list_more', count=len(backups) - 10))
+        
+        # 重建按钮
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "💾 保留1份",
+                    callback_data="backup_keep:1"
+                ),
+                InlineKeyboardButton(
+                    "💾 保留3份",
+                    callback_data="backup_keep:3"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🗑️ 全部删除",
+                    callback_data="backup_delete_all"
+                )
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            '\n'.join(lines),
+            reply_markup=reply_markup
+        )
+        
+        logger.info(f"Kept {keep_count} backups, deleted {deleted}")
+        
+    except Exception as e:
+        logger.error(f"Error handling backup keep callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_backup_delete_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle backup delete all button click - 删除所有备份
+    
+    Callback data format: backup_delete_all
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
+    """
+    query = update.callback_query
+    
+    try:
+        backup_manager = context.bot_data.get('backup_manager')
+        
+        if not backup_manager:
+            await query.answer(lang_ctx.t('backup_manager_not_initialized'), show_alert=True)
+            return
+        
+        # 获取所有备份
+        backups = backup_manager.list_backups()
+        total = len(backups)
+        
+        if total == 0:
+            await query.answer("没有备份可删除", show_alert=True)
+            return
+        
+        # 删除所有备份
+        deleted = 0
+        for backup in backups:
+            if backup_manager.delete_backup(backup['filename']):
+                deleted += 1
+        
+        await query.answer(
+            f"✅ 已删除全部 {deleted}/{total} 个备份",
+            show_alert=True
+        )
+        
+        # 更新消息
+        await query.edit_message_text(
+            lang_ctx.t('backup_none')
+        )
+        
+        logger.info(f"Deleted all {deleted} backups")
+        
+    except Exception as e:
+        logger.error(f"Error handling backup delete all callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)

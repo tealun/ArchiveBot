@@ -58,7 +58,7 @@ class ExportManager:
                 cursor = self.db.execute(f"""
                     SELECT 
                         id, title, content, content_type, tags,
-                        file_name, file_size, file_id,
+                        file_size, file_id,
                         storage_type, source_chat, source_message_id,
                         telegram_message_id, telegram_file_id,
                         ai_summary, ai_category, ai_tags, ai_key_points,
@@ -76,21 +76,20 @@ class ExportManager:
                         'content': row[2],
                         'content_type': row[3],
                         'tags': row[4].split(',') if row[4] else [],
-                        'file_name': row[5],
-                        'file_size': row[6],
-                        'file_id': row[7],
-                        'storage_type': row[8],
-                        'source_chat': row[9],
-                        'source_message_id': row[10],
-                        'telegram_message_id': row[11],
-                        'telegram_file_id': row[12],
-                        'ai_summary': row[13],
-                        'ai_category': row[14],
-                        'ai_tags': row[15],
-                        'ai_key_points': row[16],
-                        'created_at': row[17],
-                        'deleted': bool(row[18]),
-                        'deleted_at': row[19]
+                        'file_size': row[5],
+                        'file_id': row[6],
+                        'storage_type': row[7],
+                        'source_chat': row[8],
+                        'source_message_id': row[9],
+                        'telegram_message_id': row[10],
+                        'telegram_file_id': row[11],
+                        'ai_summary': row[12],
+                        'ai_category': row[13],
+                        'ai_tags': row[14],
+                        'ai_key_points': row[15],
+                        'created_at': row[16],
+                        'deleted': bool(row[17]),
+                        'deleted_at': row[18]
                     }
                     
                     # Add notes
@@ -155,8 +154,7 @@ class ExportManager:
                 cursor = self.db.execute(f"""
                     SELECT 
                         id, title, content, content_type,
-                        file_name, file_size,
-                        created_at, deleted
+                        file_size, created_at, deleted
                     FROM archives
                     {deleted_filter}
                     ORDER BY created_at DESC
@@ -170,10 +168,9 @@ class ExportManager:
                     title = row[1] or '无标题'
                     content = row[2] or ''
                     content_type = row[3]
-                    file_name = row[4]
-                    file_size = row[5]
-                    created_at = row[6]
-                    deleted = row[7]
+                    file_size = row[4]
+                    created_at = row[5]
+                    deleted = row[6]
                     
                     # 通过tag_manager获取标签
                     tags = self.tag_manager.get_archive_tags(archive_id) if self.tag_manager else []
@@ -188,9 +185,9 @@ class ExportManager:
                     if tags:
                         md.write(f"**标签:** {', '.join(f'`{tag}`' for tag in tags)}  \n")
                     
-                    if file_name:
-                        size_str = self._format_size(file_size) if file_size else '未知'
-                        md.write(f"**文件:** {file_name} ({size_str})  \n")
+                    if file_size:
+                        size_str = self._format_size(file_size)
+                        md.write(f"**文件大小:** {size_str}  \n")
                     
                     md.write("\n")
                     
@@ -244,7 +241,7 @@ class ExportManager:
             # Write header
             writer.writerow([
                 'ID', '标题', '内容', '类型', '标签',
-                '文件名', '文件大小', '创建时间',
+                '文件大小', '创建时间',
                 '是否删除', '删除时间', '笔记数量'
             ])
             
@@ -254,7 +251,7 @@ class ExportManager:
                 cursor = self.db.execute(f"""
                     SELECT 
                         id, title, content, content_type, tags,
-                        file_name, file_size, created_at,
+                        file_size, created_at,
                         deleted, deleted_at
                     FROM archives
                     {deleted_filter}
@@ -272,11 +269,10 @@ class ExportManager:
                         (row[2] or '')[:100],  # content (truncated)
                         row[3],  # content_type
                         row[4] or '',  # tags
-                        row[5] or '',  # file_name
-                        row[6] or 0,  # file_size
-                        row[7],  # created_at
-                        '是' if row[8] else '否',  # deleted
-                        row[9] or '',  # deleted_at
+                        row[5] or 0,  # file_size
+                        row[6],  # created_at
+                        '是' if row[7] else '否',  # deleted
+                        row[8] or '',  # deleted_at
                         note_count
                     ])
             

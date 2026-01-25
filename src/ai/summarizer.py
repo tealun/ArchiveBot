@@ -90,9 +90,10 @@ class AIProvider(ABC):
     async def categorize(self, content: str, language: str = 'zh-CN') -> str: pass
 
 class OpenAIProvider(AIProvider):
-    def __init__(self, api_key, model="gpt-3.5-turbo", api_url=None):
+    def __init__(self, api_key, model="gpt-3.5-turbo", api_url=None, temperature=0.7):
         self.api_key, self.model = api_key, model
         self.api_url = api_url or "https://api.openai.com/v1/chat/completions"
+        self.temperature = temperature
         try:
             import httpx
             # 增加超时时间，添加重试配置
@@ -320,7 +321,7 @@ Please respond in JSON format:
 }}"""
         
         r = await self.client.post(self.api_url,
-            json={"model": self.model, "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens})
+            json={"model": self.model, "messages": [{"role": "user", "content": prompt}], "max_tokens": max_tokens, "temperature": self.temperature})
         
         response_text = r.json()['choices'][0]['message']['content']
         
@@ -354,7 +355,7 @@ Please respond in JSON format:
             prompt = f"Generate {max_tags} tags in English (comma-separated) for the following content. Tags should include content topic tags and file attribute tags (e.g., eBook, Novel, Technical Documentation, Tutorial, Movie, Movie Clip, Photo, ID Photo, Comic, etc.):\n{content[:1000]}"
         
         r = await self.client.post(self.api_url,
-            json={"model": self.model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 50})
+            json={"model": self.model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 50, "temperature": self.temperature})
         tags_str = r.json()['choices'][0]['message']['content']
         return [t.strip().replace('#', '') for t in tags_str.split(',') if t.strip()][:max_tags]
     
@@ -379,7 +380,7 @@ Please respond in JSON format:
         
         try:
             r = await self.client.post(self.api_url,
-                json={"model": self.model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 20})
+                json={"model": self.model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 20, "temperature": self.temperature})
             category = r.json()['choices'][0]['message']['content'].strip()
             return category if category else default_category
         except:
@@ -395,18 +396,20 @@ class AISummarizer:
 
         # 只使用云端API
         api = config.get('api', {})
-        # 支持两种填写方式：优先使用 api.api_key_env（从环境读取），兼容旧的 api.api_key
-        api_key = api.get('api_key') or api.get('api_key_env')
+        # 使用 config.get() 方法以支持环境变量（AI_API_KEY）
+        api_key = config.get('ai.api.api_key') or api.get('api_key') or api.get('api_key_env')
         if not api_key:
             logger.warning("AI enabled but no API key provided in config.api")
             # 继续允许 provider 初始化失败后的 graceful behavior
         provider_type = api.get('provider', 'openai')
         if provider_type in ['openai', 'grok']:
             try:
+                temperature = config.get('ai.api.temperature', 0.7)
                 self.provider = OpenAIProvider(
                     api_key,
-                    api.get('model', 'gpt-3.5-turbo'),
-                    api.get('api_url')  # 支持自定义API URL
+                    config.get('ai.api.model') or api.get('model', 'gpt-3.5-turbo'),
+                    config.get('ai.api.api_url') or api.get('api_url'),  # 支持自定义API URL
+                    temperature
                 )
                 logger.info(f"Using {provider_type.upper()} API: {api.get('model', 'gpt-3.5-turbo')}")
             except Exception as e:
@@ -626,7 +629,8 @@ class AISummarizer:
                 json={
                     "model": self.provider.model,
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 10
+                    "max_tokens": 10,
+                    "temperature": self.provider.temperature
                 }
             )
             
@@ -745,7 +749,8 @@ class AISummarizer:
                 json={
                     "model": self.provider.model,
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 500
+                    "max_tokens": 500,
+                    "temperature": self.provider.temperature
                 }
             )
             note_content = r.json()['choices'][0]['message']['content'].strip()
@@ -845,7 +850,8 @@ class AISummarizer:
                 json={
                     "model": self.provider.model,
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 1000
+                    "max_tokens": 1000,
+                    "temperature": self.provider.temperature
                 }
             )
             note_content = r.json()['choices'][0]['message']['content'].strip()
@@ -916,7 +922,8 @@ class AISummarizer:
                 json={
                     "model": self.provider.model,
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 50
+                    "max_tokens": 50,
+                    "temperature": self.provider.temperature
                 }
             )
             title = r.json()['choices'][0]['message']['content'].strip()
