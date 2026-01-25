@@ -102,30 +102,48 @@ class NoteManager:
             logger.error(f"Error getting notes: {e}", exc_info=True)
             return []
     
-    def get_all_notes(self, limit: int = 20, offset: int = 0) -> List[Dict[str, Any]]:
+    def get_all_notes(self, limit: int = 20, offset: int = 0, include_archive_info: bool = True) -> List[Dict[str, Any]]:
         """
         Get all notes (with pagination)
         
         Args:
             limit: Maximum results
             offset: Offset for pagination
+            include_archive_info: Whether to include archive info (default True)
             
         Returns:
             List of note dictionaries
         """
         try:
-            cursor = self.db.execute(
-                """
-                SELECT id, archive_id, content, created_at
-                FROM notes
-                ORDER BY created_at DESC
-                LIMIT ? OFFSET ?
-                """,
-                (limit, offset)
-            )
+            # 优化：只在需要时才JOIN，减少数据库开销
+            if include_archive_info:
+                cursor = self.db.execute(
+                    """
+                    SELECT 
+                        n.id, n.archive_id, n.content, n.created_at,
+                        a.title as archive_title, 
+                        a.storage_type, 
+                        a.storage_path
+                    FROM notes n
+                    LEFT JOIN archives a ON n.archive_id = a.id
+                    ORDER BY n.created_at DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (limit, offset)
+                )
+            else:
+                cursor = self.db.execute(
+                    """
+                    SELECT id, archive_id, content, created_at
+                    FROM notes
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (limit, offset)
+                )
             
             notes = [dict(row) for row in cursor.fetchall()]
-            logger.debug(f"Retrieved {len(notes)} notes (offset={offset})")
+            logger.debug(f"Retrieved {len(notes)} notes (offset={offset}, with_info={include_archive_info})")
             return notes
             
         except Exception as e:

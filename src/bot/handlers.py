@@ -24,6 +24,45 @@ logger = logging.getLogger(__name__)
 _message_aggregator: Optional[MessageAggregator] = None
 
 
+def _cleanup_user_data(user_data: dict, threshold: int = 15) -> None:
+    """
+    清理user_data中的临时数据，防止内存泄漏
+    
+    Args:
+        user_data: 用户数据字典
+        threshold: 触发清理的键数量阈值
+    """
+    if len(user_data) <= threshold:
+        return
+    
+    # 定义需要保留的持久化键（只保留语言设置）
+    persistent_keys = {'language'}
+    
+    # 定义临时键（会自动清理）
+    temporary_keys = [
+        'waiting_note_for_archive', 'note_modify_mode', 'note_id_to_modify',
+        'note_append_mode', 'note_id_to_append', 'pending_command',
+        'refine_note_context', 'pending_short_text'
+    ]
+    
+    # 清理临时键（跳过持久化键和笔记模式相关键）
+    removed_count = 0
+    for key in list(user_data.keys()):
+        # 保留持久化键
+        if key in persistent_keys:
+            continue
+        # 保留笔记模式活跃时的相关键
+        if user_data.get('note_mode') and key in ['note_mode', 'note_messages', 'note_archives', 'note_timeout_job', 'note_start_time']:
+            continue
+        # 清理临时键
+        if key in temporary_keys:
+            user_data.pop(key, None)
+            removed_count += 1
+    
+    if removed_count > 0:
+        logger.info(f"Cleaned up {removed_count} temporary keys from user_data (size: {len(user_data)})")
+
+
 def get_message_aggregator() -> MessageAggregator:
     """Get or create message aggregator"""
     global _message_aggregator
@@ -916,6 +955,274 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
         logger.error(f"Error in batch callback: {e}", exc_info=True)
 
 
+async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    处理笔记模式中的消息
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
+    """
+    try:
+        message = update.message
+        
+        # 检查是否是命令
+        if message.text and message.text.startswith('/'):
+            # 排除/cancel命令（已经在命令处理中）
+            if message.text.startswith('/cancel'):
+                return
+            
+            # 其他命令：提示用户选择
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "🚪 立即退出并保存笔记",
+                        callback_data=f"note_exit_save:{message.text}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "✍️ 继续记录笔记",
+                        callback_data="note_continue"
+                    )
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await message.reply_text(
+                f"⚠️ 您正在笔记模式中\n\n"
+                f"检测到命令：{message.text}\n\n"
+                f"请选择操作：",
+                reply_markup=reply_markup
+            )
+            
+            # 暂存命令，等待用户选择后执行
+            context.user_data['pending_command'] = message.text
+            return
+        
+        # 重置超时计时器
+        if 'note_timeout_job' in context.user_data:
+            try:
+                context.user_data['note_timeout_job'].schedule_removal()
+            except:
+                pass
+        
+        # 创建新的超时任务
+        from datetime import timedelta
+        job = context.job_queue.run_once(
+            note_timeout_callback,
+            when=timedelta(minutes=15),
+            data={
+                'chat_id': update.effective_chat.id,
+                'user_id': update.effective_user.id
+            },
+            name=f"note_timeout_{update.effective_user.id}"
+        )
+        context.user_data['note_timeout_job'] = job
+        
+        # 检查消息类型
+        if message.text:
+            # 文本消息：添加到笔记内容
+            note_messages = context.user_data.get('note_messages', [])
+            
+            # 内存保护：限制消息数量，防止内存溢出
+            MAX_NOTE_MESSAGES = 100  # 最多100条消息
+            if len(note_messages) >= MAX_NOTE_MESSAGES:
+                await message.reply_text(
+                    f"⚠️ 已达到笔记消息上限（{MAX_NOTE_MESSAGES}条）\n"
+                    f"请使用 /cancel 保存当前笔记",
+                    quote=True
+                )
+                return
+            
+            # 内存保护：限制单条消息长度
+            MAX_MESSAGE_LENGTH = 4000  # Telegram消息长度限制
+            if len(message.text) > MAX_MESSAGE_LENGTH:
+                truncated_text = message.text[:MAX_MESSAGE_LENGTH] + "...[已截断]"
+                note_messages.append(truncated_text)
+                await message.reply_text(
+                    f"⚠️ 消息过长已截断\n✅ 已记录 ({len(note_messages)} 条)",
+                    quote=True
+                )
+            else:
+                note_messages.append(message.text)
+                await message.reply_text(
+                    f"✅ 已记录 ({len(note_messages)} 条)",
+                    quote=True
+                )
+            
+            context.user_data['note_messages'] = note_messages
+            logger.debug(f"Note mode: recorded text message ({len(note_messages)} total)")
+        
+        elif _is_media_message(message):
+            # 媒体消息：先归档
+            storage_manager = context.bot_data.get('storage_manager')
+            
+            if storage_manager:
+                # 内存保护：限制归档数量
+                note_archives = context.user_data.get('note_archives', [])
+                MAX_NOTE_ARCHIVES = 20  # 最多20个归档
+                
+                if len(note_archives) >= MAX_NOTE_ARCHIVES:
+                    await message.reply_text(
+                        f"⚠️ 已达到笔记归档上限（{MAX_NOTE_ARCHIVES}个）\n"
+                        f"请使用 /cancel 保存当前笔记",
+                        quote=True
+                    )
+                    return
+                
+                # 使用现有的_process_single_message处理归档
+                success, result_msg, archive_id, _ = await _process_single_message(
+                    message, context
+                )
+                
+                if success and archive_id:
+                    note_archives.append(archive_id)
+                    context.user_data['note_archives'] = note_archives
+                    
+                    caption = message.caption or ""
+                    if caption:
+                        note_messages = context.user_data.get('note_messages', [])
+                        note_messages.append(f"[媒体] {caption}")
+                        context.user_data['note_messages'] = note_messages
+                    
+                    await message.reply_text(
+                        f"✅ 媒体已归档 (#{archive_id})\n"
+                        f"📊 已归档：{len(note_archives)} 个",
+                        quote=True
+                    )
+                    logger.info(f"Note mode: archived media as #{archive_id}")
+                else:
+                    await message.reply_text(
+                        "❌ 媒体归档失败",
+                        quote=True
+                    )
+            else:
+                await message.reply_text(
+                    "❌ 存储管理器未初始化",
+                    quote=True
+                )
+        else:
+            await message.reply_text(
+                "⚠️ 不支持的消息类型",
+                quote=True
+            )
+        
+    except Exception as e:
+        logger.error(f"Error handling note mode message: {e}", exc_info=True)
+        await message.reply_text(f"❌ 处理失败: {str(e)}")
+
+
+def _is_media_message(message: Message) -> bool:
+    """判断是否为媒体消息"""
+    return any([
+        message.photo, message.video, message.document,
+        message.audio, message.voice, message.animation,
+        message.sticker, message.contact, message.location
+    ])
+
+
+async def note_timeout_callback(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    笔记模式超时回调 - 15分钟无新消息自动生成笔记
+    避免循环导入，直接在handlers中定义
+    
+    Args:
+        context: Bot context
+    """
+    try:
+        job_data = context.job.data
+        chat_id = job_data['chat_id']
+        
+        # 检查用户是否还在笔记模式
+        if not context.user_data.get('note_mode'):
+            return
+        
+        # 生成并保存笔记
+        await _finalize_note_internal(context, chat_id, reason="timeout")
+        
+        logger.info(f"Note mode timeout for user {job_data.get('user_id')}")
+        
+    except Exception as e:
+        logger.error(f"Error in note timeout callback: {e}", exc_info=True)
+
+
+async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: int, reason: str = "manual") -> None:
+    """
+    完成笔记记录，生成并保存笔记（内部版本，减少内存占用）
+    
+    Args:
+        context: Bot context
+        chat_id: Chat ID
+        reason: 退出原因 (manual, timeout, command)
+    """
+    try:
+        messages = context.user_data.get('note_messages', [])
+        archives = context.user_data.get('note_archives', [])
+        
+        if not messages:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="📝 笔记模式已退出\n\n⚠️ 未记录到任何消息"
+            )
+        else:
+            # 合并所有文本消息（使用生成器减少内存）
+            note_content = '\n\n'.join(messages)
+            
+            # 保存笔记
+            note_manager = context.bot_data.get('note_manager')
+            if note_manager:
+                # 如果有归档，关联第一个归档
+                archive_id = archives[0] if archives else None
+                note_id = note_manager.add_note(archive_id, note_content)
+                
+                if note_id:
+                    reason_map = {
+                        'manual': '手动退出',
+                        'timeout': '超时自动保存',
+                        'command': '命令触发'
+                    }
+                    reason_text = reason_map.get(reason, '未知原因')
+                    
+                    # 构建简洁的结果消息
+                    result_parts = [
+                        f"✅ 笔记已保存 (#{note_id})",
+                        f"📊 文本: {len(messages)} | 媒体: {len(archives)}"
+                    ]
+                    if archive_id:
+                        result_parts.append(f"📎 关联: #{archive_id}")
+                    result_parts.append(f"🔚 {reason_text}")
+                    
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text='\n'.join(result_parts)
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text="❌ 笔记保存失败"
+                    )
+            else:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ 笔记管理器未初始化"
+                )
+        
+        # 立即清除所有笔记模式相关数据，释放内存
+        keys_to_remove = ['note_mode', 'note_messages', 'note_archives', 'note_start_time', 'note_timeout_job', 'pending_command']
+        for key in keys_to_remove:
+            context.user_data.pop(key, None)
+        
+    except Exception as e:
+        logger.error(f"Error finalizing note: {e}", exc_info=True)
+        # 确保即使出错也清理内存
+        for key in ['note_mode', 'note_messages', 'note_archives', 'note_start_time', 'note_timeout_job', 'pending_command']:
+            context.user_data.pop(key, None)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle incoming message for archiving (with batch detection)
@@ -927,6 +1234,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         message = update.message
         lang_ctx = get_language_context(update, context)
+        
+        # 优先检查：笔记模式
+        if context.user_data.get('note_mode'):
+            await _handle_note_mode_message(update, context, lang_ctx)
+            return
         
         # 检查是否在等待添加笔记
         if context.user_data.get('waiting_note_for_archive'):
@@ -989,12 +1301,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 else:
                     await message.reply_text(lang_ctx.t('note_manager_uninitialized'))
                 
-                # 清除等待状态
-                context.user_data['waiting_note_for_archive'] = None
-                # 定期清理user_data中的过期数据
-                if len(context.user_data) > 10:
-                    logger.warning(f"user_data size exceeds 10: {len(context.user_data)}, cleaning up")
-                    context.user_data.clear()
+                # 清除等待状态（使用pop避免KeyError）
+                context.user_data.pop('waiting_note_for_archive', None)
+                context.user_data.pop('note_modify_mode', None)
+                context.user_data.pop('note_id_to_modify', None)
+                context.user_data.pop('note_append_mode', None)
+                context.user_data.pop('note_id_to_append', None)
+                
+                # 内存保护：定期清理user_data中的临时数据
+                _cleanup_user_data(context.user_data)
                 return
         
         # 检查是否在等待笔记精炼指令
@@ -1079,8 +1394,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             from ..utils.config import get_config
             config = get_config()
             ai_config = config.ai
-            chat_enabled = ai_config.get('chat_enabled', False)
-            chat_threshold = int(ai_config.get('chat_threshold_chars', 30))
+            
+            # 检查AI模式是否启用
+            chat_enabled = bool(ai_config.get('chat_enabled', False))
+            
+            # 从配置获取文本阈值
+            text_thresholds = ai_config.get('text_thresholds', {})
+            short_text_threshold = int(text_thresholds.get('short_text', 50))
             
             if chat_enabled:
                 # 检查是否已有活跃会话
@@ -1092,7 +1412,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 if session:
                     # 用户已在AI会话中，检查是否为长文本（可能是笔记意图）
-                    long_text_threshold = 100  # 100字符阈值
+                    # 使用note阈值作为长文本判断标准
+                    long_text_threshold = int(text_thresholds.get('note_chinese', 150))
                     
                     if len(text) >= long_text_threshold:
                         # 长文本，提示用户选择意图
@@ -1235,7 +1556,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         # 继续正常归档流程
                 
                 # 检查是否应自动触发AI会话（短消息且无media）
-                elif (len(text) < chat_threshold and 
+                elif (len(text) < short_text_threshold and 
                       not message.media_group_id and
                       not message.photo and 
                       not message.document and 
@@ -1349,8 +1670,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 is_short, note_type = should_create_note(text)
                 
                 if is_short:
-                    # 如果非常短（<50字符），询问用户意图
-                    if len(text) < 50:
+                    # 如果非常短（<short_text_threshold字符），询问用户意图
+                    if len(text) < short_text_threshold:
                         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                         
                         # 保存待处理文本到用户数据
@@ -1371,7 +1692,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         logger.info(f"Asking user intent for short text: {text[:30]}")
                         return
                     
-                    # 50-150字符（中文）或50-250字符（英文）的短文本，直接保存为笔记
+                    # 达到笔记阈值的短文本，直接保存为笔记
                     note_manager = context.bot_data.get('note_manager')
                     if note_manager:
                         note_id = note_manager.add_note(None, text)

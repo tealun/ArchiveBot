@@ -356,38 +356,123 @@ async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         config = get_config()
         ai_config = config.ai
         
-        status_text = lang_ctx.t('ai_status_title')
+        status_text = "🤖 **AI 功能状态**\n\n"
         
         # 检查是否启用
         if ai_config.get('enabled', False):
-            status_text += lang_ctx.t('ai_status_enabled') + "\n"
+            status_text += "✅ **状态：** 已启用\n\n"
             
             # 获取AI总结器
             summarizer = get_ai_summarizer(ai_config)
             
             if summarizer and summarizer.is_available():
-                status_text += lang_ctx.t('ai_status_available')
+                status_text += "🟢 **服务：** 可用\n\n"
                 
+                # API配置信息
                 api_config = ai_config.get('api', {})
                 provider = api_config.get('provider', 'unknown')
                 model = api_config.get('model', 'unknown')
+                base_url = api_config.get('base_url', 'default')
                 
-                status_text += lang_ctx.t('ai_status_config_title')
-                status_text += lang_ctx.t('ai_status_provider', provider=provider)
-                status_text += lang_ctx.t('ai_status_model', model=model)
-                status_text += lang_ctx.t('ai_status_max_tokens', max_tokens=api_config.get('max_tokens', 1000))
-                status_text += lang_ctx.t('ai_status_timeout', timeout=api_config.get('timeout', 30))
+                # 脱敏处理API Key
+                api_key = api_config.get('api_key', '')
+                if api_key:
+                    if len(api_key) > 10:
+                        masked_key = api_key[:4] + '****' + api_key[-4:]
+                    else:
+                        masked_key = '****'
+                else:
+                    masked_key = '未设置'
                 
-                status_text += lang_ctx.t('ai_status_features_title')
-                auto_summarize_status = '✅' if ai_config.get('auto_summarize') else '❌'
-                auto_tags_status = '✅' if ai_config.get('auto_generate_tags') else '❌'
-                status_text += lang_ctx.t('ai_status_auto_summarize', status=auto_summarize_status)
-                status_text += lang_ctx.t('ai_status_auto_tags', status=auto_tags_status)
+                status_text += "⚙️ **配置信息：**\n"
+                status_text += f"  • 提供商：`{provider}`\n"
+                status_text += f"  • 模型：`{model}`\n"
+                status_text += f"  • API Key：`{masked_key}`\n"
+                status_text += f"  • Base URL：`{base_url}`\n"
+                status_text += f"  • 最大Token：`{api_config.get('max_tokens', 1000)}`\n"
+                status_text += f"  • 超时时间：`{api_config.get('timeout', 30)}秒`\n"
+                status_text += f"  • 温度参数：`{api_config.get('temperature', 0.7)}`\n\n"
+                
+                # 功能开关
+                status_text += "🔧 **功能开关：**\n"
+                auto_summarize = ai_config.get('auto_summarize', False)
+                auto_tags = ai_config.get('auto_generate_tags', False)
+                auto_category = ai_config.get('auto_category', False)
+                chat_enabled = ai_config.get('chat', {}).get('enabled', False)
+                
+                status_text += f"  • 自动摘要：{'✅ 开启' if auto_summarize else '❌ 关闭'}\n"
+                status_text += f"  • 自动标签：{'✅ 开启' if auto_tags else '❌ 关闭'}\n"
+                status_text += f"  • 自动分类：{'✅ 开启' if auto_category else '❌ 关闭'}\n"
+                status_text += f"  • 智能对话：{'✅ 开启' if chat_enabled else '❌ 关闭'}\n\n"
+                
+                # 使用统计（从数据库获取）
+                db_storage = context.bot_data.get('db_storage')
+                if db_storage:
+                    try:
+                        cursor = db_storage.db.execute("""
+                            SELECT 
+                                COUNT(*) as total,
+                                COUNT(CASE WHEN ai_summary IS NOT NULL THEN 1 END) as with_summary,
+                                COUNT(CASE WHEN ai_tags IS NOT NULL THEN 1 END) as with_tags,
+                                COUNT(CASE WHEN ai_category IS NOT NULL THEN 1 END) as with_category
+                            FROM archives
+                            WHERE deleted = 0
+                        """)
+                        stats = cursor.fetchone()
+                        
+                        total = stats[0]
+                        with_summary = stats[1]
+                        with_tags = stats[2]
+                        with_category = stats[3]
+                        
+                        status_text += "📊 **使用统计：**\n"
+                        status_text += f"  • 总归档数：`{total}`\n"
+                        status_text += f"  • AI摘要：`{with_summary}` ({int(with_summary/total*100) if total > 0 else 0}%)\n"
+                        status_text += f"  • AI标签：`{with_tags}` ({int(with_tags/total*100) if total > 0 else 0}%)\n"
+                        status_text += f"  • AI分类：`{with_category}` ({int(with_category/total*100) if total > 0 else 0}%)\n\n"
+                    except Exception as e:
+                        logger.warning(f"Failed to get AI usage stats: {e}")
+                        status_text += "📊 **使用统计：** 无法获取\n\n"
+                
+                # 对话会话信息
+                if chat_enabled:
+                    session_manager = context.bot_data.get('session_manager')
+                    if session_manager:
+                        user_id = update.effective_user.id
+                        session = session_manager.get_session(user_id)
+                        if session:
+                            status_text += "💬 **对话会话：**\n"
+                            status_text += f"  • 状态：活跃\n"
+                            status_text += f"  • 消息数：`{session.get('message_count', 0)}`\n"
+                            last_time = session.get('last_interaction')
+                            if last_time:
+                                status_text += f"  • 最后交互：`{last_time}`\n"
+                        else:
+                            status_text += "💬 **对话会话：** 无活跃会话\n"
+                        status_text += "\n"
+                
+                # 缓存信息
+                ai_cache = context.bot_data.get('ai_cache')
+                if ai_cache:
+                    try:
+                        cache_stats = ai_cache.get_stats()
+                        status_text += "💾 **缓存统计：**\n"
+                        status_text += f"  • 缓存条目：`{cache_stats.get('total_entries', 0)}`\n"
+                        status_text += f"  • 命中率：`{cache_stats.get('hit_rate', 0):.1f}%`\n"
+                        status_text += f"  • 缓存大小：`{cache_stats.get('size_mb', 0):.2f} MB`\n"
+                    except Exception as e:
+                        logger.warning(f"Failed to get cache stats: {e}")
+                
             else:
-                status_text += lang_ctx.t('ai_status_unavailable')
+                status_text += "🔴 **服务：** 不可用\n\n"
+                status_text += "⚠️ AI服务连接失败，请检查配置\n"
         else:
-            status_text += lang_ctx.t('ai_status_disabled')
-            status_text += lang_ctx.t('ai_status_enable_guide')
+            status_text += "❌ **状态：** 未启用\n\n"
+            status_text += "💡 **启用指南：**\n"
+            status_text += "1. 编辑 `config/config.yaml`\n"
+            status_text += "2. 设置 `ai.enabled: true`\n"
+            status_text += "3. 配置API密钥和提供商\n"
+            status_text += "4. 重启Bot\n"
         
         await update.message.reply_text(
             status_text,
@@ -398,6 +483,102 @@ async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         
     except Exception as e:
         logger.error(f"Error in ai_status_command: {e}", exc_info=True)
+        await update.message.reply_text(f"❌ 获取AI状态失败: {str(e)}")
+
+
+@with_language_context
+async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle /note command - 进入笔记模式
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
+    """
+    try:
+        # 检查是否已经在笔记模式中
+        if context.user_data.get('note_mode'):
+            await update.message.reply_text(
+                "⚠️ 您已经在笔记模式中\n"
+                "发送 /cancel 可以退出并保存当前笔记"
+            )
+            return
+        
+        # 进入笔记模式
+        context.user_data['note_mode'] = True
+        context.user_data['note_messages'] = []  # 收集的消息
+        context.user_data['note_archives'] = []  # 归档的媒体ID
+        context.user_data['note_start_time'] = update.message.date
+        
+        # 设置15分钟后的超时任务
+        # 移除之前的超时任务（如果有）
+        if 'note_timeout_job' in context.user_data:
+            try:
+                context.user_data['note_timeout_job'].schedule_removal()
+            except:
+                pass
+        
+        # 创建新的超时任务
+        from datetime import timedelta
+        # 导入handlers中的note_timeout_callback
+        from ..bot.handlers import note_timeout_callback
+        
+        job = context.job_queue.run_once(
+            note_timeout_callback,
+            when=timedelta(minutes=15),
+            data={
+                'chat_id': update.effective_chat.id,
+                'user_id': update.effective_user.id
+            },
+            name=f"note_timeout_{update.effective_user.id}"
+        )
+        context.user_data['note_timeout_job'] = job
+        
+        await update.message.reply_text(
+            "📝 已进入笔记模式\n\n"
+            "💬 现在发送的所有消息都会被记录为笔记\n"
+            "📎 发送的媒体文件会自动归档并关联到笔记\n\n"
+            "⏱️ 15分钟内无新消息将自动生成笔记\n"
+            "🚫 发送 /cancel 可立即退出并保存笔记"
+        )
+        
+        logger.info(f"User {update.effective_user.id} entered note mode")
+        
+    except Exception as e:
+        logger.error(f"Error in note_command: {e}", exc_info=True)
+        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+
+
+@with_language_context
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle /cancel command - 退出笔记模式
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
+    """
+    try:
+        # 检查是否在笔记模式中
+        if not context.user_data.get('note_mode'):
+            await update.message.reply_text(
+                "⚠️ 您当前不在笔记模式中\n"
+                "发送 /note 可以进入笔记模式"
+            )
+            return
+        
+        # 导入handlers中的_finalize_note_internal
+        from ..bot.handlers import _finalize_note_internal
+        
+        # 立即生成并保存笔记
+        await _finalize_note_internal(context, update.effective_chat.id, reason="manual")
+        
+        logger.info(f"User {update.effective_user.id} cancelled note mode")
+        
+    except Exception as e:
+        logger.error(f"Error in cancel_command: {e}", exc_info=True)
         await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
 
 
@@ -412,7 +593,7 @@ async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         lang_ctx: Language context
     """
     try:
-        # 获取note_manager
+        # 获取note_manager和config
         note_manager = context.bot_data.get('note_manager')
         if not note_manager:
             await update.message.reply_text(lang_ctx.t('note_manager_not_initialized'))
@@ -420,31 +601,77 @@ async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         
         # 获取所有笔记（分页显示）
         page = 0
-        page_size = 20
+        page_size = 10
         results = note_manager.get_all_notes(limit=page_size, offset=page * page_size)
         
         if not results:
             await update.message.reply_text(lang_ctx.t('notes_list_empty'))
             return
         
+        # 获取配置
+        config = get_config()
+        
         # 构建输出
+        from ..utils.helpers import truncate_text
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
         result_text = lang_ctx.t('notes_list_header', count=len(results)) + "\n\n"
         
-        for note in results:
-            # 笔记内容截断
-            from ..utils.helpers import truncate_text
-            content_preview = truncate_text(note['content'], 50)
+        keyboard = []
+        for idx, note in enumerate(results, 1):
+            note_id = note['id']
+            created_at = note['created_at']
+            content = note['content']
+            archive_id = note.get('archive_id')
             
-            result_text += f"📝 {lang_ctx.t('note_id')}: #{note['id']}\n"
+            # 第一行：笔记ID和时间
+            result_text += f"📝 笔记ID: #{note_id} | 📅 {created_at}\n"
             
-            # 如果关联了归档，显示归档ID
-            if note.get('archive_id'):
-                result_text += f"📎 {lang_ctx.t('archive')} #{note['archive_id']}\n"
+            # 第二行：标题（内容预览）
+            content_preview = truncate_text(content, 60)
+            note_type = "[自动]" if archive_id else "[手动]"
+            result_text += f"💬 {note_type} {content_preview}\n"
             
-            result_text += f"📅 {note['created_at']}\n"
-            result_text += f"💬 {content_preview}\n\n"
+            # 第三行：所属归档
+            if archive_id:
+                archive_title = note.get('archive_title', f'归档 #{archive_id}')
+                storage_path = note.get('storage_path')
+                storage_type = note.get('storage_type')
+                
+                # 生成跳转链接
+                if storage_path and storage_type == 'telegram':
+                    parts = storage_path.split(':')
+                    if len(parts) >= 2:
+                        channel_id = parts[0].replace('-100', '')
+                        message_id = parts[1]
+                    else:
+                        channel_id = str(config.telegram_channel_id).replace('-100', '')
+                        message_id = storage_path
+                    
+                    link = f"https://t.me/c/{channel_id}/{message_id}"
+                    result_text += f"📎 所属归档：<a href='{link}'>{archive_title}</a>\n"
+                else:
+                    result_text += f"📎 所属归档：{archive_title}\n"
+            else:
+                result_text += f"📎 独立笔记\n"
+            
+            result_text += "\n"
+            
+            # 添加查看按钮
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{idx}. 查看详情",
+                    callback_data=f"note_view:{note_id}"
+                )
+            ])
         
-        await update.message.reply_text(result_text)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            result_text, 
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
+            disable_web_page_preview=True
+        )
         
         logger.info(f"Notes list command executed")
         
@@ -710,7 +937,32 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
             if len(backups) > 10:
                 lines.append(lang_ctx.t('backup_list_more', count=len(backups) - 10))
 
-            await update.message.reply_text('\n'.join(lines))
+            # 添加操作按钮
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "💾 保留1份",
+                        callback_data="backup_keep:1"
+                    ),
+                    InlineKeyboardButton(
+                        "💾 保留3份",
+                        callback_data="backup_keep:3"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "🗑️ 全部删除",
+                        callback_data="backup_delete_all"
+                    )
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                '\n'.join(lines),
+                reply_markup=reply_markup
+            )
             return
 
         subcmd = context.args[0].lower()

@@ -8,6 +8,10 @@ import signal
 import logging
 from functools import wraps
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file before importing config
+load_dotenv()
 
 from telegram import Update
 from telegram.ext import (
@@ -233,7 +237,9 @@ def main():
         application.add_handler(CommandHandler("ai", owner_only(commands.ai_status_command)))
         application.add_handler(CommandHandler(["stats", "st"], owner_only(commands.stats_command)))
         application.add_handler(CommandHandler(["language", "lang"], owner_only(commands.language_command)))
+        application.add_handler(CommandHandler("note", owner_only(commands.note_command)))
         application.add_handler(CommandHandler("notes", owner_only(commands.notes_command)))
+        application.add_handler(CommandHandler("cancel", owner_only(commands.cancel_command)))
         application.add_handler(CommandHandler("trash", owner_only(commands.trash_command)))
         application.add_handler(CommandHandler("export", owner_only(commands.export_command)))
         application.add_handler(CommandHandler("backup", owner_only(commands.backup_command)))

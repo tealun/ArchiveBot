@@ -23,6 +23,18 @@ class I18n:
         'zh-TW': '繁體中文'
     }
     
+    # 语言代码映射表：简化代码 -> 完整代码
+    LANGUAGE_CODE_MAPPING = {
+        'zh': 'zh-CN',          # 简体中文
+        'zh-cn': 'zh-CN',       # 容错：小写
+        'zh-Hans': 'zh-CN',     # 简体中文（ISO标准）
+        'zh-tw': 'zh-TW',       # 容错：小写
+        'zh-Hant': 'zh-TW',     # 繁体中文（ISO标准）
+        'en': 'en',             # 英文
+        'en-US': 'en',          # 美式英语
+        'en-GB': 'en',          # 英式英语
+    }
+    
     def __init__(self, default_language: str = 'zh-CN'):
         """
         Initialize i18n manager
@@ -63,14 +75,17 @@ class I18n:
         Set current language
         
         Args:
-            language: Language code (en, zh-CN, zh-TW)
+            language: Language code (en, zh-CN, zh-TW) or simplified code (zh, en)
             
         Returns:
             True if language was set successfully, False otherwise
         """
-        if language in self.SUPPORTED_LANGUAGES:
-            self.current_language = language
-            logger.info(f"Language set to: {language}")
+        # 尝试映射简化的语言代码到完整代码
+        mapped_language = self.LANGUAGE_CODE_MAPPING.get(language, language)
+        
+        if mapped_language in self.SUPPORTED_LANGUAGES:
+            self.current_language = mapped_language
+            logger.info(f"Language set to: {mapped_language}" + (f" (from {language})" if language != mapped_language else ""))
             return True
         else:
             logger.warning(f"Unsupported language: {language}")

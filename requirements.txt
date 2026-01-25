@@ -5,6 +5,7 @@ python-telegram-bot[all]
 
 # Configuration
 PyYAML
+python-dotenv
 
 # File handling
 python-magic
