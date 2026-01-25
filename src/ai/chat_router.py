@@ -221,6 +221,40 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
             data['tag_analysis'] = tag_analysis
             logger.info(f"✓ Analyzed {len(tag_analysis)} tags")
         
+        # 最近记录上下文（24小时内，关键词触发）
+        if need_data.get('need_recent_context') and db_storage:
+            from datetime import datetime, timedelta
+            from ..models.database import ArchiveDB
+            
+            # 获取24小时内的归档
+            cutoff_time = datetime.now() - timedelta(hours=24)
+            cutoff_timestamp = int(cutoff_time.timestamp())
+            
+            # 查询最近24小时的归档（限制数量避免内存消耗）
+            recent_archives = db_storage.db.get_archives(
+                limit=20,  # 最多20条，避免内存消耗过大
+                order_by='created_at DESC'
+            )
+            
+            # 筛选24小时内的
+            recent_archives = [
+                a for a in recent_archives 
+                if a.get('created_at', 0) >= cutoff_timestamp
+            ]
+            
+            if recent_archives:
+                # 添加标签信息
+                tag_manager = context.bot_data.get('tag_manager')
+                if tag_manager:
+                    for archive in recent_archives:
+                        if 'tags' not in archive:
+                            archive['tags'] = tag_manager.get_archive_tags(archive.get('id'))
+                
+                data['recent_context'] = recent_archives
+                logger.info(f"✓ Loaded {len(recent_archives)} recent archives (24h)")
+            else:
+                logger.info("✗ No recent archives in last 24 hours")
+        
         # 资源查询（用于直接返回文件）
         resource_query = need_data.get('resource_query', {})
         if resource_query and resource_query.get('enabled') and db_storage:
@@ -387,11 +421,19 @@ async def generate_response(
         
         # 非resource_reply策略，正常生成文本回复
         from ..utils.config import get_config
+        from .knowledge_base import get_knowledge_base
         
         config = get_config()
         api_key = config.ai.get('api', {}).get('api_key')
         api_url = config.ai.get('api', {}).get('api_url', 'https://api.x.ai/v1/chat/completions')
         fast_model = 'grok-4-1-fast-non-reasoning'
+        
+        # 判断是否需要引入知识库
+        kb = get_knowledge_base()
+        knowledge_content = None
+        if kb.is_system_related_query(user_message):
+            knowledge_content = kb.get_knowledge()
+            logger.info("System-related query detected, knowledge base included")
         
         # 构建上下文
         context_parts = []
@@ -426,15 +468,25 @@ async def generate_response(
             for s in samples:
                 context_parts.append(f"• {s['title']}")
         
+        # 最近24小时记录上下文（限制数量避免token消耗）
+        if data_context.get('recent_context'):
+            recent = data_context['recent_context'][:5]  # 最多5条，避免prompt过大
+            header = "Archives in last 24 hours" if language == 'en' else ("過去24小時歸檔" if language == 'zh-TW' else "过去24小时归档")
+            context_parts.append(f"\n{header}（{len(recent)}）：")
+            for r in recent:
+                title = r.get('title', '')[:40]  # 缩短标题长度
+                tags = ', '.join([f"#{t}" for t in r.get('tags', [])[:2]])  # 最多2个标签
+                context_parts.append(f"• {title} {tags}")
+        
         no_data_text = "No relevant data" if language == 'en' else ("暫無相關數據" if language == 'zh-TW' else "暂无相关数据")
         data_summary = '\n'.join(context_parts) if context_parts else no_data_text
         
         # 获取对话历史
         conversation_history = session_data.get('context', {}).get('history', [])
         
-        # 使用提示词模板生成消息
+        # 使用提示词模板生成消息（传递知识库）
         messages = ChatPrompts.get_response_prompt(
-            user_message, plan, data_summary, language, conversation_history
+            user_message, plan, data_summary, language, conversation_history, knowledge_base=knowledge_content
         )
         
         logger.info(f"📤 Generating with {len(messages)} messages")
@@ -458,7 +510,7 @@ async def generate_response(
                 result = response.json()
                 reply = result['choices'][0]['message']['content'].strip()
                 
-                # 更新历史
+                # 更新历史（使用配置的长度限制）
                 if 'context' not in session_data:
                     session_data['context'] = {}
                 if 'history' not in session_data['context']:
@@ -468,10 +520,17 @@ async def generate_response(
                 session_data['context']['history'].append(f"{user_prefix}{user_message}")
                 session_data['context']['history'].append(f"AI: {reply}")
                 
-                if len(session_data['context']['history']) > 6:
-                    session_data['context']['history'] = session_data['context']['history'][-6:]
+                # 获取配置的历史长度（默认10对，即20条消息）
+                from ..utils.config import get_config
+                config = get_config()
+                max_history_pairs = config.get('ai.chat_history_length', 10)
+                max_history_messages = max_history_pairs * 2  # 每对包含用户+AI两条消息
                 
-                logger.info(f"✓ Response generated: {reply[:50]}...")
+                # 保留最近的N对对话
+                if len(session_data['context']['history']) > max_history_messages:
+                    session_data['context']['history'] = session_data['context']['history'][-max_history_messages:]
+                
+                logger.info(f"✓ Response generated: {reply[:50]}... (history: {len(session_data['context']['history'])} messages)")
                 return reply
             else:
                 logger.error(f"Response generation error: {response.status_code}")

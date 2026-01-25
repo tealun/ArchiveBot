@@ -105,8 +105,41 @@ class TelegramStorage(BaseStorage):
             
             logger.info(f"Forwarding to channel {channel_id}: content_type={content_type}, file_id={file_id[:20] if file_id else 'None'}...")
             
+            # 文本和链接类型：发送文本消息（不需要file_id）
+            if content_type in ['text', 'link']:
+                content = metadata.get('content') or caption or ''
+                if not content:
+                    logger.error("No content for text/link type")
+                    return None
+                
+                # 添加标题（如果有）
+                title = metadata.get('title', '')
+                if title and title != content[:100]:
+                    formatted_text = f"<b>{title}</b>\n\n{content}"
+                else:
+                    formatted_text = content
+                
+                # 文本消息最大4096字符
+                if len(formatted_text) > 4096:
+                    formatted_text = formatted_text[:4090] + "...\n\n[内容过长已截断]"
+                
+                message = await self.bot.send_message(
+                    chat_id=channel_id,
+                    text=formatted_text,
+                    parse_mode='HTML',
+                    disable_web_page_preview=False  # 链接类型显示预览
+                )
+                
+                if message:
+                    storage_path = f"{channel_id}:{message.message_id}"
+                    logger.info(f"Text/Link stored in Telegram channel: {storage_path}")
+                    return storage_path
+                
+                return None
+            
+            # 媒体文件类型：需要file_id
             if not file_id:
-                logger.error(f"No file_id provided")
+                logger.error(f"No file_id provided for {content_type}")
                 return None
             
             if not content_type:
@@ -200,7 +233,7 @@ class TelegramStorage(BaseStorage):
     
     async def batch_store(self, metadata_list: list) -> list:
         """
-        批量存储文件到Telegram频道
+        批量存储文件到Telegram频道（使用send_media_group优化）
         
         Args:
             metadata_list: 元数据列表
@@ -208,27 +241,156 @@ class TelegramStorage(BaseStorage):
         Returns:
             storage_path列表（成功的路径，失败为None）
         """
-        import asyncio
+        from telegram import InputMediaPhoto, InputMediaVideo, InputMediaDocument, InputMediaAudio
         
         logger.info(f"Batch storing {len(metadata_list)} files to Telegram channel")
         
-        # 并发发送（Telegram API支持高并发）
-        tasks = [self.store(None, metadata) for metadata in metadata_list]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # 分组：将相同类型的媒体分组（media_group最多10个文件）
+        photo_batch = []
+        video_batch = []
+        other_files = []  # document, audio, text, link等单独发送
         
-        # 处理结果
-        storage_paths = []
-        success_count = 0
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error(f"Batch store failed for item {i}: {result}")
-                storage_paths.append(None)
+        for i, metadata in enumerate(metadata_list):
+            content_type = metadata.get('content_type')
+            if content_type == 'photo':
+                photo_batch.append((i, metadata))
+            elif content_type == 'video':
+                video_batch.append((i, metadata))
             else:
-                storage_paths.append(result)
-                if result:
-                    success_count += 1
+                other_files.append((i, metadata))
         
-        logger.info(f"Batch stored {success_count}/{len(metadata_list)} files successfully")
+        # 初始化结果列表
+        storage_paths = [None] * len(metadata_list)
+        
+        # 处理photo批次（使用send_media_group，每批最多10个）
+        for batch_start in range(0, len(photo_batch), 10):
+            batch_end = min(batch_start + 10, len(photo_batch))
+            batch_items = photo_batch[batch_start:batch_end]
+            
+            if len(batch_items) == 1:
+                # 单个文件，直接发送
+                idx, metadata = batch_items[0]
+                storage_paths[idx] = await self.store(None, metadata)
+            else:
+                # 批量发送（使用media_group）
+                # 先获取channel_id（使用第一个item的配置）
+                first_metadata = batch_items[0][1]
+                channel_id = first_metadata.get('override_channel_id', self.default_channel)
+                if not channel_id:
+                    logger.error("No channel ID configured")
+                    continue
+                
+                media_group = []
+                indices = []
+                
+                for idx, metadata in batch_items:
+                    file_id = metadata.get('file_id')
+                    caption = metadata.get('caption', '')
+                    # Telegram限制：只有第一个media可以有caption
+                    cap = caption if len(media_group) == 0 else None
+                    media_group.append(InputMediaPhoto(media=file_id, caption=cap))
+                    indices.append(idx)
+                
+                try:
+                    
+                    messages = await self.bot.send_media_group(
+                        chat_id=channel_id,
+                        media=media_group
+                    )
+                    
+                    # 记录每个消息的storage_path
+                    for i, msg in enumerate(messages):
+                        if i < len(indices):
+                            idx = indices[i]
+                            file_id = None
+                            if msg.photo:
+                                file_id = msg.photo[-1].file_id
+                            storage_path = f"{msg.chat_id}:{msg.message_id}:{file_id}" if file_id else f"{msg.chat_id}:{msg.message_id}"
+                            storage_paths[idx] = storage_path
+                    
+                    logger.info(f"Sent media_group with {len(messages)} photos")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to send photo media_group: {e}", exc_info=True)
+                    # 失败时，回退到逐个发送
+                    for idx, metadata in batch_items:
+                        storage_paths[idx] = await self.store(None, metadata)
+        
+        # 处理video批次（使用send_media_group，每批最多10个）
+        for batch_start in range(0, len(video_batch), 10):
+            batch_end = min(batch_start + 10, len(video_batch))
+            batch_items = video_batch[batch_start:batch_end]
+            
+            if len(batch_items) == 1:
+                # 单个文件，直接发送
+                idx, metadata = batch_items[0]
+                storage_paths[idx] = await self.store(None, metadata)
+            else:
+                # 批量发送（使用media_group）
+                # 先获取channel_id（使用第一个item的配置）
+                first_metadata = batch_items[0][1]
+                channel_id = first_metadata.get('override_channel_id', self.default_channel)
+                if not channel_id:
+                    logger.error("No channel ID configured")
+                    continue
+                
+                media_group = []
+                indices = []
+                
+                for idx, metadata in batch_items:
+                    file_id = metadata.get('file_id')
+                    caption = metadata.get('caption', '')
+                    # Telegram限制：只有第一个media可以有caption
+                    cap = caption if len(media_group) == 0 else None
+                    media_group.append(InputMediaVideo(media=file_id, caption=cap))
+                    indices.append(idx)
+                
+                try:
+                    
+                    messages = await self.bot.send_media_group(
+                        chat_id=channel_id,
+                        media=media_group
+                    )
+                    
+                    # 记录每个消息的storage_path
+                    for i, msg in enumerate(messages):
+                        if i < len(indices):
+                            idx = indices[i]
+                            file_id = None
+                            if msg.video:
+                                file_id = msg.video.file_id
+                            storage_path = f"{msg.chat_id}:{msg.message_id}:{file_id}" if file_id else f"{msg.chat_id}:{msg.message_id}"
+                            storage_paths[idx] = storage_path
+                    
+                    logger.info(f"Sent media_group with {len(messages)} videos")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to send video media_group: {e}", exc_info=True)
+                    # 失败时，回退到逐个发送
+                    for idx, metadata in batch_items:
+                        storage_paths[idx] = await self.store(None, metadata)
+        
+        # 处理其他类型文件（逐个发送）
+        import asyncio
+        if other_files:
+            tasks = []
+            other_indices = []
+            for idx, metadata in other_files:
+                tasks.append(self.store(None, metadata))
+                other_indices.append(idx)
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for i, result in enumerate(results):
+                idx = other_indices[i]
+                if isinstance(result, Exception):
+                    logger.error(f"Batch store failed for item {idx}: {result}")
+                    storage_paths[idx] = None
+                else:
+                    storage_paths[idx] = result
+        
+        success_count = sum(1 for p in storage_paths if p is not None)
+        logger.info(f"Batch stored {success_count}/{len(metadata_list)} files successfully (used media_group for photos/videos)")
         return storage_paths
     
     async def retrieve(self, storage_path: str) -> Optional[Any]:

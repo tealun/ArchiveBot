@@ -177,13 +177,38 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                         if content_for_ai:
                             start = time.time()
                             user_language = lang_ctx.language
-                            ai_tags = await ai_summarizer.generate_tags(content_for_ai, 5, language=user_language)
+                            # 获取配置的最大标签数量
+                            max_tags = config.ai.get('max_generated_tags', 8)
+                            max_tags = max(5, min(10, int(max_tags)))  # 限制在5-10之间
+                            
+                            ai_tags = await ai_summarizer.generate_tags(content_for_ai, max_tags, language=user_language)
                             duration = time.time() - start
                             provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'unknown')
-                            logger.info(f"AI generate_tags provider={provider}, duration={duration:.2f}s")
+                            logger.info(f"AI generate_tags provider={provider}, duration={duration:.2f}s, max_tags={max_tags}")
+                            
                             if ai_tags:
                                 existing_tags = analysis.get('tags', [])
-                                analysis['tags'] = list(set(existing_tags + ai_tags))
+                                
+                                # 智能甄别caption标签
+                                extract_from_caption = config.get('features.extract_tags_from_caption', False)
+                                if not extract_from_caption and message.caption:
+                                    # 从caption中提取潜在标签进行甄别
+                                    caption_tags = extract_hashtags(message.caption)
+                                    if caption_tags:
+                                        # AI甄别：只保留与AI生成标签语义相关的caption标签
+                                        filtered_caption_tags = []
+                                        for ctag in caption_tags:
+                                            if any(ai_tag.lower() in ctag.lower() or ctag.lower() in ai_tag.lower() for ai_tag in ai_tags):
+                                                filtered_caption_tags.append(ctag)
+                                        
+                                        analysis['tags'] = list(set(existing_tags + ai_tags + filtered_caption_tags))
+                                        if filtered_caption_tags:
+                                            logger.info(f"Filtered caption tags: {filtered_caption_tags} (from {caption_tags})")
+                                    else:
+                                        analysis['tags'] = list(set(existing_tags + ai_tags))
+                                else:
+                                    analysis['tags'] = list(set(existing_tags + ai_tags))
+                                
                                 logger.info(f"AI generated tags: {ai_tags}")
                     except Exception as e:
                         logger.warning(f"AI tag generation failed: {e}")
@@ -625,16 +650,37 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
                 
                 # 批量并发调用AI（但每个内容获得独立标签）
                 start = time.time()
-                batch_ai_tags = await ai_summarizer.batch_generate_tags(contents_for_ai, 3, language=lang_ctx.language)
+                # 获取配置的最大标签数量（批量时使用较少标签）
+                max_tags = config.ai.get('max_generated_tags', 8)
+                max_tags = max(3, min(max_tags, 5))  # 批量时限制在3-5之间
+                
+                batch_ai_tags = await ai_summarizer.batch_generate_tags(contents_for_ai, max_tags, language=lang_ctx.language)
                 duration = time.time() - start
                 provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'batch')
-                logger.info(f"AI batch_generate_tags provider={provider}, duration={duration:.2f}s")
+                logger.info(f"AI batch_generate_tags provider={provider}, duration={duration:.2f}s, max_tags={max_tags}")
                 
                 # 为每个分析结果添加其独立的AI标签
                 for i, ai_tags in enumerate(batch_ai_tags):
                     if ai_tags:
                         existing_tags = analyses[i].get('tags', [])
-                        analyses[i]['tags'] = list(set(existing_tags + ai_tags))
+                        
+                        # 智能甄别caption标签（批量）
+                        extract_from_caption = config.get('features.extract_tags_from_caption', False)
+                        if not extract_from_caption and messages[i].caption:
+                            caption_tags = extract_hashtags(messages[i].caption)
+                            if caption_tags:
+                                filtered_caption_tags = [
+                                    ctag for ctag in caption_tags
+                                    if any(ai_tag.lower() in ctag.lower() or ctag.lower() in ai_tag.lower() for ai_tag in ai_tags)
+                                ]
+                                analyses[i]['tags'] = list(set(existing_tags + ai_tags + filtered_caption_tags))
+                                if filtered_caption_tags:
+                                    logger.debug(f"Item {i}: Filtered caption tags = {filtered_caption_tags}")
+                            else:
+                                analyses[i]['tags'] = list(set(existing_tags + ai_tags))
+                        else:
+                            analyses[i]['tags'] = list(set(existing_tags + ai_tags))
+                        
                         logger.debug(f"Item {i}: AI tags = {ai_tags}")
                 
                 logger.info(f"Batch AI generated independent tags for {len(messages)} messages")
@@ -945,6 +991,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 # 清除等待状态
                 context.user_data['waiting_note_for_archive'] = None
+                # 定期清理user_data中的过期数据
+                if len(context.user_data) > 10:
+                    logger.warning(f"user_data size exceeds 10: {len(context.user_data)}, cleaning up")
+                    context.user_data.clear()
                 return
         
         # 检查是否在等待笔记精炼指令
@@ -1013,6 +1063,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 # 清除等待状态
                 context.user_data.pop('refine_note_context', None)
+                # 清理其他可能的临时数据
+                context.user_data.pop('waiting_note_for_archive', None)
+                context.user_data.pop('note_modify_mode', None)
+                context.user_data.pop('note_id_to_modify', None)
+                context.user_data.pop('note_append_mode', None)
+                context.user_data.pop('note_id_to_append', None)
                 return
 
         
@@ -1035,7 +1091,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 session = session_manager.get_session(user_id)
                 
                 if session:
-                    # 用户已在AI会话中，处理消息
+                    # 用户已在AI会话中，检查是否为长文本（可能是笔记意图）
+                    long_text_threshold = 100  # 100字符阈值
+                    
+                    if len(text) >= long_text_threshold:
+                        # 长文本，提示用户选择意图
+                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                        
+                        if lang_ctx.language == 'en':
+                            prompt_text = f"📝 You sent {len(text)} characters. What do you want to do?"
+                            note_btn_text = "📝 Save as Note"
+                            chat_btn_text = "💬 Continue Chat"
+                        elif lang_ctx.language in ['zh-TW', 'zh-HK', 'zh-MO']:
+                            prompt_text = f"📝 您發送了 {len(text)} 個字符。您想做什麼？"
+                            note_btn_text = "📝 記錄為筆記"
+                            chat_btn_text = "💬 繼續對話"
+                        else:
+                            prompt_text = f"📝 您发送了 {len(text)} 个字符。您想做什么？"
+                            note_btn_text = "📝 记录为笔记"
+                            chat_btn_text = "💬 继续对话"
+                        
+                        keyboard = [
+                            [
+                                InlineKeyboardButton(note_btn_text, callback_data=f"longtxt_note:{message.message_id}"),
+                                InlineKeyboardButton(chat_btn_text, callback_data=f"longtxt_chat:{message.message_id}")
+                            ]
+                        ]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        
+                        await message.reply_text(
+                            prompt_text,
+                            reply_markup=reply_markup
+                        )
+                        
+                        # 暂存消息内容，等待用户选择
+                        if 'pending_long_text' not in session.get('context', {}):
+                            session['context']['pending_long_text'] = {}
+                        session['context']['pending_long_text'][str(message.message_id)] = text
+                        session_manager.update_session(user_id, session.get('context', {}))
+                        
+                        logger.info(f"Long text detected ({len(text)} chars), awaiting user choice")
+                        return
+                    
+                    # 正常长度，处理消息
                     try:
                         # 发送AI处理进度提示
                         progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")

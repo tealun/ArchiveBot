@@ -309,7 +309,7 @@ def main():
                     return
                 
                 # 检查是否需要备份（基于配置的间隔）
-                backup_interval = config.get('backup.auto_interval_hours', 24)
+                backup_interval = config.get('backup.auto_interval_hours', 168)
                 if backup_mgr.auto_backup_check(interval_hours=backup_interval):
                     logger.info(f"Auto backup triggered (interval: {backup_interval}h)")
                     filename = backup_mgr.create_backup(description="Auto backup")
@@ -322,15 +322,38 @@ def main():
             except Exception as e:
                 logger.error(f"Error in auto backup job: {e}", exc_info=True)
         
-        # 添加定时任务（每小时检查一次）
+        # 内存清理任务
+        async def cleanup_job(context: ContextTypes.DEFAULT_TYPE):
+            """定期清理任务：释放未使用的内存"""
+            try:
+                # 清理AI会话
+                from src.core.ai_session import get_session_manager
+                session_mgr = get_session_manager()
+                session_mgr.cleanup_expired()
+                
+                # 清理AI缓存（如果启用）
+                ai_sum = context.bot_data.get('ai_summarizer')
+                if ai_sum and hasattr(ai_sum, 'cache') and ai_sum.cache:
+                    ai_sum.cache.cleanup()
+                
+                logger.debug("Memory cleanup completed")
+            except Exception as e:
+                logger.error(f"Error in cleanup job: {e}")
+        
+        # 添加定时任务
         job_queue = application.job_queue
         if job_queue:
-            # 启动后1分钟执行首次检查，然后每小时执行一次
-            job_queue.run_once(auto_backup_job, when=60)  # 1分钟后首次执行
-            job_queue.run_repeating(auto_backup_job, interval=3600, first=60)  # 每小时执行
-            logger.info("✓ Auto backup scheduler started (check interval: 1 hour)")
+            # 自动备份：启动后1分钟首次检查，然后每天检查一次（配置168h=7天备份一次）
+            job_queue.run_once(auto_backup_job, when=60)
+            job_queue.run_repeating(auto_backup_job, interval=86400, first=60)  # 每24小时检查
+            logger.info("✓ Auto backup scheduler started (check: daily, backup: every 7 days per config)")
+            
+            # 内存清理：启动后5分钟，然后每30分钟
+            job_queue.run_once(cleanup_job, when=300)
+            job_queue.run_repeating(cleanup_job, interval=1800, first=300)
+            logger.info("✓ Memory cleanup scheduler started (interval: 30 minutes)")
         else:
-            logger.warning("JobQueue not available - auto backup disabled")
+            logger.warning("JobQueue not available - auto backup and cleanup disabled")
         
         # 设置机器人命令菜单（多语言支持）
         from telegram import BotCommand

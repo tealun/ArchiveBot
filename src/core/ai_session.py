@@ -75,6 +75,7 @@ class AISessionManager:
         return data
 
     def clear_session(self, session_id: str) -> bool:
+        """清除会话（包括pending数据清理）"""
         p = _session_path(session_id)
         try:
             if p.exists():
@@ -84,7 +85,9 @@ class AISessionManager:
             return False
 
     def cleanup_expired(self):
+        """清理过期会话（包括pending数据）"""
         now = int(time.time())
+        cleaned = 0
         for p in SESSIONS_DIR.glob("*.json"):
             try:
                 with p.open("r", encoding="utf-8") as f:
@@ -92,11 +95,15 @@ class AISessionManager:
                 last_active = int(data.get("last_active", data.get("created_at", now)))
                 if now - last_active > self.ttl:
                     p.unlink()
+                    cleaned += 1
             except Exception:
                 try:
                     p.unlink()
+                    cleaned += 1
                 except Exception:
                     pass
+        if cleaned > 0:
+            logger.info(f"Cleaned {cleaned} expired sessions")
 
 
 _default_session_manager: Optional[AISessionManager] = None

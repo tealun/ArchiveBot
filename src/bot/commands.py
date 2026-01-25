@@ -313,6 +313,10 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE, l
         lang_ctx: Language context
     """
     try:
+        # Get current language name
+        current_lang_key = f"language_name_{lang_ctx.language}"
+        current_language = lang_ctx.t(current_lang_key)
+        
         # Create language selection keyboard
         keyboard = [
             [
@@ -327,7 +331,7 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE, l
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            lang_ctx.t('language_select'),
+            lang_ctx.t('language_select', current_language=current_language),
             reply_markup=reply_markup
         )
         

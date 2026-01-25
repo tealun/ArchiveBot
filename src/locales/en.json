@@ -23,7 +23,10 @@
   
   "language_changed": "✅ Language changed to English",
   
-  "language_select": "🌍 Select Language:\n\n Please choose your preferred language:",
+  "language_select": "🌍 Select Language\n\n📍 Current Language: {current_language}\n\nPlease choose your preferred language:",
+  "language_name_en": "English",
+  "language_name_zh-CN": "简体中文 (Simplified Chinese)",
+  "language_name_zh-TW": "繁體中文 (Traditional Chinese)",
   
   "processing": "⏳ Processing...",
   

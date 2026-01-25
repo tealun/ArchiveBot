@@ -54,6 +54,7 @@ class ChatPrompts:
         "need_statistics": true/false,
         "need_sample_archives": true/false,
         "need_tags_analysis": true/false,
+        "need_recent_context": true/false,  # 如果提到「最近」「剛才」等時間詞
         "resource_query": {{  # 如果用戶需要實際文件/圖片/視頻等資源
             "enabled": true/false,
             "type": "random|search|filter",  # 隨機/搜尋/篩選
@@ -98,6 +99,7 @@ class ChatPrompts:
         "need_statistics": true/false,
         "need_sample_archives": true/false,
         "need_tags_analysis": true/false,
+        "need_recent_context": true/false,  # 如果提到「最近」「刚才」等时间词
         "resource_query": {{  # 如果用户需要实际文件/图片/视频等资源
             "enabled": true/false,
             "type": "random|search|filter",  # 随机/搜索/筛选
@@ -147,8 +149,7 @@ Please understand the user's need and plan the response. Return JSON (no markdow
         "search_keywords": "If search needed, extract keywords; otherwise null",
         "need_statistics": true/false,
         "need_sample_archives": true/false,
-        "need_tags_analysis": true/false,
-        "resource_query": {{  # If user needs actual files/photos/videos/resources
+        "need_tags_analysis": true/false,        "need_recent_context": true/false,  # If mentions "recent" "lately" "just" etc time words        "resource_query": {{  # If user needs actual files/photos/videos/resources
             "enabled": true/false,
             "type": "random|search|filter",  # random/search/filter
             "content_types": ["photo", "video", "document"],  # type filter, null=any
@@ -184,7 +185,8 @@ Return JSON only."""
         plan: dict,
         data_summary: str,
         language: str,
-        conversation_history: list = None
+        conversation_history: list = None,
+        knowledge_base: str = None  # 新增：知识库参数
     ) -> dict:
         """
         Get prompt for generating final response
@@ -195,6 +197,7 @@ Return JSON only."""
             data_summary: Gathered data summary
             language: Language code
             conversation_history: Previous conversation messages
+            knowledge_base: System knowledge base content (optional)
             
         Returns:
             Message list for API call
@@ -202,11 +205,11 @@ Return JSON only."""
         if language.startswith('zh'):
             is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
             return ChatPrompts._get_response_prompt_zh(
-                user_message, plan, data_summary, conversation_history, is_traditional
+                user_message, plan, data_summary, conversation_history, is_traditional, knowledge_base
             )
         else:
             return ChatPrompts._get_response_prompt_en(
-                user_message, plan, data_summary, conversation_history
+                user_message, plan, data_summary, conversation_history, knowledge_base
             )
     
     @staticmethod
@@ -215,10 +218,16 @@ Return JSON only."""
         plan: dict,
         data_summary: str,
         conversation_history: list = None,
-        is_traditional: bool = False
+        is_traditional: bool = False,
+        knowledge_base: str = None  # 新增：知识库
     ) -> dict:
         """Chinese response prompt"""
         question_type = plan.get('question_type', 'open')
+        
+        # 如果有知识库内容，添加到系统消息
+        kb_section = ""
+        if knowledge_base:
+            kb_section = f"\n\n【系统知识库】\n以下是关于ArchiveBot使用的参考资料，优先基于此回答：\n{knowledge_base}\n"
         
         if is_traditional:
             if question_type == 'precise':
@@ -241,7 +250,7 @@ Return JSON only."""
 用戶需求：{plan.get('user_goal', '未知')}
 問題類型：{question_type}
 回覆策略：{plan.get('response_strategy', '友好回覆')}
-
+{kb_section}
 {style_guide}
 
 通用要求：
@@ -336,10 +345,16 @@ Return JSON only."""
         user_message: str,
         plan: dict,
         data_summary: str,
-        conversation_history: list = None
+        conversation_history: list = None,
+        knowledge_base: str = None  # 新增：知识库
     ) -> dict:
         """English response prompt"""
         question_type = plan.get('question_type', 'open')
+        
+        # 如果有知识库内容，添加到系统消息
+        kb_section = ""
+        if knowledge_base:
+            kb_section = f"\n\n【Knowledge Base】\nReference documentation about ArchiveBot usage (answer based on this first):\n{knowledge_base}\n"
         
         if question_type == 'precise':
             style_guide = """Style requirements (Precise mode):
@@ -361,7 +376,7 @@ Return JSON only."""
 User need: {plan.get('user_goal', 'Unknown')}
 Question type: {question_type}
 Response strategy: {plan.get('response_strategy', 'Friendly reply')}
-
+{kb_section}
 {style_guide}
 
 General requirements:

@@ -135,13 +135,17 @@ class MessageAggregator:
         self._batches: Dict[str, MessageBatch] = {}  # chat_id -> MessageBatch
         self._media_groups: Dict[str, MessageBatch] = {}  # media_group_id -> MessageBatch
         
-        # 处理锁
-        self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        # 处理锁（限制数量避免内存泄漏）
+        self._locks: Dict[str, asyncio.Lock] = {}
+        self._max_locks = 100  # 最多保留100个锁
         
         # 定时器
         self._timers: Dict[str, asyncio.Task] = {}
         
-        logger.info(f"MessageAggregator initialized: window={batch_window_ms}ms, max_batch={max_batch_size}")
+        # 清理计数器（每处理100个批次清理一次）
+        self._processed_count = 0
+        
+        logger.info(f"MessageAggregator initialized: window={batch_window_ms}ms, max_batch={max_batch_size}, max_locks={self._max_locks}")
     
     async def process_message(
         self,
@@ -160,6 +164,15 @@ class MessageAggregator:
         """
         chat_id = str(message.chat_id)
         media_group_id = message.media_group_id
+        
+        # 获取或创建锁（限制数量）
+        if chat_id not in self._locks:
+            if len(self._locks) >= self._max_locks:
+                # 清理最旧的锁（简单策略：清理第一个）
+                oldest_key = next(iter(self._locks))
+                self._locks.pop(oldest_key, None)
+                logger.debug(f"Lock cache full, removed oldest: {oldest_key}")
+            self._locks[chat_id] = asyncio.Lock()
         
         async with self._locks[chat_id]:
             # 处理media_group（Telegram原生批量）
@@ -288,14 +301,32 @@ class MessageAggregator:
                 else:
                     self._batches.pop(batch_id, None)
                 self._timers.pop(batch_id, None)
+                
+                # 定期清理锁（每处理100个批次）
+                self._processed_count += 1
+                if self._processed_count >= 100:
+                    self._cleanup_inactive_locks()
+                    self._processed_count = 0
         
         task = asyncio.create_task(process_after_timeout())
         self._timers[batch_id] = task
+    
+    def _cleanup_inactive_locks(self):
+        """清理不活跃的锁（没有对应批次的）"""
+        active_ids = set(self._batches.keys()) | set(self._media_groups.keys())
+        inactive_locks = [k for k in self._locks.keys() if k not in active_ids]
+        
+        for lock_id in inactive_locks:
+            self._locks.pop(lock_id, None)
+        
+        if inactive_locks:
+            logger.debug(f"Cleaned {len(inactive_locks)} inactive locks, remaining: {len(self._locks)}")
     
     def get_stats(self) -> Dict:
         """Get aggregator statistics"""
         return {
             'active_batches': len(self._batches),
             'active_media_groups': len(self._media_groups),
-            'active_timers': len(self._timers)
+            'active_timers': len(self._timers),
+            'cached_locks': len(self._locks)
         }

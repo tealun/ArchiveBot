@@ -10,6 +10,7 @@ from telegram import Message
 
 from ..utils.helpers import is_url, extract_urls, extract_hashtags
 from ..utils.constants import EBOOK_EXTENSIONS
+from ..utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ class ContentAnalyzer:
             Dictionary containing analysis results
         """
         try:
+            config = get_config()
+            
             result = {
                 'content_type': None,
                 'title': None,
@@ -45,9 +48,18 @@ class ContentAnalyzer:
                 'created_at': message.date.isoformat() if message.date else datetime.now().isoformat(),
             }
             
-            # Extract hashtags from caption or text
+            # Extract hashtags from caption or text (根据配置)
             text = message.caption or message.text or ''
-            result['hashtags'] = extract_hashtags(text)
+            extract_from_caption = config.get('features.extract_tags_from_caption', False)
+            
+            # 如果启用从caption提取，或者是非转发消息（用户自己输入的），才提取标签
+            is_forwarded = bool(message.forward_origin)
+            should_extract = extract_from_caption or not is_forwarded
+            
+            if should_extract and text:
+                result['hashtags'] = extract_hashtags(text)
+            else:
+                result['hashtags'] = []
             
             # Determine source (收藏来源)
             source_parts = []

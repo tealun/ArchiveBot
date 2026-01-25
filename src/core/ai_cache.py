@@ -75,6 +75,21 @@ class AICache:
         )
         self._conn.commit()
 
+    def cleanup(self) -> int:
+        """清理过期缓存条目"""
+        try:
+            cur = self._conn.cursor()
+            now = int(time.time())
+            cur.execute("DELETE FROM ai_cache WHERE ? - created_at > ?", (now, self.ttl))
+            deleted = cur.rowcount
+            self._conn.commit()
+            if deleted > 0:
+                logger.info(f"AI cache cleanup: removed {deleted} expired entries")
+            return deleted
+        except Exception as e:
+            logger.error(f"AI cache cleanup error: {e}")
+            return 0
+    
     def close(self):
         try:
             self._conn.close()

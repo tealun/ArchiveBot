@@ -6,9 +6,11 @@ bot:
   owner_id: 0  # 你的 Telegram ID，从 @userinfobot 获取
   language: "zh-CN"  # 界面语言: en, zh-CN, zh-TW
   polling_interval: 1  # 轮询间隔（秒）
+  feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # 用户反馈链接
 
 features:
   auto_tag: true  # 自动生成类型标签
+  extract_tags_from_caption: false  # 从转发消息caption中提取#标签（默认关闭，避免标签污染）
   enable_fts: true  # 启用全文搜索
   enable_ocr: false  # 启用图片OCR识别
 
@@ -16,6 +18,7 @@ ai:
   enabled: false  # 启用AI功能
   auto_summarize: false  # 自动总结新归档内容
   auto_generate_tags: false  # 自动生成AI标签
+  max_generated_tags: 8  # AI自动生成标签的最大数量（5-10为佳，默认8）
 
   # 统一AI配置（推荐）。为避免硬编码密钥，建议通过环境变量设置API密钥
   # 并在 api.api_key_env 中引用环境变量名称
@@ -44,6 +47,7 @@ ai:
   chat_enabled: false           # 启用短消息自动AI聊天模式
   chat_threshold_chars: 30      # 当用户消息短于此长度时触发聊天模式（排除转发消息）
   chat_session_ttl_seconds: 600 # 会话超时时间（默认10分钟）
+  chat_history_length: 10       # 会话历史保留消息对数（默认10，即20条消息）
   chat_allow_write_ops: false   # 允许AI执行写操作（归档/删除/标签）- 为安全起见保持false
   
   # AI参考内容排除配置（用于AI互动模式的上下文数据过滤）
@@ -62,7 +66,7 @@ storage:
     path: "data/archive.db"  # 数据库文件路径
   
   backup:
-    auto_interval_hours: 24  # 自动备份间隔（小时），默认24小时
+    auto_interval_hours: 168  # 自动备份间隔（小时），默认168小时（7天/每周）
     keep_count: 10           # 保留备份数量，默认保留最近10个
   
   telegram:

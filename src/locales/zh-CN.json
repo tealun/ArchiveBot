@@ -24,7 +24,10 @@
   
   "language_changed": "✅ 语言已切换为简体中文",
   
-  "language_select": "🌍 选择语言：\n\n请选择您偏好的语言：",
+  "language_select": "🌍 选择语言\n\n📍 当前语言：{current_language}\n\n请选择您偏好的语言：",
+  "language_name_en": "English",
+  "language_name_zh-CN": "简体中文",
+  "language_name_zh-TW": "繁體中文",
   
   "processing": "⏳ 处理中...",
   

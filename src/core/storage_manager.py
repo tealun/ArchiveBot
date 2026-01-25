@@ -110,7 +110,7 @@ class StorageManager:
                 metadata = {
                     'file_id': analysis.get('file_id'),
                     'content_type': content_type,
-                    'caption': analysis.get('title') or analysis.get('content'),
+                    'caption': analysis.get('content') or analysis.get('title'),  # 使用content（含批注），回退到title
                     'file_size': analysis.get('file_size', 0)
                 }
                 
@@ -586,10 +586,12 @@ class StorageManager:
         file_id = analysis.get('file_id')
         file_size = analysis.get('file_size', 0)
         
-        # 检查必需字段
-        if not file_id:
-            logger.error(f"No file_id in analysis for {content_type}")
-            return None
+        # 文本和链接类型不需要file_id
+        if content_type not in ['text', 'link']:
+            # 检查必需字段
+            if not file_id:
+                logger.error(f"No file_id in analysis for {content_type}")
+                return None
         
         # 确定存储频道（根据多种规则）
         target_channel_id = self._determine_channel_id(
@@ -599,10 +601,12 @@ class StorageManager:
             is_direct_send=is_direct_send
         )
         
-        # 构建metadata（统一使用file_id转发，简单可靠）
+        # 构建metadata
         metadata = {
             'file_id': file_id,
             'content_type': content_type,
+            'title': analysis.get('title'),
+            'content': analysis.get('content'),  # 文本和链接需要content字段
             'caption': analysis.get('title') or analysis.get('content'),
             'file_size': file_size
         }
@@ -612,7 +616,7 @@ class StorageManager:
             metadata['override_channel_id'] = target_channel_id
             logger.info(f"Using specific channel {target_channel_id} for this storage")
         
-        logger.info(f"Forwarding {content_type} to Telegram channel: file_id={file_id[:20]}..., size={format_file_size(file_size) if file_size else 'unknown'}")
+        logger.info(f"Forwarding {content_type} to Telegram channel: file_id={file_id[:20] if file_id else 'text/link'}..., size={format_file_size(file_size) if file_size else 'N/A'}")
         
         try:
             storage_path = await self.telegram_storage.store(None, metadata)
@@ -627,8 +631,8 @@ class StorageManager:
     
     def _determine_storage_type(self, content_type: str, file_size: Optional[int]) -> str:
         """
-        简化的存储策略：
-        - 文本/链接 -> database
+        双存储策略优化：
+        - 文本/链接 -> database + telegram频道（双存储，数据库为主，频道为辅助浏览）
         - 媒体文件 (<2GB) -> telegram频道 (file_id永久有效)
         - 超大文件 (>2GB) -> reference (仅存储元数据)
         
@@ -637,10 +641,20 @@ class StorageManager:
             file_size: File size in bytes
             
         Returns:
-            Storage type
+            Storage type (返回STORAGE_TELEGRAM表示需要存储到频道)
         """
-        # 文本和链接存数据库
-        if content_type in ['text', 'link', 'contact', 'location']:
+        # 文本和链接：同时存数据库+频道（但标记为STORAGE_TELEGRAM让其发送到频道）
+        # 数据库存储在archive_content中会自动进行
+        if content_type in ['text', 'link']:
+            if self.telegram_storage and self.telegram_storage.is_available():
+                logger.debug(f"{content_type} -> database + telegram (dual storage)")
+                return STORAGE_TELEGRAM  # 返回TELEGRAM表示需要发送到频道
+            else:
+                logger.debug(f"{content_type} -> database only (telegram unavailable)")
+                return STORAGE_DATABASE
+        
+        # contact和location仍然只存数据库
+        if content_type in ['contact', 'location']:
             return STORAGE_DATABASE
         
         # 无文件大小信息，存为引用
