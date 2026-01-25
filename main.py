@@ -164,12 +164,19 @@ def main():
         # Initialize Telegram storage if channel is configured
         telegram_storage = None
         if config.telegram_storage_enabled:
-            # 构建telegram配置
+            # 构建telegram配置（从环境变量或YAML获取）
             telegram_config = {
                 'enabled': True,
-                'channel_id': config.telegram_channel_id,  # 向后兼容
-                'channels': config.telegram_channels,
-                'type_mapping': config.telegram_type_mapping
+                'channel_id': config.get('storage.telegram.channels.default') or config.telegram_channel_id,  # 向后兼容
+                'channels': {
+                    'default': config.get('storage.telegram.channels.default'),
+                    'text': config.get('storage.telegram.channels.text'),
+                    'ebook': config.get('storage.telegram.channels.ebook'),
+                    'document': config.get('storage.telegram.channels.document'),
+                    'image': config.get('storage.telegram.channels.image'),
+                    'media': config.get('storage.telegram.channels.media'),
+                },
+                'type_mapping': config.get('storage.telegram.type_mapping', {})
             }
             
             telegram_storage = TelegramStorage(
@@ -178,11 +185,11 @@ def main():
             )
             
             # 获取配置的频道数量
-            channels_count = len(telegram_config['channels'])
+            channels_count = len([v for v in telegram_config['channels'].values() if v])
             if channels_count > 0:
                 logger.info(f"Telegram storage enabled: {channels_count} channels configured")
             else:
-                logger.info(f"Telegram storage enabled: single channel mode (channel_id={config.telegram_channel_id})")
+                logger.info(f"Telegram storage enabled: single channel mode (channel_id={telegram_config['channel_id']})")
         else:
             logger.warning("Telegram storage not configured - files will be stored as references only")
         

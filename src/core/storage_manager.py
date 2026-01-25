@@ -194,11 +194,49 @@ class StorageManager:
                         self.tag_manager.add_tags_to_archive(archive_id, unique_ai_tags, 'ai')
                         all_tags.extend(unique_ai_tags)
                 
-                # Success message (简化版)
+                # Success message (使用和单个归档相同的格式)
                 storage_name = self.i18n.t(f'storage_{storage_type}')
                 tags_display = self.tag_manager.format_tags_for_display(all_tags)
+                source_display = analysis.get('source', '直接发送')
                 
-                success_msg = f"✅ {self.i18n.t(f'tag_{content_type}')} | 🏷️ {tags_display}"
+                # 构建标题链接（使用HTML格式）
+                title = analysis.get('title', '')
+                title_link = ''
+                if title and storage_path and storage_provider == 'telegram_channel':
+                    # 解析storage_path获取频道和消息ID
+                    parts = storage_path.split(':')
+                    if len(parts) >= 2:
+                        channel_id_str = parts[0].replace('-100', '')
+                        message_id = parts[1]
+                        file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
+                        title_link = f"📚 标题: <a href='{file_link}'>{title}</a>\n"
+                elif title:
+                    title_link = f"📚 标题: {title}\n"
+                
+                # 构建成功消息
+                file_size = analysis.get('file_size', 0)
+                if content_type not in ['text', 'link'] and file_size > 0:
+                    success_msg = self.i18n.t(
+                        'archive_success_with_size',
+                        title_link=title_link,
+                        content_type=self.i18n.t(f'tag_{content_type}'),
+                        file_size=format_file_size(file_size),
+                        tags=tags_display if tags_display else self.i18n.t('tag_text'),
+                        storage_type=storage_name,
+                        source=source_display,
+                        time=format_datetime()
+                    )
+                else:
+                    success_msg = self.i18n.t(
+                        'archive_success',
+                        title_link=title_link,
+                        content_type=self.i18n.t(f'tag_{content_type}'),
+                        tags=tags_display if tags_display else self.i18n.t('tag_text'),
+                        storage_type=storage_name,
+                        source=source_display,
+                        time=format_datetime()
+                    )
+                
                 results.append((True, success_msg))
                 
                 # 更新进度
