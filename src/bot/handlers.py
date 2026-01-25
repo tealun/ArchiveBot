@@ -668,77 +668,69 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
         shared_hashtags = extract_hashtags(merged_caption)
         logger.info(f"Extracted shared hashtags from caption: {shared_hashtags}")
     
-    # 阶段3: AI处理 (20-50%)
+    # 阶段3: AI处理 (20-50%) - 批量消息只分析一次合并的caption
     if progress_callback:
         await progress_callback(0, total, lang_ctx.t('batch_progress_ai_generating_tags'))
     
-    # 批量AI处理 - 为每个内容独立生成AI标签（并发执行，但不共享）
+    # 批量AI处理 - 只对合并的caption+用户评论调用一次AI
+    shared_ai_result = {'tags': [], 'title': None, 'summary': None}
     ai_summarizer = context.bot_data.get('ai_summarizer')
     if ai_summarizer and ai_summarizer.is_available():
         from ..utils.config import get_config
         config = get_config()
         
-        # 批量生成AI标签（每个内容独立）
-        if config.ai.get('auto_generate_tags', False):
+        # 只分析一次：使用merged_caption（包含用户评论）
+        if config.ai.get('auto_generate_tags', False) and merged_caption:
             try:
-                # 准备每个内容的文本
-                contents_for_ai = [
-                    analysis.get('content') or analysis.get('title', '')
-                    for analysis in analyses
-                ]
-                
-                # 批量并发调用AI（但每个内容获得独立标签）
                 start = time.time()
-                # 获取配置的最大标签数量（批量时使用较少标签）
                 max_tags = config.ai.get('max_generated_tags', 8)
                 max_tags = max(3, min(max_tags, 5))  # 批量时限制在3-5之间
                 
-                batch_ai_tags = await ai_summarizer.batch_generate_tags(contents_for_ai, max_tags, language=lang_ctx.language)
+                # 生成标签
+                ai_tags = await ai_summarizer.generate_tags(merged_caption, max_tags, language=lang_ctx.language)
                 duration = time.time() - start
-                provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'batch')
-                logger.info(f"AI batch_generate_tags provider={provider}, duration={duration:.2f}s, max_tags={max_tags}")
+                provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'single')
+                logger.info(f"Batch AI single analysis: provider={provider}, duration={duration:.2f}s, tags={ai_tags}")
                 
-                # 为每个分析结果添加其独立的AI标签
-                for i, ai_tags in enumerate(batch_ai_tags):
-                    if ai_tags:
-                        existing_tags = analyses[i].get('tags', [])
-                        
-                        # 智能甄别caption标签（批量）
-                        extract_from_caption = config.get('features.extract_tags_from_caption', False)
-                        if not extract_from_caption and messages[i].caption:
-                            caption_tags = extract_hashtags(messages[i].caption)
-                            if caption_tags:
-                                filtered_caption_tags = [
-                                    ctag for ctag in caption_tags
-                                    if any(ai_tag.lower() in ctag.lower() or ctag.lower() in ai_tag.lower() for ai_tag in ai_tags)
-                                ]
-                                analyses[i]['tags'] = list(set(existing_tags + ai_tags + filtered_caption_tags))
-                                if filtered_caption_tags:
-                                    logger.debug(f"Item {i}: Filtered caption tags = {filtered_caption_tags}")
-                            else:
-                                analyses[i]['tags'] = list(set(existing_tags + ai_tags))
-                        else:
-                            analyses[i]['tags'] = list(set(existing_tags + ai_tags))
-                        
-                        logger.debug(f"Item {i}: AI tags = {ai_tags}")
+                if ai_tags:
+                    shared_ai_result['tags'] = ai_tags
                 
-                logger.info(f"Batch AI generated independent tags for {len(messages)} messages")
+                # 生成标题（限制32字符）
+                if config.ai.get('auto_generate_title', False):
+                    ai_title = await ai_summarizer.generate_title(merged_caption, language=lang_ctx.language)
+                    if ai_title:
+                        shared_ai_result['title'] = ai_title[:32]
+                        logger.info(f"Batch AI generated title: {shared_ai_result['title']}")
+                
+                logger.info(f"Batch AI shared analysis completed")
             except Exception as e:
-                logger.warning(f"Batch AI tag generation failed: {e}")
+                logger.warning(f"Batch AI analysis failed: {e}")
     
     if progress_callback:
         await progress_callback(total, total, lang_ctx.t('batch_progress_ai_generating_tags'))
     
-    # 阶段4: 应用标签 (50-60%)
+    # 阶段4: 应用标签和AI结果 (50-60%)
     if progress_callback:
         await progress_callback(0, total, lang_ctx.t('batch_progress_applying_tags'))
     
-    # 应用共享的hashtags到所有分析结果
+    # 应用共享的AI分析结果和hashtags到所有分析结果
     for i, analysis in enumerate(analyses):
         # 添加共享的hashtags（用户手动标签）
         if shared_hashtags:
             existing_hashtags = analysis.get('hashtags', [])
             analysis['hashtags'] = list(set(existing_hashtags + shared_hashtags))
+        
+        # 添加共享的AI标签到所有item
+        if shared_ai_result['tags']:
+            existing_tags = analysis.get('tags', [])
+            analysis['tags'] = list(set(existing_tags + shared_ai_result['tags']))
+        
+        # 使用共享的AI标题（如果有），否则截取caption前32字符
+        if shared_ai_result['title']:
+            analysis['title'] = shared_ai_result['title']
+        elif merged_caption and not analysis.get('title'):
+            # 截取caption前32字符作为标题
+            analysis['title'] = merged_caption[:32] + ('...' if len(merged_caption) > 32 else '')
         
         # 第一条消息附加caption到content（作为批注）
         if i == 0 and merged_caption:

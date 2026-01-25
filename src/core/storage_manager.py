@@ -194,40 +194,27 @@ class StorageManager:
                         self.tag_manager.add_tags_to_archive(archive_id, unique_ai_tags, 'ai')
                         all_tags.extend(unique_ai_tags)
                 
-                # Success message (使用和单个归档相同的格式)
-                storage_name = self.i18n.t(f'storage_{storage_type}')
-                tags_display = self.tag_manager.format_tags_for_display(all_tags)
-                source_display = analysis.get('source', '直接发送')
+                # Success message (使用MessageBuilder统一构建)
+                from ..utils.message_builder import MessageBuilder
                 
-                # 构建标题链接（使用HTML格式）
-                title = analysis.get('title', '')
-                title_link = ''
-                if title and storage_path and storage_provider == 'telegram_channel':
-                    # 解析storage_path获取频道和消息ID
-                    parts = storage_path.split(':')
-                    if len(parts) >= 2:
-                        channel_id_str = parts[0].replace('-100', '')
-                        message_id = parts[1]
-                        file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                        title_link = f"📚 标题: <a href='{file_link}'>{title}</a>\n"
-                elif title:
-                    title_link = f"📚 标题: {title}\n"
-                
-                # 构建成功消息
-                file_size = analysis.get('file_size', 0)
-                if content_type not in ['text', 'link'] and file_size > 0:
-                    success_msg = self.i18n.t(
-                        'archive_success_with_size',
-                        title_link=title_link,
-                        content_type=self.i18n.t(f'tag_{content_type}'),
-                        file_size=format_file_size(file_size),
-                        tags=tags_display if tags_display else self.i18n.t('tag_text'),
-                        storage_type=storage_name,
-                        source=source_display,
-                        time=format_datetime()
-                    )
-                else:
-                    success_msg = self.i18n.t(
+                success_msg = MessageBuilder.build_archive_success_message(
+                    archive_data={
+                        'title': analysis.get('title'),
+                        'content': analysis.get('content'),
+                        'content_type': content_type,
+                        'file_size': analysis.get('file_size', 0),
+                        'tags': all_tags,
+                        'storage_type': storage_type,
+                        'storage_provider': storage_provider,
+                        'storage_path': storage_path,
+                        'source': analysis.get('source', '直接发送'),
+                        'ai_summary': analysis.get('ai_summary'),
+                        'ai_category': analysis.get('ai_category'),
+                        'ai_key_points': analysis.get('ai_key_points', [])
+                    },
+                    i18n=self.i18n,
+                    include_ai_info=True
+                )
                         'archive_success',
                         title_link=title_link,
                         content_type=self.i18n.t(f'tag_{content_type}'),
@@ -358,119 +345,27 @@ class StorageManager:
                     all_tags.extend(unique_ai_tags)
                     logger.info(f"Added AI tags: {unique_ai_tags}")
             
-            # Format success message
-            storage_name = self.i18n.t(f'storage_{storage_type}')
-            tags_display = self.tag_manager.format_tags_for_display(all_tags)
-            source_display = analysis.get('source', '直接发送')
+            # Format success message (使用MessageBuilder统一构建)
+            from ..utils.message_builder import MessageBuilder
             
-            # 构建标题链接（使用HTML格式）
-            title = analysis.get('title', '')
-            title_link = ''
-            if title and storage_path and storage_provider == 'telegram_channel':
-                # 获取频道ID
-                from ..utils.config import get_config
-                config = get_config()
-                channel_id = config.telegram_channel_id
-                if channel_id:
-                    # 解析storage_path: 可能是 "message_id" 或 "channel_id:message_id" 或 "channel_id:message_id:file_id"
-                    parts = storage_path.split(':')
-                    if len(parts) >= 2:
-                        # 格式: channel_id:message_id:file_id
-                        channel_id_str = parts[0].replace('-100', '')
-                        message_id = parts[1]
-                    else:
-                        # 格式: message_id（使用配置的channel_id）
-                        channel_id_str = str(channel_id).replace('-100', '')
-                        message_id = storage_path
-                    
-                    file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                    # 使用HTML格式的链接
-                    title_link = f"📚 标题: <a href='{file_link}'>{title}</a>\n"
-                    logger.debug(f"Generated title link: {file_link} for content_type={content_type}")
-            elif title:
-                title_link = f"📚 标题: {title}\n"
-                logger.debug(f"Generated plain title (no link) for content_type={content_type}, storage_provider={storage_provider}")
-            
-            # 对于非文本和非链接类型，显示文件大小
-            file_size = analysis.get('file_size', 0)
-            if content_type not in ['text', 'link'] and file_size > 0:
-                success_msg = self.i18n.t(
-                    'archive_success_with_size',
-                    title_link=title_link,
-                    content_type=self.i18n.t(f'tag_{content_type}'),
-                    file_size=format_file_size(file_size),
-                    tags=tags_display if tags_display else self.i18n.t('tag_text'),
-                    storage_type=storage_name,
-                    source=source_display,
-                    time=format_datetime()
-                )
-            else:
-                success_msg = self.i18n.t(
-                    'archive_success',
-                    title_link=title_link,
-                    content_type=self.i18n.t(f'tag_{content_type}'),
-                    tags=tags_display if tags_display else self.i18n.t('tag_text'),
-                    storage_type=storage_name,
-                    source=source_display,
-                    time=format_datetime()
-                )
-            
-            # 注意：此消息需要用 parse_mode='HTML' 发送
-            
-            # 添加存档频道信息和跳转链接
-            if storage_provider == STORAGE_TELEGRAM and storage_path:
-                parts = storage_path.split(':')
-                if len(parts) >= 2:
-                    # 解析频道ID和消息ID
-                    channel_id_from_path = int(parts[0])
-                    message_id_from_path = parts[1]
-                    
-                    # 获取频道名称
-                    config = get_config()
-                    all_channels = config.get('storage.telegram.channels', {})
-                    
-                    # 查找频道名称
-                    channel_name = None
-                    for name, ch_id in all_channels.items():
-                        if ch_id == channel_id_from_path:
-                            channel_name_map = {
-                                'default': '默认',
-                                'text': '文本',
-                                'ebook': '电子书',
-                                'document': '文档',
-                                'image': '图片',
-                                'media': '媒体'
-                            }
-                            channel_name = channel_name_map.get(name, name)
-                            break
-                    
-                    if not channel_name:
-                        channel_name = f'ID:{channel_id_from_path}'
-                    
-                    # 生成跳转链接
-                    channel_id_str = str(channel_id_from_path).replace('-100', '')
-                    view_link = f"https://t.me/c/{channel_id_str}/{message_id_from_path}"
-                    
-                    success_msg += f"\n\n📂 已存档到 <a href='{view_link}'>{channel_name}频道</a>，点击查看"
-            
-            # 添加AI分析信息（如果有）
-            ai_summary = analysis.get('ai_summary', '')
-            ai_key_points = analysis.get('ai_key_points', [])
-            ai_category = analysis.get('ai_category', '')
-            
-            if ai_summary or ai_key_points or ai_category:
-                success_msg += "\n\n🤖 AI智能分析："
-                
-                if ai_category:
-                    success_msg += f"\n📁 分类：{ai_category}"
-                
-                if ai_summary:
-                    success_msg += f"\n📝 摘要：{ai_summary}"
-                
-                if ai_key_points:
-                    success_msg += "\n🔑 关键点："
-                    for i, point in enumerate(ai_key_points[:3], 1):
-                        success_msg += f"\n  {i}. {point}"
+            success_msg = MessageBuilder.build_archive_success_message(
+                archive_data={
+                    'title': analysis.get('title'),
+                    'content': analysis.get('content'),
+                    'content_type': content_type,
+                    'file_size': analysis.get('file_size', 0),
+                    'tags': all_tags,
+                    'storage_type': storage_type,
+                    'storage_provider': storage_provider,
+                    'storage_path': storage_path,
+                    'source': analysis.get('source', '直接发送'),
+                    'ai_summary': analysis.get('ai_summary'),
+                    'ai_category': analysis.get('ai_category'),
+                    'ai_key_points': analysis.get('ai_key_points', [])
+                },
+                i18n=self.i18n,
+                include_ai_info=True
+            )
             
             logger.info(f"Successfully archived content: archive_id={archive_id}")
             return True, success_msg, archive_id

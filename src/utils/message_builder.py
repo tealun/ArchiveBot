@@ -17,6 +17,143 @@ class MessageBuilder:
     """消息构建器 - 统一处理列表消息和资源发送"""
     
     @staticmethod
+    def build_archive_success_message(
+        archive_data: Dict[str, Any],
+        i18n,
+        include_ai_info: bool = True
+    ) -> str:
+        """
+        构建归档成功消息（统一格式）
+        
+        Args:
+            archive_data: 归档数据，包含：
+                - title: 标题
+                - content_type: 内容类型
+                - file_size: 文件大小（可选）
+                - tags: 标签列表
+                - storage_type: 存储类型
+                - storage_provider: 存储提供者
+                - storage_path: 存储路径
+                - source: 来源信息
+                - ai_summary: AI摘要（可选）
+                - ai_category: AI分类（可选）
+            i18n: 国际化对象
+            include_ai_info: 是否包含AI分析信息
+            
+        Returns:
+            格式化的HTML消息文本
+        """
+        from ..utils.helpers import format_file_size, format_datetime
+        
+        content_type = archive_data.get('content_type', '')
+        storage_type = archive_data.get('storage_type', '')
+        storage_provider = archive_data.get('storage_provider', '')
+        storage_path = archive_data.get('storage_path', '')
+        
+        # 获取频道信息和链接
+        storage_display = i18n.t(f'storage_{storage_type}')
+        
+        if storage_provider == 'telegram_channel' and storage_path:
+            parts = storage_path.split(':')
+            if len(parts) >= 2:
+                channel_id_from_path = int(parts[0])
+                message_id = parts[1]
+                
+                # 获取频道名称
+                from ..utils.config import get_config
+                config = get_config()
+                all_channels = config.get('storage.telegram.channels', {})
+                
+                # 查找频道名称
+                channel_name = None
+                for name, ch_id in all_channels.items():
+                    if ch_id == channel_id_from_path:
+                        channel_name_map = {
+                            'default': 'Archive Default',
+                            'text': 'Archive Text',
+                            'ebook': 'Archive Ebook',
+                            'document': 'Archive File',
+                            'image': 'Archive Image',
+                            'media': 'Archive Media'
+                        }
+                        channel_name = channel_name_map.get(name, f'Archive {name.title()}')
+                        break
+                
+                if channel_name:
+                    channel_id_str = str(channel_id_from_path).replace('-100', '')
+                    channel_url = f"https://t.me/c/{channel_id_str}/{message_id}"
+                    storage_display = f"<a href='{channel_url}'>{channel_name}</a> 频道"
+        
+        # 构建标题
+        title = archive_data.get('title', '')
+        if not title and archive_data.get('content'):
+            # 如果没有标题，截取内容前32字符作为标题
+            title = archive_data['content'][:32] + ('...' if len(archive_data['content']) > 32 else '')
+        
+        title_link = ''
+        if title and storage_path and storage_provider == 'telegram_channel':
+            parts = storage_path.split(':')
+            if len(parts) >= 2:
+                channel_id_str = parts[0].replace('-100', '')
+                message_id = parts[1]
+                file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
+                title_link = f"📚 标题: <a href='{file_link}'>{title}</a>\n"
+        elif title:
+            title_link = f"📚 标题: {title}\n"
+        
+        # 构建标签显示
+        tags = archive_data.get('tags', [])
+        tags_display = ' '.join([f'#{tag}' for tag in tags]) if tags else i18n.t('tag_text')
+        
+        # 构建消息
+        source_display = archive_data.get('source', '直接发送')
+        file_size = archive_data.get('file_size', 0)
+        
+        if content_type not in ['text', 'link'] and file_size > 0:
+            success_msg = i18n.t(
+                'archive_success_with_size',
+                title_link=title_link,
+                content_type=i18n.t(f'tag_{content_type}'),
+                file_size=format_file_size(file_size),
+                tags=tags_display,
+                storage_type=storage_display,
+                source=source_display,
+                time=format_datetime()
+            )
+        else:
+            success_msg = i18n.t(
+                'archive_success',
+                title_link=title_link,
+                content_type=i18n.t(f'tag_{content_type}'),
+                tags=tags_display,
+                storage_type=storage_display,
+                source=source_display,
+                time=format_datetime()
+            )
+        
+        # 添加AI分析信息（如果有）
+        if include_ai_info:
+            ai_summary = archive_data.get('ai_summary', '')
+            ai_category = archive_data.get('ai_category', '')
+            ai_key_points = archive_data.get('ai_key_points', [])
+            
+            if ai_summary or ai_category or ai_key_points:
+                success_msg += "\n\n🤖 AI智能分析："
+                
+                if ai_category:
+                    success_msg += f"\n📁 分类：{ai_category}"
+                
+                if ai_summary:
+                    success_msg += f"\n📝 摘要：{ai_summary}"
+                
+                if ai_key_points:
+                    success_msg += "\n🔑 关键点："
+                    for i, point in enumerate(ai_key_points[:3], 1):
+                        success_msg += f"\n  {i}. {point}"
+        
+        return success_msg
+    
+    @staticmethod
     def format_archive_list(
         archives: List[Dict[str, Any]],
         i18n,
