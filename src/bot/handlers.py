@@ -92,8 +92,11 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
     """
     # 从 message 创建临时 update 对象以获取语言上下文
     from telegram import Update as TelegramUpdate
+    from ..utils.config import get_config
+    
     temp_update = TelegramUpdate(update_id=0, message=message)
     lang_ctx = get_language_context(temp_update, context)
+    config = get_config()
     
     try:
         # Analyze content
@@ -162,9 +165,6 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         ai_available = ai_summarizer and ai_summarizer.is_available()
         
         if ai_available:
-            from ..utils.config import get_config
-            config = get_config()
-            
             # 1. 优先处理电子书判断（如果需要）
             if analysis.get('_needs_ai_ebook_check'):
                 if progress_callback:

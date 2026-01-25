@@ -396,22 +396,32 @@ class AISummarizer:
 
         # 只使用云端API
         api = config.get('api', {})
-        # 使用 config.get() 方法以支持环境变量（AI_API_KEY）
-        api_key = config.get('ai.api.api_key') or api.get('api_key') or api.get('api_key_env')
+        
+        # 从全局 Config 获取配置（支持环境变量优先）
+        from ..utils.config import get_config
+        global_config = get_config()
+        
+        # 优先从环境变量读取（通过 global_config.get），然后从传入的 config 读取
+        api_key = global_config.get('ai.api.api_key') or api.get('api_key')
         if not api_key:
             logger.warning("AI enabled but no API key provided in config.api")
             # 继续允许 provider 初始化失败后的 graceful behavior
-        provider_type = api.get('provider', 'openai')
+        
+        provider_type = global_config.get('ai.api.provider') or api.get('provider', 'openai')
+        
         if provider_type in ['openai', 'grok']:
             try:
-                temperature = config.get('ai.api.temperature', 0.7)
+                model = global_config.get('ai.api.model') or api.get('model', 'gpt-3.5-turbo')
+                api_url = global_config.get('ai.api.api_url') or api.get('api_url')
+                temperature = api.get('temperature', 0.7)
+                
                 self.provider = OpenAIProvider(
                     api_key,
-                    config.get('ai.api.model') or api.get('model', 'gpt-3.5-turbo'),
-                    config.get('ai.api.api_url') or api.get('api_url'),  # 支持自定义API URL
+                    model,
+                    api_url,
                     temperature
                 )
-                logger.info(f"Using {provider_type.upper()} API: {api.get('model', 'gpt-3.5-turbo')}")
+                logger.info(f"Using {provider_type.upper()} API: {model}")
             except Exception as e:
                 logger.error(f"Failed to initialize {provider_type} provider: {e}")
 
