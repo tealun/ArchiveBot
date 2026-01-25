@@ -215,14 +215,6 @@ class StorageManager:
                     i18n=self.i18n,
                     include_ai_info=True
                 )
-                        'archive_success',
-                        title_link=title_link,
-                        content_type=self.i18n.t(f'tag_{content_type}'),
-                        tags=tags_display if tags_display else self.i18n.t('tag_text'),
-                        storage_type=storage_name,
-                        source=source_display,
-                        time=format_datetime()
-                    )
                 
                 results.append((True, success_msg))
                 
