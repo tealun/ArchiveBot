@@ -17,8 +17,7 @@ features:
 ai:
   enabled: false  # 啟用AI功能
   auto_summarize: false  # 自動摘要新歸檔內容
-  auto_generate_tags: false  # 自動產生AI標籤
-  max_generated_tags: 8  # AI自動產生標籤的最大數量（5-10為佳，預設8）
+  auto_generate_tags: false  # 自動產生AI標籤  auto_generate_title: true  # 自動為筆記產生AI標題（15-20字）  max_generated_tags: 8  # AI自動產生標籤的最大數量（5-10為佳，預設8）
 
   # 統一AI設定（建議）。為避免硬編碼金鑰，建議透過環境變數設定API金鑰
   # 並在 api.api_key_env 中引用環境變數名稱
@@ -86,8 +85,7 @@ storage:
       ebook: CHANNEL_EBOOK  # 從環境變數讀取（可選）
       document: CHANNEL_DOCUMENT  # 從環境變數讀取（可選）
       image: CHANNEL_IMAGE  # 從環境變數讀取（可選）
-      media: CHANNEL_MEDIA  # 從環境變數讀取（可選）
-    
+      media: CHANNEL_MEDIA  # 從環境變數讀取（可選）      note: CHANNEL_NOTE  # 筆記專用頻道，從環境變數讀取（可選，未配置則使用text或default）    
     # 類型到頻道的對映規則
     type_mapping:
       text: text           # 純文字 → 文字頻道

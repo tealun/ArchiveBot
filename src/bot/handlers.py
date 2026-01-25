@@ -1380,275 +1380,287 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         
         # AI Chat Mode - 如果用户已在AI会话中，优先处理
+        # 但是，如果用户正在进行其他特殊模式操作（笔记编辑/追加等），则跳过AI Chat
         if message.text and not message.forward_origin:
             text = message.text.strip()
             
-            from ..utils.config import get_config
-            config = get_config()
-            ai_config = config.ai
+            # 检查是否有其他特殊模式正在进行
+            # 这些模式已经在上面处理并return了，但为了安全，这里再检查一次
+            has_other_mode = (
+                context.user_data.get('waiting_note_for_archive') or
+                context.user_data.get('note_modify_mode') or
+                context.user_data.get('note_append_mode') or
+                (context.user_data.get('refine_note_context') and 
+                 context.user_data['refine_note_context'].get('waiting_for_instruction'))
+            )
             
-            # 检查AI模式是否启用
-            chat_enabled = bool(ai_config.get('chat_enabled', False))
+            if not has_other_mode:
+                from ..utils.config import get_config
+                config = get_config()
+                ai_config = config.ai
+                
+                # 检查AI模式是否启用
+                chat_enabled = bool(ai_config.get('chat_enabled', False))
+                
+                # 从配置获取文本阈值
+                text_thresholds = ai_config.get('text_thresholds', {})
+                short_text_threshold = int(text_thresholds.get('short_text', 50))
             
-            # 从配置获取文本阈值
-            text_thresholds = ai_config.get('text_thresholds', {})
-            short_text_threshold = int(text_thresholds.get('short_text', 50))
-            
-            if chat_enabled:
+                if chat_enabled:
                 # 检查是否已有活跃会话
-                session_manager = get_session_manager(
-                    ttl_seconds=ai_config.get('chat_session_ttl_seconds', 600)
-                )
-                user_id = str(message.from_user.id)
-                session = session_manager.get_session(user_id)
+                    session_manager = get_session_manager(
+                        ttl_seconds=ai_config.get('chat_session_ttl_seconds', 600)
+                    )
+                    user_id = str(message.from_user.id)
+                    session = session_manager.get_session(user_id)
                 
-                if session:
-                    # 用户已在AI会话中，检查是否为长文本（可能是笔记意图）
-                    # 使用note阈值作为长文本判断标准
-                    long_text_threshold = int(text_thresholds.get('note_chinese', 150))
+                    if session:
+                        # 用户已在AI会话中，检查是否为长文本（可能是笔记意图）
+                        # 使用note阈值作为长文本判断标准
+                        long_text_threshold = int(text_thresholds.get('note_chinese', 150))
                     
-                    if len(text) >= long_text_threshold:
-                        # 长文本，提示用户选择意图
-                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                        if len(text) >= long_text_threshold:
+                            # 长文本，提示用户选择意图
+                            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                         
-                        if lang_ctx.language == 'en':
-                            prompt_text = f"📝 You sent {len(text)} characters. What do you want to do?"
-                            note_btn_text = "📝 Save as Note"
-                            chat_btn_text = "💬 Continue Chat"
-                        elif lang_ctx.language in ['zh-TW', 'zh-HK', 'zh-MO']:
-                            prompt_text = f"📝 您發送了 {len(text)} 個字符。您想做什麼？"
-                            note_btn_text = "📝 記錄為筆記"
-                            chat_btn_text = "💬 繼續對話"
-                        else:
-                            prompt_text = f"📝 您发送了 {len(text)} 个字符。您想做什么？"
-                            note_btn_text = "📝 记录为笔记"
-                            chat_btn_text = "💬 继续对话"
+                            if lang_ctx.language == 'en':
+                                prompt_text = f"📝 You sent {len(text)} characters. What do you want to do?"
+                                note_btn_text = "📝 Save as Note"
+                                chat_btn_text = "💬 Continue Chat"
+                            elif lang_ctx.language in ['zh-TW', 'zh-HK', 'zh-MO']:
+                                prompt_text = f"📝 您發送了 {len(text)} 個字符。您想做什麼？"
+                                note_btn_text = "📝 記錄為筆記"
+                                chat_btn_text = "💬 繼續對話"
+                            else:
+                                prompt_text = f"📝 您发送了 {len(text)} 个字符。您想做什么？"
+                                note_btn_text = "📝 记录为笔记"
+                                chat_btn_text = "💬 继续对话"
                         
-                        keyboard = [
-                            [
-                                InlineKeyboardButton(note_btn_text, callback_data=f"longtxt_note:{message.message_id}"),
-                                InlineKeyboardButton(chat_btn_text, callback_data=f"longtxt_chat:{message.message_id}")
+                            keyboard = [
+                                [
+                                    InlineKeyboardButton(note_btn_text, callback_data=f"longtxt_note:{message.message_id}"),
+                                    InlineKeyboardButton(chat_btn_text, callback_data=f"longtxt_chat:{message.message_id}")
+                                ]
                             ]
-                        ]
-                        reply_markup = InlineKeyboardMarkup(keyboard)
+                            reply_markup = InlineKeyboardMarkup(keyboard)
                         
-                        await message.reply_text(
-                            prompt_text,
-                            reply_markup=reply_markup
-                        )
+                            await message.reply_text(
+                                prompt_text,
+                                reply_markup=reply_markup
+                            )
                         
-                        # 暂存消息内容，等待用户选择
-                        if 'pending_long_text' not in session.get('context', {}):
-                            session['context']['pending_long_text'] = {}
-                        session['context']['pending_long_text'][str(message.message_id)] = text
-                        session_manager.update_session(user_id, session.get('context', {}))
+                            # 暂存消息内容，等待用户选择
+                            if 'pending_long_text' not in session.get('context', {}):
+                                session['context']['pending_long_text'] = {}
+                            session['context']['pending_long_text'][str(message.message_id)] = text
+                            session_manager.update_session(user_id, session.get('context', {}))
                         
-                        logger.info(f"Long text detected ({len(text)} chars), awaiting user choice")
-                        return
+                            logger.info(f"Long text detected ({len(text)} chars), awaiting user choice")
+                            return
                     
-                    # 正常长度，处理消息
-                    try:
-                        # 发送AI处理进度提示
-                        progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
+                        # 正常长度，处理消息
+                        try:
+                            # 发送AI处理进度提示
+                            progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
                         
-                        # 包装handle_chat_message，添加进度回调
-                        async def update_ai_progress(stage: str):
+                            # 包装handle_chat_message，添加进度回调
+                            async def update_ai_progress(stage: str):
+                                try:
+                                    await progress_msg.edit_text(f"🤖 {stage}")
+                                except Exception:
+                                    pass
+                        
+                            # Stage 1: 理解需求
+                            await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
+                        
+                            # 调用AI处理（内部有3个阶段）
+                            # 使用'auto'让AI自动判断回复语言，不受界面语言约束
+                            ai_response = await handle_chat_message(text, session, context, 'auto', update_ai_progress)
+                        
+                            # 检测是否为资源回复（JSON格式）
+                            import json
                             try:
-                                await progress_msg.edit_text(f"🤖 {stage}")
-                            except Exception:
+                                response_data = json.loads(ai_response)
+                                if response_data.get('type') == 'resources':
+                                    # 资源回复模式
+                                    from ..utils.message_builder import MessageBuilder
+                                    from ..utils.i18n import I18n
+                                
+                                    strategy = response_data.get('strategy')
+                                    resources = response_data.get('items', [])
+                                    count = response_data.get('count', 0)
+                                
+                                    # 删除进度消息
+                                    try:
+                                        await progress_msg.delete()
+                                    except:
+                                        pass
+                                
+                                    if strategy == 'single' and resources:
+                                        # 单个资源，直接发送文件
+                                        result = await MessageBuilder.send_archive_resource(
+                                            context.bot,
+                                            message.chat_id,
+                                            resources[0]
+                                        )
+                                        if not result:
+                                            await message.reply_text(lang_ctx.t('resource_send_failed') if hasattr(lang_ctx, 't') else "发送资源失败")
+                                
+                                    elif strategy == 'list' and resources:
+                                        # 多个资源，显示列表
+                                        db_storage = context.bot_data.get('db_storage')
+                                        db = db_storage.db if db_storage else None
+                                    
+                                        i18n = I18n(lang_ctx.language if hasattr(lang_ctx, 'language') else 'zh-CN')
+                                        list_text = MessageBuilder.format_archive_list(
+                                            resources,
+                                            i18n,
+                                            db_instance=db,
+                                            with_links=True
+                                        )
+                                    
+                                        # 添加标题
+                                        if lang_ctx.language == 'en':
+                                            header = f"🔍 Found {count} resource(s):\n\n"
+                                        elif lang_ctx.language == 'zh-TW':
+                                            header = f"🔍 找到 {count} 個資源：\n\n"
+                                        else:
+                                            header = f"🔍 找到 {count} 个资源：\n\n"
+                                    
+                                        final_text = header + list_text
+                                    
+                                        await message.reply_text(
+                                            final_text,
+                                            parse_mode=ParseMode.HTML,
+                                            disable_web_page_preview=True
+                                        )
+                                
+                                    # 更新会话
+                                    session_manager.update_session(user_id, session.get('context', {}))
+                                    logger.info(f"AI chat {strategy} resource(s) sent to user {user_id}")
+                                    return
+                                
+                            except (json.JSONDecodeError, ValueError):
+                                # 不是JSON，正常文本回复
                                 pass
                         
-                        # Stage 1: 理解需求
-                        await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
+                            # 编辑消息为最终回复（正常文本）
+                            await progress_msg.edit_text(f"🤖 {ai_response}")
                         
-                        # 调用AI处理（内部有3个阶段）
-                        # 使用'auto'让AI自动判断回复语言，不受界面语言约束
-                        ai_response = await handle_chat_message(text, session, context, 'auto', update_ai_progress)
+                            # 更新会话（保存上下文）
+                            session_manager.update_session(user_id, session.get('context', {}))
                         
-                        # 检测是否为资源回复（JSON格式）
-                        import json
-                        try:
-                            response_data = json.loads(ai_response)
-                            if response_data.get('type') == 'resources':
-                                # 资源回复模式
-                                from ..utils.message_builder import MessageBuilder
-                                from ..utils.i18n import I18n
-                                
-                                strategy = response_data.get('strategy')
-                                resources = response_data.get('items', [])
-                                count = response_data.get('count', 0)
-                                
-                                # 删除进度消息
-                                try:
-                                    await progress_msg.delete()
-                                except:
-                                    pass
-                                
-                                if strategy == 'single' and resources:
-                                    # 单个资源，直接发送文件
-                                    result = await MessageBuilder.send_archive_resource(
-                                        context.bot,
-                                        message.chat_id,
-                                        resources[0]
-                                    )
-                                    if not result:
-                                        await message.reply_text(lang_ctx.t('resource_send_failed') if hasattr(lang_ctx, 't') else "发送资源失败")
-                                
-                                elif strategy == 'list' and resources:
-                                    # 多个资源，显示列表
-                                    db_storage = context.bot_data.get('db_storage')
-                                    db = db_storage.db if db_storage else None
-                                    
-                                    i18n = I18n(lang_ctx.language if hasattr(lang_ctx, 'language') else 'zh-CN')
-                                    list_text = MessageBuilder.format_archive_list(
-                                        resources,
-                                        i18n,
-                                        db_instance=db,
-                                        with_links=True
-                                    )
-                                    
-                                    # 添加标题
-                                    if lang_ctx.language == 'en':
-                                        header = f"🔍 Found {count} resource(s):\n\n"
-                                    elif lang_ctx.language == 'zh-TW':
-                                        header = f"🔍 找到 {count} 個資源：\n\n"
-                                    else:
-                                        header = f"🔍 找到 {count} 个资源：\n\n"
-                                    
-                                    final_text = header + list_text
-                                    
-                                    await message.reply_text(
-                                        final_text,
-                                        parse_mode=ParseMode.HTML,
-                                        disable_web_page_preview=True
-                                    )
-                                
-                                # 更新会话
-                                session_manager.update_session(user_id, session.get('context', {}))
-                                logger.info(f"AI chat {strategy} resource(s) sent to user {user_id}")
-                                return
-                                
-                        except (json.JSONDecodeError, ValueError):
-                            # 不是JSON，正常文本回复
-                            pass
+                            logger.info(f"AI chat response sent to user {user_id}")
+                            return
                         
-                        # 编辑消息为最终回复（正常文本）
-                        await progress_msg.edit_text(f"🤖 {ai_response}")
-                        
-                        # 更新会话（保存上下文）
-                        session_manager.update_session(user_id, session.get('context', {}))
-                        
-                        logger.info(f"AI chat response sent to user {user_id}")
-                        return
-                        
-                    except Exception as e:
-                        logger.error(f"AI chat error: {e}", exc_info=True)
-                        await message.reply_text(lang_ctx.t('ai_chat_error_session_end'))
-                        session_manager.clear_session(user_id)
-                        # 继续正常归档流程
+                        except Exception as e:
+                            logger.error(f"AI chat error: {e}", exc_info=True)
+                            await message.reply_text(lang_ctx.t('ai_chat_error_session_end'))
+                            session_manager.clear_session(user_id)
+                            # 继续正常归档流程
                 
-                # 检查是否应自动触发AI会话（短消息且无media）
-                elif (len(text) < short_text_threshold and 
-                      not message.media_group_id and
-                      not message.photo and 
-                      not message.document and 
-                      not message.video and
-                      not message.audio):
+                    # 检查是否应自动触发AI会话（短消息且无media）
+                    elif (len(text) < short_text_threshold and 
+                          not message.media_group_id and
+                          not message.photo and 
+                          not message.document and 
+                          not message.video and
+                          not message.audio):
                     
-                    # 自动创建AI会话
-                    session = session_manager.create_session(user_id)
-                    logger.info(f"AI chat session auto-created for user {user_id}")
+                        # 自动创建AI会话
+                        session = session_manager.create_session(user_id)
+                        logger.info(f"AI chat session auto-created for user {user_id}")
                     
-                    try:
-                        # 发送AI处理进度提示
-                        progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
+                        try:
+                            # 发送AI处理进度提示
+                            progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
                         
-                        # 进度更新回调
-                        async def update_ai_progress(stage: str):
+                            # 进度更新回调
+                            async def update_ai_progress(stage: str):
+                                try:
+                                    await progress_msg.edit_text(f"🤖 {stage}")
+                                except Exception:
+                                    pass
+                        
+                            # Stage 1: 理解需求
+                            await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
+                        
+                            # 使用'auto'让AI自动判断回复语言
+                            ai_response = await handle_chat_message(text, session, context, 'auto', update_ai_progress)
+                        
+                            # 检测是否为资源回复（JSON格式）
+                            import json
                             try:
-                                await progress_msg.edit_text(f"🤖 {stage}")
-                            except Exception:
+                                response_data = json.loads(ai_response)
+                                if response_data.get('type') == 'resources':
+                                    # 资源回复模式（同上）
+                                    from ..utils.message_builder import MessageBuilder
+                                    from ..utils.i18n import I18n
+                                
+                                    strategy = response_data.get('strategy')
+                                    resources = response_data.get('items', [])
+                                    count = response_data.get('count', 0)
+                                
+                                    try:
+                                        await progress_msg.delete()
+                                    except:
+                                        pass
+                                
+                                    if strategy == 'single' and resources:
+                                        result = await MessageBuilder.send_archive_resource(
+                                            context.bot,
+                                            message.chat_id,
+                                            resources[0]
+                                        )
+                                        if not result:
+                                            await message.reply_text("发送资源失败")
+                                
+                                    elif strategy == 'list' and resources:
+                                        db_storage = context.bot_data.get('db_storage')
+                                        db = db_storage.db if db_storage else None
+                                    
+                                        i18n = I18n(lang_ctx.language if hasattr(lang_ctx, 'language') else 'zh-CN')
+                                        list_text = MessageBuilder.format_archive_list(
+                                            resources,
+                                            i18n,
+                                            db_instance=db,
+                                            with_links=True
+                                        )
+                                    
+                                        if lang_ctx.language == 'en':
+                                            header = f"🔍 Found {count} resource(s):\n\n"
+                                        elif lang_ctx.language == 'zh-TW':
+                                            header = f"🔍 找到 {count} 個資源：\n\n"
+                                        else:
+                                            header = f"🔍 找到 {count} 个资源：\n\n"
+                                    
+                                        await message.reply_text(
+                                            header + list_text,
+                                            parse_mode=ParseMode.HTML,
+                                            disable_web_page_preview=True
+                                        )
+                                
+                                    session_manager.update_session(user_id, session.get('context', {}))
+                                    logger.info(f"AI chat auto-triggered, {strategy} resource(s) sent")
+                                    return
+                                
+                            except (json.JSONDecodeError, ValueError):
                                 pass
                         
-                        # Stage 1: 理解需求
-                        await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
+                            # 编辑消息为最终回复
+                            await progress_msg.edit_text(f"🤖 {ai_response}")
                         
-                        # 使用'auto'让AI自动判断回复语言
-                        ai_response = await handle_chat_message(text, session, context, 'auto', update_ai_progress)
+                            # 更新会话
+                            session_manager.update_session(user_id, session.get('context', {}))
                         
-                        # 检测是否为资源回复（JSON格式）
-                        import json
-                        try:
-                            response_data = json.loads(ai_response)
-                            if response_data.get('type') == 'resources':
-                                # 资源回复模式（同上）
-                                from ..utils.message_builder import MessageBuilder
-                                from ..utils.i18n import I18n
-                                
-                                strategy = response_data.get('strategy')
-                                resources = response_data.get('items', [])
-                                count = response_data.get('count', 0)
-                                
-                                try:
-                                    await progress_msg.delete()
-                                except:
-                                    pass
-                                
-                                if strategy == 'single' and resources:
-                                    result = await MessageBuilder.send_archive_resource(
-                                        context.bot,
-                                        message.chat_id,
-                                        resources[0]
-                                    )
-                                    if not result:
-                                        await message.reply_text("发送资源失败")
-                                
-                                elif strategy == 'list' and resources:
-                                    db_storage = context.bot_data.get('db_storage')
-                                    db = db_storage.db if db_storage else None
-                                    
-                                    i18n = I18n(lang_ctx.language if hasattr(lang_ctx, 'language') else 'zh-CN')
-                                    list_text = MessageBuilder.format_archive_list(
-                                        resources,
-                                        i18n,
-                                        db_instance=db,
-                                        with_links=True
-                                    )
-                                    
-                                    if lang_ctx.language == 'en':
-                                        header = f"🔍 Found {count} resource(s):\n\n"
-                                    elif lang_ctx.language == 'zh-TW':
-                                        header = f"🔍 找到 {count} 個資源：\n\n"
-                                    else:
-                                        header = f"🔍 找到 {count} 个资源：\n\n"
-                                    
-                                    await message.reply_text(
-                                        header + list_text,
-                                        parse_mode=ParseMode.HTML,
-                                        disable_web_page_preview=True
-                                    )
-                                
-                                session_manager.update_session(user_id, session.get('context', {}))
-                                logger.info(f"AI chat auto-triggered, {strategy} resource(s) sent")
-                                return
-                                
-                        except (json.JSONDecodeError, ValueError):
-                            pass
+                            logger.info(f"AI chat auto-triggered for user {user_id}")
+                            return
                         
-                        # 编辑消息为最终回复
-                        await progress_msg.edit_text(f"🤖 {ai_response}")
-                        
-                        # 更新会话
-                        session_manager.update_session(user_id, session.get('context', {}))
-                        
-                        logger.info(f"AI chat auto-triggered for user {user_id}")
-                        return
-                        
-                    except Exception as e:
-                        logger.error(f"AI chat error: {e}", exc_info=True)
-                        await message.reply_text(lang_ctx.t('ai_chat_error'))
-                        session_manager.clear_session(user_id)
-                        # 继续正常归档流程
+                        except Exception as e:
+                            logger.error(f"AI chat error: {e}", exc_info=True)
+                            await message.reply_text(lang_ctx.t('ai_chat_error'))
+                            session_manager.clear_session(user_id)
+                            # 继续正常归档流程
             
             # 检测是否是 URL（单独的链接应该归档而非做笔记）
             from ..utils.helpers import is_url

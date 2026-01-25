@@ -19,6 +19,7 @@ ai:
   enabled: false  # 启用AI功能
   auto_summarize: false  # 自动总结新归档内容
   auto_generate_tags: false  # 自动生成AI标签
+  auto_generate_title: true  # 自动为笔记生成AI标题（15-20字）
   max_generated_tags: 8  # AI自动生成标签的最大数量（5-10为佳，默认8）
 
   # 统一AI配置（推荐）。为避免硬编码密钥，建议通过环境变量设置API密钥
@@ -88,6 +89,7 @@ storage:
       document: CHANNEL_DOCUMENT  # 从环境变量读取（可选）
       image: CHANNEL_IMAGE  # 从环境变量读取（可选）
       media: CHANNEL_MEDIA  # 从环境变量读取（可选）
+      note: CHANNEL_NOTE  # 笔记专用频道，从环境变量读取（可选，未配置则使用text或default）
     
     # 类型到频道的映射规则
     type_mapping:

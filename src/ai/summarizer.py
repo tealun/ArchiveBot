@@ -445,6 +445,17 @@ class AISummarizer:
             self.rate_limit = 0
         self._rate_count = 0
         self._rate_window_start = int(time.time())
+        
+        # 日志和重试配置
+        try:
+            self.log_calls = bool(config.get('log_calls', False))
+            self.retry_on_failure = int(config.get('retry_on_failure', 1))
+            self.retry_on_failure = max(0, min(3, self.retry_on_failure))  # 限制在0-3次
+            if self.log_calls:
+                logger.info(f"AI call logging enabled, retry_on_failure={self.retry_on_failure}")
+        except Exception:
+            self.log_calls = False
+            self.retry_on_failure = 1
 
     def _allow_call(self) -> bool:
         """简单的每分钟速率限制（非分布式）"""
@@ -468,114 +479,160 @@ class AISummarizer:
         if not self.is_available():
             return {'success': False, 'error': 'AI不可用'}
 
-        try:
-            # 尝试从缓存读取（cache key 包含 model 与上下文以避免冲突）
-            if self.cache:
-                try:
-                    ctx_ser = json.dumps(context or {}, sort_keys=True, ensure_ascii=False)
-                    key_src = f"{getattr(self.provider, 'model', '')}|{ctx_ser}|{content}"
-                    cache_key = content_hash(key_src)
-                    cached = self.cache.get(cache_key)
-                    if cached:
-                        cached['success'] = True
-                        cached['provider'] = 'CACHE'
-                        return cached
-                except Exception as e:
-                    logger.debug(f"AI cache lookup error: {e}")
-
-            # 速率检测：如超过限制，优先返回缓存或失败
-            if not self._allow_call():
-                logger.warning("AI rate limit reached, skipping external summarize call")
-                if self.cache and cached:
+        # 尝试从缓存读取（cache key 包含 model 与上下文以避免冲突）
+        cached = None
+        if self.cache:
+            try:
+                ctx_ser = json.dumps(context or {}, sort_keys=True, ensure_ascii=False)
+                key_src = f"{getattr(self.provider, 'model', '')}|{ctx_ser}|{content}"
+                cache_key = content_hash(key_src)
+                cached = self.cache.get(cache_key)
+                if cached:
                     cached['success'] = True
                     cached['provider'] = 'CACHE'
                     return cached
-                return {'success': False, 'error': 'AI rate limit exceeded'}
+            except Exception as e:
+                logger.debug(f"AI cache lookup error: {e}")
 
-            start = time.time()
-            result = await self.provider.summarize(content, 1000, language=language, context=context)
-            duration = time.time() - start
-            result['success'] = True
-            result['provider'] = 'CLOUD'
-            # 记录调用信息
+        # 速率检测：如超过限制，优先返回缓存或失败
+        if not self._allow_call():
+            logger.warning("AI rate limit reached, skipping external summarize call")
+            if self.cache and cached:
+                cached['success'] = True
+                cached['provider'] = 'CACHE'
+                return cached
+            return {'success': False, 'error': 'AI rate limit exceeded'}
+
+        # 重试逻辑
+        last_error = None
+        for attempt in range(self.retry_on_failure + 1):
             try:
-                self._last_call_info = {'provider': 'CLOUD', 'duration': duration}
-            except Exception:
-                pass
-
-            # 如果summarize没有返回category，单独调用categorize
-            default_category = '其他' if language.startswith('zh') else 'Other'
-            if not result.get('category') or result.get('category') == default_category:
-                result['category'] = await self.provider.categorize(content, language=language)
-
-            # 写回缓存
-            if self.cache:
+                if self.log_calls and attempt > 0:
+                    logger.info(f"AI summarize retry attempt {attempt}/{self.retry_on_failure}")
+                
+                start = time.time()
+                result = await self.provider.summarize(content, 1000, language=language, context=context)
+                duration = time.time() - start
+                result['success'] = True
+                result['provider'] = 'CLOUD'
+                
+                # 详细日志
+                if self.log_calls:
+                    logger.info(f"AI summarize success: duration={duration:.2f}s, content_len={len(content)}, language={language}")
+                
+                # 记录调用信息
                 try:
-                    ctx_ser = json.dumps(context or {}, sort_keys=True, ensure_ascii=False)
-                    key_src = f"{getattr(self.provider, 'model', '')}|{ctx_ser}|{content}"
-                    cache_key = content_hash(key_src)
-                    self.cache.set(cache_key, result)
-                except Exception as e:
-                    logger.debug(f"AI cache write error: {e}")
+                    self._last_call_info = {'provider': 'CLOUD', 'duration': duration}
+                except Exception:
+                    pass
 
-            return result
-        except Exception as e:
-            try:
-                self._last_call_info = {'provider': 'ERROR', 'duration': 0}
-            except Exception:
-                pass
-            return {'success': False, 'error': str(e)}
+                # 如果summarize没有返回category，单独调用categorize
+                default_category = '其他' if language.startswith('zh') else 'Other'
+                if not result.get('category') or result.get('category') == default_category:
+                    result['category'] = await self.provider.categorize(content, language=language)
+
+                # 写回缓存
+                if self.cache:
+                    try:
+                        ctx_ser = json.dumps(context or {}, sort_keys=True, ensure_ascii=False)
+                        key_src = f"{getattr(self.provider, 'model', '')}|{ctx_ser}|{content}"
+                        cache_key = content_hash(key_src)
+                        self.cache.set(cache_key, result)
+                    except Exception as e:
+                        logger.debug(f"AI cache write error: {e}")
+                
+                return result
+                
+            except Exception as e:
+                last_error = e
+                if self.log_calls:
+                    logger.warning(f"AI summarize attempt {attempt + 1} failed: {e}")
+                if attempt < self.retry_on_failure:
+                    await asyncio.sleep(1)  # 等待1秒后重试
+                continue
+        
+        # 所有重试失败
+        if self.log_calls:
+            logger.error(f"AI summarize failed after {self.retry_on_failure + 1} attempts: {last_error}")
+        try:
+            self._last_call_info = {'provider': 'ERROR', 'duration': 0}
+        except Exception:
+            pass
+        return {'success': False, 'error': str(last_error)}
     
     async def generate_tags(self, content, max_tags=5, language='zh-CN'):
         if not self.is_available(): return []
-        try:
-            # 缓存优先
-            if self.cache:
-                try:
-                    key_src = f"tags|{getattr(self.provider, 'model', '')}|{max_tags}|{content}"
-                    cache_key = content_hash(key_src)
-                    cached = self.cache.get(cache_key)
-                    if cached:
-                        return cached
-                except Exception as e:
-                    logger.debug(f"AI tag cache lookup error: {e}")
-
-            # 速率检测：如超过限制，优先返回缓存或空列表
-            if not self._allow_call():
-                logger.warning("AI rate limit reached, skipping external generate_tags call")
-                if self.cache and cached:
-                    try:
-                        self._last_call_info = {'provider': 'CACHE', 'duration': 0}
-                    except Exception:
-                        pass
+        
+        # 缓存优先
+        cached = None
+        if self.cache:
+            try:
+                key_src = f"tags|{getattr(self.provider, 'model', '')}|{max_tags}|{content}"
+                cache_key = content_hash(key_src)
+                cached = self.cache.get(cache_key)
+                if cached:
                     return cached
+            except Exception as e:
+                logger.debug(f"AI tag cache lookup error: {e}")
+
+        # 速率检测：如超过限制，优先返回缓存或空列表
+        if not self._allow_call():
+            logger.warning("AI rate limit reached, skipping external generate_tags call")
+            if self.cache and cached:
                 try:
-                    self._last_call_info = {'provider': 'RATE_LIMIT', 'duration': 0}
+                    self._last_call_info = {'provider': 'CACHE', 'duration': 0}
                 except Exception:
                     pass
-                return []
-
-            start = time.time()
-            tags = await self.provider.generate_tags(content, max_tags, language=language)
-            duration = time.time() - start
+                return cached
             try:
-                self._last_call_info = {'provider': 'CLOUD', 'duration': duration}
+                self._last_call_info = {'provider': 'RATE_LIMIT', 'duration': 0}
             except Exception:
                 pass
-
-            # 写回缓存
-            if self.cache:
-                try:
-                    key_src = f"tags|{getattr(self.provider, 'model', '')}|{max_tags}|{content}"
-                    cache_key = content_hash(key_src)
-                    self.cache.set(cache_key, tags)
-                except Exception as e:
-                    logger.debug(f"AI tag cache write error: {e}")
-
-            return tags
-        except Exception as e:
-            logger.error(f"Generate tags error: {e}")
             return []
+
+        # 重试逻辑
+        last_error = None
+        for attempt in range(self.retry_on_failure + 1):
+            try:
+                if self.log_calls and attempt > 0:
+                    logger.info(f"AI generate_tags retry attempt {attempt}/{self.retry_on_failure}")
+                
+                start = time.time()
+                tags = await self.provider.generate_tags(content, max_tags, language=language)
+                duration = time.time() - start
+                
+                # 详细日志
+                if self.log_calls:
+                    logger.info(f"AI generate_tags success: duration={duration:.2f}s, tags={tags}, content_len={len(content)}")
+                
+                try:
+                    self._last_call_info = {'provider': 'CLOUD', 'duration': duration}
+                except Exception:
+                    pass
+
+                # 写回缓存
+                if self.cache:
+                    try:
+                        key_src = f"tags|{getattr(self.provider, 'model', '')}|{max_tags}|{content}"
+                        cache_key = content_hash(key_src)
+                        self.cache.set(cache_key, tags)
+                    except Exception as e:
+                        logger.debug(f"AI tag cache write error: {e}")
+
+                return tags
+                
+            except Exception as e:
+                last_error = e
+                if self.log_calls:
+                    logger.warning(f"AI generate_tags attempt {attempt + 1} failed: {e}")
+                if attempt < self.retry_on_failure:
+                    await asyncio.sleep(1)  # 等待1秒后重试
+                continue
+        
+        # 所有重试失败
+        if self.log_calls:
+            logger.error(f"AI generate_tags failed after {self.retry_on_failure + 1} attempts: {last_error}")
+        return []
     
     async def batch_generate_tags(self, contents: list, max_tags: int = 5, language: str = 'zh-CN'):
         """

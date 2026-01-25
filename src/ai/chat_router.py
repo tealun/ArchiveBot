@@ -15,6 +15,7 @@ import httpx
 from typing import Optional, Dict, Any
 
 from .prompts.chat import ChatPrompts
+from ..utils.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,19 @@ async def understand_and_plan(user_message: str, language: str, context: Any, st
     """
     try:
         config = get_config()
+        
+        # 检查是否启用推理模型（默认启用）
+        use_reasoning = config.ai.get('chat_use_reasoning', True)
+        if not use_reasoning:
+            # 不使用推理模型，返回简单响应策略
+            logger.info("🧠 AI reasoning disabled, using simple reply strategy")
+            return {
+                'user_goal': 'general_chat',
+                'need_data': {},
+                'response_strategy': 'simple_reply',
+                'reasoning': 'reasoning disabled'
+            }
+        
         # 使用 config.get() 方法以支持环境变量（AI_API_KEY）
         api_key = config.get('ai.api.api_key') or config.ai.get('api', {}).get('api_key')
         api_url = config.get('ai.api.api_url') or config.ai.get('api', {}).get('api_url', 'https://api.x.ai/v1/chat/completions')

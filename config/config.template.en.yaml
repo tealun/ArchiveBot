@@ -17,8 +17,7 @@ features:
 ai:
   enabled: false  # Enable AI features
   auto_summarize: false  # Automatically summarize new archives
-  auto_generate_tags: false  # Automatically generate AI tags
-  max_generated_tags: 8  # Maximum number of AI-generated tags (5-10 recommended, default 8)
+  auto_generate_tags: false  # Automatically generate AI tags  auto_generate_title: true  # Automatically generate AI title for notes (15-20 chars)  max_generated_tags: 8  # Maximum number of AI-generated tags (5-10 recommended, default 8)
 
   # Unified AI configuration (recommended). To avoid hardcoding secrets, 
   # set API keys via environment variables and reference the variable name in api.api_key_env
@@ -87,6 +86,7 @@ storage:
       document: CHANNEL_DOCUMENT  # Read from environment variable (optional)
       image: CHANNEL_IMAGE  # Read from environment variable (optional)
       media: CHANNEL_MEDIA  # Read from environment variable (optional)
+      note: CHANNEL_NOTE  # Note-specific channel, read from environment variable (optional, fallback to text or default)
     
     # Type to channel mapping rules
     type_mapping:
