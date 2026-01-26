@@ -524,7 +524,7 @@ Send any content to the Bot (text/links/images/documents, etc.), and AI will aut
 ### ✅ Phase 3 (Completed)
 
 - ✅ User experience optimization
-  - ✅ Command aliases (/s = /search, /t = /tags, /st = /stats, /lang = /language)
+  - ✅ Command aliases (/s = /search, /t = /tags, /st = /stats, /la = /language)
   - ✅ Auto-deduplication (file MD5 detection to prevent duplicate archiving)
 - ✅ Content review features
   - ✅ Activity statistics reports (weekly/monthly/yearly trends, popular tags, daily activity)

@@ -526,7 +526,7 @@ Envía cualquier contenido al Bot (texto/enlace/imagen/documento, etc.), AI anal
 ### ✅ Tercera Fase (Completada)
 
 - ✅ Optimización de experiencia de usuario
-  - ✅ Soporte de alias de comandos (/s = /search, /t = /tags, /st = /stats, /lang = /language)
+  - ✅ Soporte de alias de comandos (/s = /search, /t = /tags, /st = /stats, /la = /language)
   - ✅ Detección automática de duplicados (detección MD5 de archivos, previene archivos duplicados)
 - ✅ Función de revisión de contenido
   - ✅ Informe de estadísticas de actividad (tendencias semanales/mensuales/anuales, etiquetas populares, actividad diaria)

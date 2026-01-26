@@ -1,7 +1,7 @@
 {
   "welcome": "👋 Welcome to ArchiveBot!\n\n🤖 Your Intelligent Personal Archive Assistant\n\n<b>Core Features:</b>\n📦 Universal Archiving - Text/Images/Videos/Documents/Links\n🏷️ Smart Tags - Auto-classification & tag extraction\n🤖 AI Enhanced - Summarization/Key points/Smart titles\n🔍 Powerful Search - Full-text/Tag filtering/Time range\n💾 Flexible Storage - Telegram channel + Database backup\n📝 Notes Management - Linked archives/Standalone/AI assist\n🗑️ Safe Operations - Trash bin/Backup/Export formats\n\n<b>Quick Start:</b>\n• Send any content to archive\n• Use #hashtags for custom tags\n• Send /help for complete command list\n\n<b>Open Source:</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\nLet's start archiving! 🚀",
   
-  "help": "📖 Help\n\n<b>Archive Content:</b>\n• Send any content directly to me\n• Add tags using #tag format\n• Forward messages to record source\n• Batch forwarding auto-aggregation\n\n<b>Basic Commands:</b>\n/start - Initialize bot\n/help - View this help\n/search (/s) &lt;keyword&gt; - Search archives\n/tags (/t) - View all tags\n/stats (/st) - View statistics\n/review - Archive review & stats\n\n<b>Notes:</b>\n/note - Add note to archive\n/notes - View all notes\n\n<b>Data Management:</b>\n/trash - View trash bin\n/export - Export data (JSON/HTML/Markdown)\n/backup - Backup & restore database\n\n<b>Other:</b>\n/ai - AI status\n/language (/lang) - Change language\n\n<b>Search Tips:</b>\n• Keyword: /s python\n• Tag: /s #tech\n• Combined: /s #tech python\n• Click results to jump to channel\n\n<b>AI Features:</b>\n• Smart summary generation\n• Auto extract key points\n• Tag suggestions (batch shared)\n• Intelligent categorization",
+  "help": "📖 Help\n\n<b>Archive Content:</b>\n• Send me any content directly\n• Add tags using #tag format\n• Forward messages to record source\n• Batch forwarding auto-aggregation\n\n<b>Basic Commands:</b>\n/start - Initialize bot\n/help - View this help\n/search (/s) &lt;keyword&gt; - Search archives\n/tags (/t) - View all tags\n/stats (/st) - View statistics\n/review - Archive review & stats\n\n<b>Notes:</b>\n/note (/n) - Add note to archive\n/notes - View all notes\n\n<b>Data Management:</b>\n/trash - View trash bin\n/export - Export data (JSON/HTML/Markdown)\n/backup - Backup & restore database\n\n<b>Other:</b>\n/ai - AI status\n/language (/la) - Change language\n\n<b>Search Tips:</b>\n• Keyword: /s python\n• Tag: /s #tech\n• Combined: /s #tech python\n• Click results to jump to channel\n\n<b>AI Features:</b>\n• Smart summary generation\n• Auto extract key points\n• Tag suggestions (batch shared)\n• Intelligent categorization",
   
   "unauthorized": "⛔ Unauthorized\n\nSorry, this bot is for private use only.",
   
@@ -57,7 +57,7 @@
   
   "note_added": "✅ Note added\n\n📝 Note ID: #{note_id}\n📦 Archive ID: #{archive_id}",
   "note_add_failed": "❌ Failed to add note\n\nPlease check if the archive ID is correct.",
-  "note_no_archive_id": "Please provide an archive ID.\n\nExample: /note 123",
+  "note_no_archive_id": "Please provide an archive ID.\n\nExample: /note 123 or /n 123",
   "invalid_archive_id": "❌ Invalid archive ID\n\nPlease provide a valid numeric ID.",
   "note_manager_not_initialized": "❌ Note feature not initialized\n\nPlease restart the bot.",
   "no_notes_found": "📝 Archive #{archive_id} has no notes.\n\n💡 Reply to archive message to add notes!",
@@ -153,7 +153,7 @@
   "note_mode_saved_with_archive": "✅ Note saved\n\n📝 Note ID: #{note_id}\n📎 Linked Archive: #{archive_id}",
   "note_mode_cancelled": "❌ Note mode cancelled",
   "note_mode_save_failed": "❌ Failed to save note\n\nPlease try again later.",
-  "notes_list_empty": "📝 No notes yet\n\nUse /note command or click the 📝 button in archive lists to create notes.",
+  "notes_list_empty": "📝 No notes yet\n\nUse /note (/n) command or click the 📝 button in archive lists to create notes.",
   "notes_list_header": "📝 Notes ({count})",
   "button_add_note": "📝 Note",
   "nothing_to_cancel": "ℹ️ No operation in progress.",

@@ -1,7 +1,7 @@
 {
   "welcome": "👋 ArchiveBotへようこそ！\n\n🤖 あなた専用のインテリジェント・アーカイブアシスタント\n\n<b>主要機能：</b>\n📦 万能アーカイブ - テキスト/画像/動画/ドキュメント/リンク\n🏷️ スマートタグ - 自動分類とタグ抽出\n🤖 AI強化 - 要約生成/キーポイント抽出/スマートタイトル\n🔍 強力な検索 - 全文検索/タグフィルタ/時間範囲\n💾 柔軟なストレージ - Telegramチャンネル + データベースバックアップ\n📝 ノート管理 - アーカイブリンク/スタンドアロン/AIアシスト\n🗑️ 安全な操作 - ゴミ箱/バックアップ/エクスポート形式\n\n<b>クイックスタート：</b>\n• コンテンツを送信してアーカイブ\n• #ハッシュタグでカスタムタグを追加\n• /helpでコマンド一覧を表示\n\n<b>オープンソース：</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\nアーカイブを始めましょう！🚀",
   
-  "help": "📖 ヘルプ\n\n<b>コンテンツのアーカイブ：</b>\n• コンテンツを直接送信\n• #タグ形式でタグを追加\n• メッセージを転送してソースを記録\n• 一括転送で自動集約\n\n<b>基本コマンド：</b>\n/start - ボット初期化\n/help - このヘルプを表示\n/search (/s) &lt;キーワード&gt; - アーカイブ検索\n/tags (/t) - 全タグ表示\n/stats (/st) - 統計情報表示\n/review - アーカイブレビューと統計\n\n<b>ノート：</b>\n/note - アーカイブにノートを追加\n/notes - 全ノート表示\n\n<b>データ管理：</b>\n/trash - ゴミ箱表示\n/export - データエクスポート (JSON/HTML/Markdown)\n/backup - データベースバックアップと復元\n\n<b>その他：</b>\n/ai - AIステータス\n/language (/lang) - 言語変更\n\n<b>検索のヒント：</b>\n• キーワード：/s python\n• タグ：/s #tech\n• 組み合わせ：/s #tech python\n• 結果をクリックしてチャンネルへジャンプ\n\n<b>AI機能：</b>\n• スマート要約生成\n• キーポイントの自動抽出\n• タグ提案（バッチ共有）\n• インテリジェント分類",
+  "help": "📖 ヘルプ\n\n<b>コンテンツのアーカイブ：</b>\n• コンテンツを直接送信\n• #タグ形式でタグを追加\n• メッセージを転送してソースを記録\n• 一括転送で自動集約\n\n<b>基本コマンド：</b>\n/start - ボット初期化\n/help - このヘルプを表示\n/search (/s) &lt;キーワード&gt; - アーカイブ検索\n/tags (/t) - 全タグ表示\n/stats (/st) - 統計情報表示\n/review - アーカイブレビューと統計\n\n<b>ノート：</b>\n/note (/n) - アーカイブにノートを追加\n/notes - 全ノート表示\n\n<b>データ管理：</b>\n/trash - ゴミ箱表示\n/export - データエクスポート (JSON/HTML/Markdown)\n/backup - データベースバックアップと復元\n\n<b>その他：</b>\n/ai - AIステータス\n/language (/la) - 言語変更\n\n<b>検索のヒント：</b>\n• キーワード：/s python\n• タグ：/s #tech\n• 組み合わせ：/s #tech python\n• 結果をクリックしてチャンネルへジャンプ\n\n<b>AI機能：</b>\n• スマート要約生成\n• キーポイントの自動抽出\n• タグ提案（バッチ共有）\n• インテリジェント分類",
   
   "unauthorized": "⛔ 未認証\n\n申し訳ございません。このボットは個人使用のみです。",
   
@@ -63,7 +63,7 @@
   
   "note_added": "✅ ノートを追加しました\n\n📝 ノートID：#{note_id}\n📦 アーカイブID：#{archive_id}",
   "note_add_failed": "❌ ノートの追加に失敗しました\n\nアーカイブIDが正しいか確認してください。",
-  "note_no_archive_id": "アーカイブIDを入力してください。\n\n例：/note 123",
+  "note_no_archive_id": "アーカイブIDを入力してください。\n\n例：/note 123 または /n 123",
   "invalid_archive_id": "❌ 無効なアーカイブID\n\n有効な数値IDを入力してください。",
   "note_manager_not_initialized": "❌ ノート機能が初期化されていません\n\nボットを再起動してください。",
   "no_notes_found": "📝 アーカイブ #{archive_id} にはノートがありません。\n\n💡 アーカイブメッセージに返信してノートを追加！",
@@ -159,7 +159,7 @@
   "note_mode_saved_with_archive": "✅ ノートを保存しました\n\n📝 ノートID：#{note_id}\n📎 リンクアーカイブ：#{archive_id}",
   "note_mode_cancelled": "❌ ノートモードをキャンセルしました",
   "note_mode_save_failed": "❌ ノートの保存に失敗しました\n\n後でもう一度お試しください。",
-  "notes_list_empty": "📝 ノートがまだありません\n\n/noteコマンドまたはアーカイブリストの📝ボタンでノートを作成してください。",
+  "notes_list_empty": "📝 ノートがまだありません\n\n/note (/n) コマンドまたはアーカイブリストの📝ボタンでノートを作成してください。",
   "notes_list_header": "📝 ノート（{count}件）",
   "button_add_note": "📝 ノート",
   "nothing_to_cancel": "ℹ️ 進行中の操作はありません。",

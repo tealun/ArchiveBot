@@ -1,7 +1,7 @@
 {
   "welcome": "👋 ArchiveBot에 오신 것을 환영합니다!\n\n🤖 당신만의 스마트 아카이브 어시스턴트\n\n<b>핵심 기능:</b>\n📦 만능 아카이브 - 텍스트/이미지/동영상/문서/링크\n🏷️ 스마트 태그 - 자동 분류 및 태그 추출\n🤖 AI 강화 - 요약 생성/핵심 포인트 추출/스마트 제목\n🔍 강력한 검색 - 전문 검색/태그 필터/시간 범위\n💾 유연한 저장소 - Telegram 채널 + 데이터베이스 백업\n📝 노트 관리 - 연결된 아카이브/독립 실행형/AI 지원\n🗑️ 안전한 작업 - 휴지통/백업/내보내기 형식\n\n<b>빠른 시작:</b>\n• 콘텐츠를 전송하여 아카이브\n• #해시태그로 사용자 정의 태그 추가\n• /help로 전체 명령어 목록 확인\n\n<b>오픈소스:</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\n아카이브를 시작하세요! 🚀",
   
-  "help": "📖 도움말\n\n<b>콘텐츠 아카이브:</b>\n• 콘텐츠를 직접 전송\n• #태그 형식으로 태그 추가\n• 메시지 전달로 출처 기록\n• 일괄 전달 자동 집계\n\n<b>기본 명령어:</b>\n/start - 봇 초기화\n/help - 도움말 표시\n/search (/s) &lt;키워드&gt; - 아카이브 검색\n/tags (/t) - 모든 태그 표시\n/stats (/st) - 통계 표시\n/review - 아카이브 리뷰 및 통계\n\n<b>노트:</b>\n/note - 아카이브에 노트 추가\n/notes - 모든 노트 표시\n\n<b>데이터 관리:</b>\n/trash - 휴지통 표시\n/export - 데이터 내보내기 (JSON/HTML/Markdown)\n/backup - 데이터베이스 백업 및 복원\n\n<b>기타:</b>\n/ai - AI 상태\n/language (/lang) - 언어 변경\n\n<b>검색 팁:</b>\n• 키워드: /s python\n• 태그: /s #tech\n• 조합: /s #tech python\n• 결과를 클릭하여 채널로 이동\n\n<b>AI 기능:</b>\n• 스마트 요약 생성\n• 핵심 포인트 자동 추출\n• 태그 제안 (일괄 공유)\n• 지능형 분류",
+  "help": "📖 도움말\n\n<b>콘텐츠 아카이브:</b>\n• 콘텐츠를 직접 전송\n• #태그 형식으로 태그 추가\n• 메시지 전달로 출처 기록\n• 일괄 전달 자동 집계\n\n<b>기본 명령어:</b>\n/start - 봇 초기화\n/help - 도움말 표시\n/search (/s) &lt;키워드&gt; - 아카이브 검색\n/tags (/t) - 모든 태그 표시\n/stats (/st) - 통계 표시\n/review - 아카이브 리뷰 및 통계\n\n<b>노트:</b>\n/note (/n) - 아카이브에 노트 추가\n/notes - 모든 노트 표시\n\n<b>데이터 관리:</b>\n/trash - 휴지통 표시\n/export - 데이터 내보내기 (JSON/HTML/Markdown)\n/backup - 데이터베이스 백업 및 복원\n\n<b>기타:</b>\n/ai - AI 상태\n/language (/la) - 언어 변경\n\n<b>검색 팁:</b>\n• 키워드: /s python\n• 태그: /s #tech\n• 조합: /s #tech python\n• 결과를 클릭하여 채널로 이동\n\n<b>AI 기능:</b>\n• 스마트 요약 생성\n• 핵심 포인트 자동 추출\n• 태그 제안 (일괄 공유)\n• 지능형 분류",
   
   "unauthorized": "⛔ 권한 없음\n\n죄송합니다. 이 봇은 개인용입니다.",
   
@@ -63,7 +63,7 @@
   
   "note_added": "✅ 노트가 추가되었습니다\n\n📝 노트 ID: #{note_id}\n📦 아카이브 ID: #{archive_id}",
   "note_add_failed": "❌ 노트 추가 실패\n\n아카이브 ID가 올바른지 확인하세요.",
-  "note_no_archive_id": "아카이브 ID를 입력하세요.\n\n예: /note 123",
+  "note_no_archive_id": "아카이브 ID를 입력하세요.\n\n예: /note 123 또는 /n 123",
   "invalid_archive_id": "❌ 잘못된 아카이브 ID\n\n유효한 숫자 ID를 입력하세요.",
   "note_manager_not_initialized": "❌ 노트 기능이 초기화되지 않았습니다\n\n봇을 다시 시작하세요.",
   "no_notes_found": "📝 아카이브 #{archive_id}에 노트가 없습니다.\n\n💡 아카이브 메시지에 답장하여 노트를 추가하세요!",
@@ -159,7 +159,7 @@
   "note_mode_saved_with_archive": "✅ 노트가 저장되었습니다\n\n📝 노트 ID: #{note_id}\n📎 연결된 아카이브: #{archive_id}",
   "note_mode_cancelled": "❌ 노트 모드가 취소되었습니다",
   "note_mode_save_failed": "❌ 노트 저장 실패\n\n나중에 다시 시도하세요.",
-  "notes_list_empty": "📝 아직 노트가 없습니다\n\n/note 명령어 또는 아카이브 목록의 📝 버튼을 사용하여 노트를 생성하세요.",
+  "notes_list_empty": "📝 아직 노트가 없습니다\n\n/note (/n) 명령어 또는 아카이브 목록의 📝 버튼을 사용하여 노트를 생성하세요.",
   "notes_list_header": "📝 노트 ({count}개)",
   "button_add_note": "📝 노트",
   "nothing_to_cancel": "ℹ️ 진행 중인 작업이 없습니다.",

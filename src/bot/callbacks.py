@@ -348,7 +348,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("start", "开始使用"),
                             BotCommand("help", "查看帮助"),
                             BotCommand("search", "搜索归档 (简写: /s)"),
-                            BotCommand("note", "添加笔记"),
+                            BotCommand("note", "添加笔记 (简写: /n)"),
                             BotCommand("notes", "查看笔记"),
                             BotCommand("tags", "标签列表 (简写: /t)"),
                             BotCommand("stats", "统计信息 (简写: /st)"),
@@ -357,7 +357,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("export", "导出数据"),
                             BotCommand("backup", "备份管理"),
                             BotCommand("ai", "AI状态"),
-                            BotCommand("language", "切换语言 (简写: /lang)"),
+                            BotCommand("language", "切换语言 (简写: /la)"),
                         ]
                         telegram_lang = "zh"  # Telegram 使用 zh 作为中文语言代码
                     elif language == 'ja':
@@ -366,7 +366,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("start", "ボット初期化"),
                             BotCommand("help", "ヘルプ表示"),
                             BotCommand("search", "アーカイブ検索 (/s)"),
-                            BotCommand("note", "ノート追加"),
+                            BotCommand("note", "ノート追加 (/n)"),
                             BotCommand("notes", "ノート表示"),
                             BotCommand("tags", "タグ一覧 (/t)"),
                             BotCommand("stats", "統計情報 (/st)"),
@@ -375,7 +375,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("export", "データエクスポート"),
                             BotCommand("backup", "バックアップ管理"),
                             BotCommand("ai", "AIステータス"),
-                            BotCommand("language", "言語変更 (/lang)"),
+                            BotCommand("language", "言語変更 (/la)"),
                         ]
                         telegram_lang = "ja"
                     elif language == 'ko':
@@ -384,7 +384,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("start", "봇 초기화"),
                             BotCommand("help", "도움말 표시"),
                             BotCommand("search", "아카이브 검색 (/s)"),
-                            BotCommand("note", "노트 추가"),
+                            BotCommand("note", "노트 추가 (/n)"),
                             BotCommand("notes", "노트 표시"),
                             BotCommand("tags", "태그 목록 (/t)"),
                             BotCommand("stats", "통계 표시 (/st)"),
@@ -393,7 +393,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("export", "데이터 내보내기"),
                             BotCommand("backup", "백업 관리"),
                             BotCommand("ai", "AI 상태"),
-                            BotCommand("language", "언어 변경 (/lang)"),
+                            BotCommand("language", "언어 변경 (/la)"),
                         ]
                         telegram_lang = "ko"
                     elif language == 'es':
@@ -402,7 +402,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("start", "Inicializar bot"),
                             BotCommand("help", "Mostrar ayuda"),
                             BotCommand("search", "Buscar archivos (/s)"),
-                            BotCommand("note", "Añadir nota"),
+                            BotCommand("note", "Añadir nota (/n)"),
                             BotCommand("notes", "Ver notas"),
                             BotCommand("tags", "Lista de etiquetas (/t)"),
                             BotCommand("stats", "Mostrar estadísticas (/st)"),
@@ -411,7 +411,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("export", "Exportar datos"),
                             BotCommand("backup", "Gestión de copias"),
                             BotCommand("ai", "Estado de IA"),
-                            BotCommand("language", "Cambiar idioma (/lang)"),
+                            BotCommand("language", "Cambiar idioma (/la)"),
                         ]
                         telegram_lang = "es"
                     else:
@@ -420,7 +420,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("start", "Start bot"),
                             BotCommand("help", "Show help"),
                             BotCommand("search", "Search archives (/s)"),
-                            BotCommand("note", "Add note"),
+                            BotCommand("note", "Add note (/n)"),
                             BotCommand("notes", "View notes"),
                             BotCommand("tags", "List tags (/t)"),
                             BotCommand("stats", "Show statistics (/st)"),
@@ -429,7 +429,7 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("export", "Export data"),
                             BotCommand("backup", "Backup management"),
                             BotCommand("ai", "AI status"),
-                            BotCommand("language", "Change language (/lang)"),
+                            BotCommand("language", "Change language (/la)"),
                         ]
                         telegram_lang = "en"
                     

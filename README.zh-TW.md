@@ -520,7 +520,7 @@ python main.py
 ### ✅ 第三階段 (已完成)
 
 - ✅ 使用者體驗最佳化
-  - ✅ 命令別名支援（/s = /search, /t = /tags, /st = /stats, /lang = /language）
+  - ✅ 命令別名支援（/s = /search, /t = /tags, /st = /stats, /la = /language）
   - ✅ 自動去重檢測（檔案MD5檢測，防止重複歸檔）
 - ✅ 內容回顧功能
   - ✅ 活動統計報告（週/月/年趨勢、熱門標籤、每日活動）

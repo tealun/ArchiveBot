@@ -1,7 +1,7 @@
 {
   "welcome": "👋 歡迎使用 ArchiveBot！\n\n🤖 您的專屬智能歸檔助手\n\n<b>核心功能：</b>\n📦 全能歸檔 - 文字/圖片/影片/文件/連結\n🏷️ 智能標籤 - 自動分類與標籤提取\n🤖 AI 增強 - 摘要生成/關鍵點提取/智能標題\n🔍 高效搜尋 - 全文檢索/標籤篩選/時間範圍\n💾 靈活存儲 - Telegram頻道/資料庫雙備份\n📝 筆記管理 - 關聯歸檔/獨立筆記/AI輔助\n🗑️ 安全管理 - 垃圾箱/備份/導出多格式\n\n<b>快速開始：</b>\n• 發送任何內容即可歸檔\n• 使用 #標籤 添加自訂標籤\n• 發送 /help 查看完整指令清單\n\n<b>專案開源：</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\n讓我們開始歸檔之旅！🚀",
   
-  "help": "📖 說明\n\n<b>歸檔內容：</b>\n• 直接傳送任何內容給我\n• 使用 #標籤 格式新增標籤\n• 轉發訊息自動記錄來源\n• 批次轉發自動聚合處理\n\n<b>基礎命令：</b>\n/start - 初始化機器人\n/help - 檢視此說明\n/search (/s) &lt;關鍵詞&gt; - 搜尋歸檔\n/tags (/t) - 檢視所有標籤\n/stats (/st) - 檢視統計資訊\n/review - 存檔回顧與統計\n\n<b>筆記功能：</b>\n/note - 新增筆記到歸檔\n/notes - 檢視所有筆記\n\n<b>資料管理：</b>\n/trash - 檢視資源回收筒\n/export - 匯出資料（JSON/HTML/Markdown）\n/backup - 備份與復原資料庫\n\n<b>其他：</b>\n/ai - AI功能狀態\n/language (/lang) - 切換語言\n\n<b>搜尋技巧：</b>\n• 關鍵詞：/s python\n• 標籤：/s #技術\n• 組合：/s #技術 python\n• 點擊結果可跳轉到頻道\n\n<b>AI功能：</b>\n• 智慧摘要生成\n• 自動擷取關鍵點\n• 標籤推薦（批次共享）\n• 內容智慧分類",
+  "help": "📖 說明\n\n<b>歸檔內容：</b>\n• 直接傳送任何內容給我\n• 使用 #標籤 格式新增標籤\n• 轉發訊息自動記錄來源\n• 批次轉發自動聚合處理\n\n<b>基礎命令：</b>\n/start - 初始化機器人\n/help - 檢視此說明\n/search (/s) &lt;關鍵詞&gt; - 搜尋歸檔\n/tags (/t) - 檢視所有標籤\n/stats (/st) - 檢視統計資訊\n/review - 存檔回顧與統計\n\n<b>筆記功能：</b>\n/note (/n) - 新增筆記到歸檔\n/notes - 檢視所有筆記\n\n<b>資料管理：</b>\n/trash - 檢視資源回收筒\n/export - 匯出資料（JSON/HTML/Markdown）\n/backup - 備份與復原資料庫\n\n<b>其他：</b>\n/ai - AI功能狀態\n/language (/la) - 切換語言\n\n<b>搜尋技巧：</b>\n• 關鍵詞：/s python\n• 標籤：/s #技術\n• 組合：/s #技術 python\n• 點擊結果可跳轉到頻道\n\n<b>AI功能：</b>\n• 智慧摘要生成\n• 自動擷取關鍵點\n• 標籤推薦（批次共享）\n• 內容智慧分類",
   
   "unauthorized": "⛔ 未授權\n\n抱歉，此機器人僅供私人使用。",
   
@@ -58,7 +58,7 @@
   
   "note_added": "✅ 筆記已新增\n\n📝 筆記ID: #{note_id}\n📦 歸檔ID: #{archive_id}",
   "note_add_failed": "❌ 新增筆記失敗\n\n請檢查歸檔ID是否正確。",
-  "note_no_archive_id": "請提供歸檔ID。\n\n範例：/note 123",
+  "note_no_archive_id": "請提供歸檔ID。\n\n範例：/note 123 或 /n 123",
   "invalid_archive_id": "❌ 無效的歸檔ID\n\n請提供有效的數字ID。",
   "note_manager_not_initialized": "❌ 筆記功能未初始化\n\n請重啟機器人。",
   "no_notes_found": "📝 歸檔 #{archive_id} 暫無筆記。\n\n💡 回覆歸檔訊息新增筆記！",
@@ -154,7 +154,7 @@
   "note_mode_saved_with_archive": "✅ 筆記已儲存\n\n📝 筆記ID: #{note_id}\n📎 關聯歸檔: #{archive_id}",
   "note_mode_cancelled": "❌ 已取消筆記模式",
   "note_mode_save_failed": "❌ 筆記儲存失敗\n\n請稍後重試。",
-  "notes_list_empty": "📝 暫無筆記\n\n使用 /note 命令或點擊歸檔列表中的 📝 按鈕來建立筆記。",
+  "notes_list_empty": "📝 暫無筆記\n\n使用 /note (/n) 命令或點擊歸檔列表中的 📝 按鈕來建立筆記。",
   "notes_list_header": "📝 筆記列表 ({count}條)",
   "button_add_note": "📝 筆記",
   "nothing_to_cancel": "ℹ️ 沒有正在進行的操作。",

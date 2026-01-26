@@ -1,7 +1,7 @@
 {
   "welcome": "👋 欢迎使用 ArchiveBot！\n\n🤖 您的专属智能归档助手\n\n<b>核心功能：</b>\n📦 全能归档 - 文本/图片/视频/文档/链接\n🏷️ 智能标签 - 自动分类与标签提取\n🤖 AI 增强 - 摘要生成/关键点提取/智能标题\n🔍 高效搜索 - 全文检索/标签筛选/时间范围\n💾 灵活存储 - Telegram频道/数据库双备份\n📝 笔记管理 - 关联归档/独立笔记/AI辅助\n🗑️ 安全管理 - 垃圾箱/备份/导出多格式\n\n<b>快速开始：</b>\n• 发送任何内容即可归档\n• 使用 #标签 添加自定义标签\n• 发送 /help 查看完整命令列表\n\n<b>项目开源：</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\n让我们开始归档之旅！🚀",
   
-  "help": "📖 帮助\n\n<b>归档内容：</b>\n• 直接发送任何内容给我\n• 使用 #标签 格式添加标签\n• 转发消息自动记录来源\n• 批量转发自动聚合处理\n\n<b>基础命令：</b>\n/start - 初始化机器人\n/help - 查看此帮助\n/search (/s) &lt;关键词&gt; - 搜索归档\n/tags (/t) - 查看所有标签\n/stats (/st) - 查看统计信息\n/review - 存档回顾与统计\n\n<b>笔记功能：</b>\n/note - 添加笔记到归档\n/notes - 查看所有笔记\n\n<b>数据管理：</b>\n/trash - 查看垃圾箱\n/export - 导出数据（JSON/HTML/Markdown）\n/backup - 备份与恢复数据库\n\n<b>其他：</b>\n/ai - AI功能状态\n/language (/lang) - 切换语言\n\n<b>搜索技巧：</b>\n• 关键词：/s python\n• 标签：/s #技术\n• 组合：/s #技术 python\n• 点击结果可跳转到频道\n\n<b>AI功能：</b>\n• 智能摘要生成\n• 自动提取关键点\n• 标签推荐（批量共享）\n• 内容智能分类",
+  "help": "📖 帮助\n\n<b>归档内容：</b>\n• 直接发送任何内容给我\n• 使用 #标签 格式添加标签\n• 转发消息自动记录来源\n• 批量转发自动聚合处理\n\n<b>基础命令：</b>\n/start - 初始化机器人\n/help - 查看此帮助\n/search (/s) &lt;关键词&gt; - 搜索归档\n/tags (/t) - 查看所有标签\n/stats (/st) - 查看统计信息\n/review - 存档回顾与统计\n\n<b>笔记功能：</b>\n/note (/n) - 添加笔记到归档\n/notes - 查看所有笔记\n\n<b>数据管理：</b>\n/trash - 查看垃圾箱\n/export - 导出数据（JSON/HTML/Markdown）\n/backup - 备份与恢复数据库\n\n<b>其他：</b>\n/ai - AI功能状态\n/language (/la) - 切换语言\n\n<b>搜索技巧：</b>\n• 关键词：/s python\n• 标签：/s #技术\n• 组合：/s #技术 python\n• 点击结果可跳转到频道\n\n<b>AI功能：</b>\n• 智能摘要生成\n• 自动提取关键点\n• 标签推荐（批量共享）\n• 内容智能分类",
   
   "unauthorized": "⛔ 未授权\n\n抱歉，此机器人仅供私人使用。",
   
@@ -58,7 +58,7 @@
   
   "note_added": "✅ 笔记已添加\n\n📝 笔记ID: #{note_id}\n📦 归档ID: #{archive_id}",
   "note_add_failed": "❌ 添加笔记失败\n\n请检查归档ID是否正确。",
-  "note_no_archive_id": "请提供归档ID。\n\n示例：/note 123",
+  "note_no_archive_id": "请提供归档ID。\n\n示例：/note 123 或 /n 123",
   "invalid_archive_id": "❌ 无效的归档ID\n\n请提供有效的数字ID。",
   "note_manager_not_initialized": "❌ 笔记功能未初始化\n\n请重启机器人。",
   "no_notes_found": "📝 归档 #{archive_id} 暂无笔记。\n\n💡 回复归档消息添加笔记！",
@@ -154,7 +154,7 @@
   "note_mode_saved_with_archive": "✅ 笔记已保存\n\n📝 笔记ID: #{note_id}\n📎 关联归档: #{archive_id}",
   "note_mode_cancelled": "❌ 已取消笔记模式",
   "note_mode_save_failed": "❌ 笔记保存失败\n\n请稍后重试。",
-  "notes_list_empty": "📝 暂无笔记\n\n使用 /note 命令或点击归档列表中的 📝 按钮来创建笔记。",
+  "notes_list_empty": "📝 暂无笔记\n\n使用 /note (/n) 命令或点击归档列表中的 📝 按钮来创建笔记。",
   "notes_list_header": "📝 笔记列表 ({count}条)",
   "button_add_note": "📝 笔记",
   "nothing_to_cancel": "ℹ️ 没有正在进行的操作。",

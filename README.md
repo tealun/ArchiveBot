@@ -526,7 +526,7 @@ python main.py
 ### ✅ 第三阶段 (已完成)
 
 - ✅ 用户体验优化
-  - ✅ 命令别名支持（/s = /search, /t = /tags, /st = /stats, /lang = /language）
+  - ✅ 命令别名支持（/s = /search, /t = /tags, /st = /stats, /la = /language）
   - ✅ 自动去重检测（文件MD5检测，防止重复归档）
 - ✅ 内容回顾功能
   - ✅ 活动统计报告（周/月/年趋势、热门标签、每日活动）
