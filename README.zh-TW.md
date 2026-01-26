@@ -1,12 +1,16 @@
 # ArchiveBot
 
+**📖 Read this in other languages / 其他語言版本**
+
+[English](README.en.md) | [简体中文](README.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md)
+
+---
+
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot-blue.svg)](https://core.telegram.org/bots)
 
 基於 Telegram Bot 的個人內容歸檔系統 | Personal Content Archiving System for Telegram
-
-[English](README.en.md) | [简体中文](README.md) | 繁體中文
 
 ## 📖 專案簡介
 
