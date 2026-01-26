@@ -601,7 +601,7 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         from ..bot.handlers import _finalize_note_internal
         
         # 立即生成并保存笔记
-        await _finalize_note_internal(context, update.effective_chat.id, reason="manual")
+        await _finalize_note_internal(context, update.effective_chat.id, update.effective_user.id, reason="manual")
         
         logger.info(f"User {update.effective_user.id} cancelled note mode")
         

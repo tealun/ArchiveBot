@@ -6,6 +6,7 @@ Handles incoming messages for archiving
 import logging
 import time
 from typing import List, Optional
+from datetime import datetime, timedelta
 from telegram import Update, Message
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -1149,32 +1150,46 @@ async def note_timeout_callback(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         job_data = context.job.data
         chat_id = job_data['chat_id']
+        user_id = job_data['user_id']
+        
+        # 使用application.user_data来访问用户数据
+        # context.user_data在job中可能为空，需要通过user_id访问
+        from telegram.ext._utils.types import UD
+        user_data = context.application.user_data.get(user_id, {})
         
         # 检查用户是否还在笔记模式
-        if not context.user_data or not context.user_data.get('note_mode'):
+        if not user_data.get('note_mode'):
+            logger.debug(f"Note timeout callback: user {user_id} not in note mode, skipping")
             return
         
-        # 生成并保存笔记
-        await _finalize_note_internal(context, chat_id, reason="timeout")
+        # 生成并保存笔记（传递user_data确保数据访问正确）
+        await _finalize_note_internal(context, chat_id, user_id, reason="timeout")
         
-        logger.info(f"Note mode timeout for user {job_data.get('user_id')}")
+        logger.info(f"Note mode timeout for user {user_id}")
         
     except Exception as e:
         logger.error(f"Error in note timeout callback: {e}", exc_info=True)
 
 
-async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: int, reason: str = "manual") -> None:
+async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int, reason: str = "manual") -> None:
     """
     完成笔记记录，生成并保存笔记（内部版本，减少内存占用）
     
     Args:
         context: Bot context
         chat_id: Chat ID
+        user_id: User ID（用于访问user_data）
         reason: 退出原因 (manual, timeout, command)
     """
     try:
-        messages = context.user_data.get('note_messages', [])
-        archives = context.user_data.get('note_archives', [])
+        # 在job回调中，context.user_data可能为空，需要从application.user_data获取
+        if reason == "timeout":
+            user_data = context.application.user_data.get(user_id, {})
+        else:
+            user_data = context.user_data
+        
+        messages = user_data.get('note_messages', [])
+        archives = user_data.get('note_archives', [])
         
         if not messages:
             await context.bot.send_message(
@@ -1193,7 +1208,7 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                     # 获取用户语言设置
                     from ..utils.config import get_config
                     config = get_config()
-                    user_language = context.user_data.get('language', config.get('bot.language', 'zh-CN'))
+                    user_language = user_data.get('language', config.get('bot.language', 'zh-CN'))
                     
                     # 使用AI生成标题（32字以内）
                     note_title = await ai_summarizer.generate_title_from_text(
@@ -1323,17 +1338,42 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
             
             result_parts.append(f"🔚 {reason_text}")
             
+            # 构建编辑/追加/删除按钮
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = [
+                [
+                    InlineKeyboardButton("✏️ 编辑", callback_data=f"note_quick_edit:{note_id}"),
+                    InlineKeyboardButton("➕ 追加", callback_data=f"note_quick_append:{note_id}"),
+                ],
+                [
+                    InlineKeyboardButton("🗑️ 删除", callback_data=f"note_quick_delete:{note_id}")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
             await context.bot.send_message(
                 chat_id=chat_id,
                 text='\n'.join(result_parts),
                 parse_mode='HTML',
-                disable_web_page_preview=True
+                disable_web_page_preview=True,
+                reply_markup=reply_markup
             )
+            
+            # 保存笔记ID和保存时间到user_data，用于5分钟窗口检测
+            if reason != "timeout":
+                context.user_data['last_note_id'] = note_id
+                context.user_data['last_note_time'] = datetime.now()
         
         # 立即清除所有笔记模式相关数据，释放内存
+        # 根据reason决定清除哪个user_data
+        if reason == "timeout":
+            user_data_to_clean = context.application.user_data.get(user_id, {})
+        else:
+            user_data_to_clean = context.user_data
+        
         keys_to_remove = ['note_mode', 'note_messages', 'note_archives', 'note_start_time', 'note_timeout_job', 'pending_command']
         for key in keys_to_remove:
-            context.user_data.pop(key, None)
+            user_data_to_clean.pop(key, None)
         
     except Exception as e:
         logger.error(f"Error finalizing note: {e}", exc_info=True)
@@ -1357,6 +1397,58 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # 优先检查：笔记模式
         if context.user_data.get('note_mode'):
             await _handle_note_mode_message(update, context, lang_ctx)
+            return
+        
+        # 检查快速编辑模式
+        if context.user_data.get('note_edit_mode'):
+            note_id = context.user_data.get('note_id_to_edit')
+            if note_id and message.text:
+                note_manager = context.bot_data.get('note_manager')
+                if note_manager:
+                    # 更新笔记内容
+                    success = note_manager.update_note(note_id, message.text)
+                    if success:
+                        await message.reply_text(f"✅ 笔记 #{note_id} 已更新")
+                        logger.info(f"Quick edited note {note_id}")
+                        
+                        # 更新时间窗口
+                        context.user_data['last_note_id'] = note_id
+                        context.user_data['last_note_time'] = datetime.now()
+                    else:
+                        await message.reply_text("❌ 更新失败")
+                
+                # 清除编辑模式
+                context.user_data.pop('note_edit_mode', None)
+                context.user_data.pop('note_id_to_edit', None)
+            return
+        
+        # 检查快速追加模式
+        if context.user_data.get('note_append_mode'):
+            note_id = context.user_data.get('note_id_to_append')
+            if note_id and message.text:
+                note_manager = context.bot_data.get('note_manager')
+                if note_manager:
+                    # 获取现有笔记内容
+                    note = note_manager.get_note(note_id)
+                    if note:
+                        # 追加内容
+                        new_content = f"{note['content']}\n\n---\n\n{message.text}"
+                        success = note_manager.update_note(note_id, new_content)
+                        if success:
+                            await message.reply_text(f"✅ 内容已追加到笔记 #{note_id}")
+                            logger.info(f"Quick appended to note {note_id}")
+                            
+                            # 更新时间窗口
+                            context.user_data['last_note_id'] = note_id
+                            context.user_data['last_note_time'] = datetime.now()
+                        else:
+                            await message.reply_text("❌ 追加失败")
+                    else:
+                        await message.reply_text("❌ 笔记不存在")
+                
+                # 清除追加模式
+                context.user_data.pop('note_append_mode', None)
+                context.user_data.pop('note_id_to_append', None)
             return
         
         # 检查是否在等待添加笔记
@@ -1788,6 +1880,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                             await message.reply_text(lang_ctx.t('ai_chat_error'))
                             session_manager.clear_session(user_id)
                             # 继续正常归档流程
+            
+            # 5分钟追加连贯性检测（仅对文本消息）
+            last_note_id = context.user_data.get('last_note_id')
+            last_note_time = context.user_data.get('last_note_time')
+            
+            if last_note_id and last_note_time and message.text:
+                # 计算时间差
+                time_diff = datetime.now() - last_note_time
+                
+                # 如果在5分钟窗口内
+                if time_diff.total_seconds() < 300:  # 5分钟 = 300秒
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    
+                    # 保存当前消息文本
+                    context.user_data['pending_continuity_text'] = message.text
+                    
+                    # 提示用户选择
+                    keyboard = [
+                        [
+                            InlineKeyboardButton("➕ 追加上一条笔记", callback_data=f"continuity:append:{last_note_id}"),
+                        ],
+                        [
+                            InlineKeyboardButton("📝 创建新笔记", callback_data="continuity:new_note"),
+                            InlineKeyboardButton("📦 正常归档", callback_data="continuity:archive")
+                        ]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    # 计算剩余时间
+                    remaining_seconds = int(300 - time_diff.total_seconds())
+                    remaining_minutes = remaining_seconds // 60
+                    remaining_secs = remaining_seconds % 60
+                    
+                    await message.reply_text(
+                        f"💡 检测到您在 {remaining_minutes}分{remaining_secs}秒 前保存了笔记 #{last_note_id}\n\n"
+                        f"这条消息是否要追加到该笔记？",
+                        reply_markup=reply_markup
+                    )
+                    logger.info(f"Continuity prompt shown for note {last_note_id}")
+                    return
             
             # 检测是否是 URL（单独的链接应该归档而非做笔记）
             from ..utils.helpers import is_url

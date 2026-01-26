@@ -90,7 +90,7 @@ class NoteManager:
                 """
                 SELECT id, archive_id, content, created_at
                 FROM notes
-                WHERE archive_id = ?
+                WHERE archive_id = ? AND deleted = 0
                 ORDER BY created_at ASC
                 """,
                 (archive_id,)
@@ -128,6 +128,7 @@ class NoteManager:
                         a.storage_path
                     FROM notes n
                     LEFT JOIN archives a ON n.archive_id = a.id
+                    WHERE n.deleted = 0
                     ORDER BY n.created_at DESC
                     LIMIT ? OFFSET ?
                     """,
@@ -138,6 +139,7 @@ class NoteManager:
                     """
                     SELECT id, archive_id, content, created_at
                     FROM notes
+                    WHERE deleted = 0
                     ORDER BY created_at DESC
                     LIMIT ? OFFSET ?
                     """,
@@ -167,7 +169,7 @@ class NoteManager:
                 """
                 SELECT id, archive_id, content, created_at
                 FROM notes
-                WHERE id = ?
+                WHERE id = ? AND deleted = 0
                 """,
                 (note_id,)
             )
@@ -219,7 +221,7 @@ class NoteManager:
     
     def delete_note(self, note_id: int) -> bool:
         """
-        Delete a note
+        Delete a note (soft delete)
         
         Args:
             note_id: Note ID
@@ -229,18 +231,20 @@ class NoteManager:
         """
         try:
             with self.db._lock:
+                # Mark as deleted
+                now = format_datetime()
                 cursor = self.db.execute(
-                    "DELETE FROM notes WHERE id = ?",
-                    (note_id,)
+                    "UPDATE notes SET deleted = 1, deleted_at = ? WHERE id = ? AND deleted = 0",
+                    (now, note_id)
                 )
                 
                 self.db.commit()
                 
                 if cursor.rowcount > 0:
-                    logger.info(f"Note deleted: id={note_id}")
+                    logger.info(f"Note soft deleted: id={note_id}")
                     return True
                 else:
-                    logger.warning(f"Note {note_id} not found")
+                    logger.warning(f"Note {note_id} not found or already deleted")
                     return False
                     
         except Exception as e:
@@ -315,7 +319,7 @@ class NoteManager:
         """
         try:
             cursor = self.db.execute(
-                "SELECT COUNT(*) FROM notes WHERE archive_id = ?",
+                "SELECT COUNT(*) FROM notes WHERE archive_id = ? AND deleted = 0",
                 (archive_id,)
             )
             return cursor.fetchone()[0]
@@ -340,7 +344,7 @@ class NoteManager:
                        COUNT(n.id) as note_count
                 FROM archives a
                 INNER JOIN notes n ON a.id = n.archive_id
-                WHERE a.deleted = 0
+                WHERE a.deleted = 0 AND n.deleted = 0
                 GROUP BY a.id
                 ORDER BY MAX(n.created_at) DESC
                 LIMIT ?

@@ -81,6 +81,16 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_note_share_callback(update, context)
         elif callback_data.startswith('note_delete:'):
             await handle_note_delete_callback(update, context)
+        elif callback_data.startswith('note_quick_edit:'):
+            await handle_note_quick_edit_callback(update, context)
+        elif callback_data.startswith('note_quick_append:'):
+            await handle_note_quick_append_callback(update, context)
+        elif callback_data.startswith('note_quick_delete:'):
+            await handle_note_quick_delete_callback(update, context)
+        elif callback_data.startswith('note_quick_delete_confirm:'):
+            await handle_note_quick_delete_confirm_callback(update, context)
+        elif callback_data.startswith('continuity:'):
+            await handle_continuity_callback(update, context)
         elif callback_data == 'note_close':
             # 关闭笔记查看窗口
             await query.message.delete()
@@ -1081,7 +1091,7 @@ async def handle_note_exit_save_callback(update: Update, context: ContextTypes.D
         from ..bot.handlers import _finalize_note_internal
         
         # 保存笔记
-        await _finalize_note_internal(context, update.effective_chat.id, reason="command")
+        await _finalize_note_internal(context, update.effective_chat.id, update.effective_user.id, reason="command")
         
         await query.answer("✅ 笔记已保存")
         await query.message.delete()
@@ -1118,7 +1128,7 @@ async def handle_note_finish_callback(update: Update, context: ContextTypes.DEFA
         from ..bot.handlers import _finalize_note_internal
         
         # 保存笔记
-        await _finalize_note_internal(context, update.effective_chat.id, reason="manual")
+        await _finalize_note_internal(context, update.effective_chat.id, update.effective_user.id, reason="manual")
         
         await query.answer("✅ 笔记已保存")
         
@@ -2044,3 +2054,262 @@ async def handle_backup_delete_all_callback(update: Update, context: ContextType
     except Exception as e:
         logger.error(f"Error handling backup delete all callback: {e}", exc_info=True)
         await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+# ==================== Quick Note Operations ====================
+
+@with_language_context
+async def handle_note_quick_edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle quick edit button click - 编辑笔记
+    返回笔记纯文本，等待下一条消息替换内容
+    
+    Callback data format: note_quick_edit:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        note_id = int(query.data.split(':')[1])
+        
+        note_manager = context.bot_data.get('note_manager')
+        if not note_manager:
+            await query.answer("笔记管理器未初始化", show_alert=True)
+            return
+        
+        # 获取笔记内容
+        note = note_manager.get_note(note_id)
+        if not note:
+            await query.answer("❌ 笔记不存在", show_alert=True)
+            return
+        
+        # 设置编辑模式
+        context.user_data['note_edit_mode'] = True
+        context.user_data['note_id_to_edit'] = note_id
+        
+        # 返回笔记纯文本（易于复制）
+        await query.answer("✏️ 进入编辑模式")
+        
+        # 发送纯文本笔记内容
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"📝 当前笔记内容：\n\n{note['content']}\n\n💡 请发送新内容来替换此笔记"
+        )
+        
+        logger.info(f"User entered edit mode for note {note_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling note quick edit: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_note_quick_append_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle quick append button click - 追加笔记
+    等待下一条消息追加到笔记末尾
+    
+    Callback data format: note_quick_append:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        note_id = int(query.data.split(':')[1])
+        
+        note_manager = context.bot_data.get('note_manager')
+        if not note_manager:
+            await query.answer("笔记管理器未初始化", show_alert=True)
+            return
+        
+        # 检查笔记是否存在
+        note = note_manager.get_note(note_id)
+        if not note:
+            await query.answer("❌ 笔记不存在", show_alert=True)
+            return
+        
+        # 设置追加模式
+        context.user_data['note_append_mode'] = True
+        context.user_data['note_id_to_append'] = note_id
+        
+        await query.answer("➕ 进入追加模式")
+        
+        # 提示用户
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="💬 请发送要追加的内容"
+        )
+        
+        logger.info(f"User entered append mode for note {note_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling note quick append: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_note_quick_delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle quick delete button click - 删除笔记确认
+    
+    Callback data format: note_quick_delete:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        note_id = int(query.data.split(':')[1])
+        
+        # 显示确认对话框
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ 确认删除", callback_data=f"note_quick_delete_confirm:{note_id}"),
+                InlineKeyboardButton("❌ 取消", callback_data="note_close")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"⚠️ 确认要删除笔记 #{note_id} 吗？\n\n删除后可在回收站中恢复",
+            reply_markup=reply_markup
+        )
+        
+    except Exception as e:
+        logger.error(f"Error handling note quick delete: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_note_quick_delete_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle confirmed delete - 执行删除
+    
+    Callback data format: note_quick_delete_confirm:note_id
+    """
+    query = update.callback_query
+    
+    try:
+        note_id = int(query.data.split(':')[1])
+        
+        note_manager = context.bot_data.get('note_manager')
+        if not note_manager:
+            await query.answer("笔记管理器未初始化", show_alert=True)
+            return
+        
+        # 执行软删除
+        success = note_manager.delete_note(note_id)
+        
+        if success:
+            await query.answer("✅ 笔记已删除")
+            await query.edit_message_text(
+                f"✅ 笔记 #{note_id} 已删除\n\n💡 可在回收站中恢复"
+            )
+            logger.info(f"Deleted note {note_id}")
+        else:
+            await query.answer("❌ 删除失败", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"Error handling note quick delete confirm: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
+async def handle_continuity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle continuity callback - 5分钟追加连贯性
+    
+    Callback data formats:
+    - continuity:append:note_id - 追加到笔记
+    - continuity:new_note - 创建新笔记
+    - continuity:archive - 正常归档
+    """
+    query = update.callback_query
+    
+    try:
+        parts = query.data.split(':')
+        action = parts[1]
+        
+        # 获取待处理文本
+        pending_text = context.user_data.get('pending_continuity_text')
+        if not pending_text:
+            await query.answer("❌ 未找到待处理文本", show_alert=True)
+            return
+        
+        if action == 'append':
+            # 追加到笔记
+            note_id = int(parts[2])
+            
+            note_manager = context.bot_data.get('note_manager')
+            if not note_manager:
+                await query.answer("笔记管理器未初始化", show_alert=True)
+                return
+            
+            # 获取笔记内容
+            note = note_manager.get_note(note_id)
+            if not note:
+                await query.answer("❌ 笔记不存在", show_alert=True)
+                return
+            
+            # 追加内容
+            new_content = f"{note['content']}\n\n---\n\n{pending_text}"
+            success = note_manager.update_note(note_id, new_content)
+            
+            if success:
+                await query.answer("✅ 已追加到笔记")
+                await query.edit_message_text(
+                    f"✅ 内容已追加到笔记 #{note_id}"
+                )
+                
+                # 更新时间窗口
+                from datetime import datetime
+                context.user_data['last_note_id'] = note_id
+                context.user_data['last_note_time'] = datetime.now()
+                
+                logger.info(f"Continuity: appended to note {note_id}")
+            else:
+                await query.answer("❌ 追加失败", show_alert=True)
+        
+        elif action == 'new_note':
+            # 创建新笔记
+            note_manager = context.bot_data.get('note_manager')
+            if not note_manager:
+                await query.answer("笔记管理器未初始化", show_alert=True)
+                return
+            
+            # 创建笔记
+            note_id = note_manager.add_note(None, pending_text)
+            
+            if note_id:
+                await query.answer("✅ 已创建新笔记")
+                await query.edit_message_text(
+                    f"✅ 笔记已保存\n📝 笔记 #{note_id}"
+                )
+                
+                # 更新时间窗口
+                from datetime import datetime
+                context.user_data['last_note_id'] = note_id
+                context.user_data['last_note_time'] = datetime.now()
+                
+                logger.info(f"Continuity: created new note {note_id}")
+            else:
+                await query.answer("❌ 创建失败", show_alert=True)
+        
+        elif action == 'archive':
+            # 正常归档流程
+            await query.answer("📦 进入归档流程")
+            await query.message.delete()
+            
+            # 清除pending_continuity_text，让消息进入正常归档流程
+            # 由于回调无法触发handle_message，需要告知用户重新发送
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="💡 请重新发送消息以进行归档"
+            )
+            
+            logger.info("Continuity: user chose normal archive")
+        
+        # 清除待处理文本
+        context.user_data.pop('pending_continuity_text', None)
+        
+    except Exception as e:
+        logger.error(f"Error handling continuity callback: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+

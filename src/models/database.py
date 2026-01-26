@@ -159,6 +159,19 @@ class Database:
             except sqlite3.OperationalError:
                 pass
             
+            # Add soft delete columns to notes if missing (for trash functionality)
+            try:
+                cursor.execute("ALTER TABLE notes ADD COLUMN deleted INTEGER DEFAULT 0")
+                logger.info("Added deleted column to notes table")
+            except sqlite3.OperationalError:
+                pass
+            
+            try:
+                cursor.execute("ALTER TABLE notes ADD COLUMN deleted_at TEXT")
+                logger.info("Added deleted_at column to notes table")
+            except sqlite3.OperationalError:
+                pass
+            
             # Migrate notes table to allow NULL archive_id (for standalone notes)
             # Check if migration is needed
             cursor.execute("PRAGMA table_info(notes)")
@@ -258,6 +271,11 @@ class Database:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_notes_created_at 
                 ON notes (created_at DESC)
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_notes_deleted 
+                ON notes (deleted)
             """)
             
             cursor.execute("""
