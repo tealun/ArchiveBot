@@ -1,6 +1,7 @@
 """
-AI Chat Mode Handler
-处理AI对话模式相关逻辑
+AI Chat Mode Handler (重构版)
+处理AI对话模式的UI交互层 - 薄壳设计
+业务逻辑已移至 src/ai/chat_router.py
 """
 
 import logging
@@ -11,9 +12,13 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from ...core.ai_session import get_session_manager
-from ...ai.chat_router import handle_chat_message
+from ...ai.chat_router import (
+    should_trigger_ai_chat,
+    detect_message_intent,
+    process_ai_chat
+)
 from ...utils.config import get_config
-from ...utils.helpers import is_url, should_create_note
+from ...utils.helpers import is_url
 from ...utils.message_builder import MessageBuilder
 from ...utils.i18n import I18n
 
@@ -22,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 async def handle_ai_chat_mode(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> bool:
     """
-    处理AI对话模式
+    处理AI对话模式 (重构版 - UI层薄壳)
     
     Args:
         update: Telegram update
@@ -33,39 +38,11 @@ async def handle_ai_chat_mode(update: Update, context: ContextTypes.DEFAULT_TYPE
         bool: 如果处理了AI对话返回True，否则返回False
     """
     message = update.message
+    text = message.text.strip() if message.text else ""
     
-    # 只处理文本消息且非转发消息
-    if not message.text or message.forward_origin:
-        return False
-    
-    text = message.text.strip()
-    
-    # 检查是否有其他特殊模式正在进行
-    has_other_mode = (
-        context.user_data.get('waiting_note_for_archive') or
-        context.user_data.get('note_modify_mode') or
-        context.user_data.get('note_append_mode') or
-        (context.user_data.get('refine_note_context') and 
-         context.user_data['refine_note_context'].get('waiting_for_instruction'))
-    )
-    
-    if has_other_mode:
-        return False
-    
-    # 获取配置
+    # 获取配置和会话管理器
     config = get_config()
     ai_config = config.ai
-    
-    # 检查AI模式是否启用
-    chat_enabled = bool(ai_config.get('chat_enabled', False))
-    if not chat_enabled:
-        return False
-    
-    # 从配置获取文本阈值
-    text_thresholds = ai_config.get('text_thresholds', {})
-    short_text_threshold = int(text_thresholds.get('short_text', 50))
-    
-    # 获取会话管理器
     session_manager = get_session_manager(
         ttl_seconds=ai_config.get('chat_session_ttl_seconds', 600)
     )
@@ -76,17 +53,13 @@ async def handle_ai_chat_mode(update: Update, context: ContextTypes.DEFAULT_TYPE
     if session:
         return await _handle_existing_session(
             message, context, lang_ctx, text, 
-            session, session_manager, user_id, text_thresholds
+            session, session_manager, user_id, config
         )
     
-    # 情况2：检查是否应自动触发AI会话（短消息且无media）
-    if (len(text) < short_text_threshold and 
-        not message.media_group_id and
-        not message.photo and 
-        not message.document and 
-        not message.video and
-        not message.audio):
-        
+    # 情况2：判断是否应触发AI会话
+    should_trigger, reason = should_trigger_ai_chat(message, context, config)
+    
+    if should_trigger:
         return await _handle_auto_trigger(
             message, context, lang_ctx, text,
             session_manager, user_id
@@ -96,59 +69,67 @@ async def handle_ai_chat_mode(update: Update, context: ContextTypes.DEFAULT_TYPE
     if await _handle_continuity_check(message, context, lang_ctx):
         return True
     
-    # 情况4：URL检测 - 不处理，让其归档
-    if is_url(text):
+    # 情况4：URL检测 - 已在should_trigger_ai_chat中处理
+    if reason == 'url_detected':
         logger.info(f"Detected URL, processing as link archive: {text[:50]}")
         return False
     
     # 情况5：短文本处理
-    return await _handle_short_text(message, context, lang_ctx, text, short_text_threshold)
+    from ...utils.helpers import should_create_note
+    is_short, note_type = should_create_note(text)
+    if is_short:
+        return await _handle_short_text(message, context, lang_ctx, text)
+    
+    return False
 
 
 async def _handle_existing_session(
     message, context, lang_ctx, text, 
-    session, session_manager, user_id, text_thresholds
+    session, session_manager, user_id, config
 ) -> bool:
-    """处理已存在的AI会话"""
+    """
+    处理已存在的AI会话 (重构版 - 使用detect_message_intent)
+    """
+    # 检测消息意图
+    intent = detect_message_intent(text, lang_ctx.language, config, has_active_session=True)
     
-    # 检查是否为长文本（可能是笔记意图）
-    long_text_threshold = int(text_thresholds.get('note_chinese', 150))
-    
-    if len(text) >= long_text_threshold:
-        # 长文本，提示用户选择意图
-        if lang_ctx.language == 'en':
-            prompt_text = f"📝 You sent {len(text)} characters. What do you want to do?"
-            note_btn_text = "📝 Save as Note"
-            chat_btn_text = "💬 Continue Chat"
-        elif lang_ctx.language in ['zh-TW', 'zh-HK', 'zh-MO']:
-            prompt_text = f"📝 您發送了 {len(text)} 個字符。您想做什麼？"
-            note_btn_text = "📝 記錄為筆記"
-            chat_btn_text = "💬 繼續對話"
-        else:
-            prompt_text = f"📝 您发送了 {len(text)} 个字符。您想做什么？"
-            note_btn_text = "📝 记录为笔记"
-            chat_btn_text = "💬 继续对话"
-        
-        keyboard = [
-            [
-                InlineKeyboardButton(note_btn_text, callback_data=f"longtxt_note:{message.message_id}"),
-                InlineKeyboardButton(chat_btn_text, callback_data=f"longtxt_chat:{message.message_id}")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await message.reply_text(prompt_text, reply_markup=reply_markup)
-        
-        # 暂存消息内容，等待用户选择
-        if 'pending_long_text' not in session.get('context', {}):
-            session['context']['pending_long_text'] = {}
-        session['context']['pending_long_text'][str(message.message_id)] = text
-        session_manager.update_session(user_id, session.get('context', {}))
-        
-        logger.info(f"Long text detected ({len(text)} chars), awaiting user choice")
+    # 长文本意图 - 提示用户选择
+    if intent['type'] == 'long_text_in_session':
+        await _show_long_text_intent_prompt(
+            message, lang_ctx, intent['length'], 
+            session, session_manager, user_id
+        )
         return True
     
-    # 正常长度，处理消息
+    # 正常长度，处理AI对话
+    return await _process_ai_message(
+        message, context, lang_ctx, session, session_manager, user_id
+    )
+
+
+async def _handle_auto_trigger(
+    message, context, lang_ctx, text,
+    session_manager, user_id
+) -> bool:
+    """
+    自动触发AI会话 (重构版 - 复用process_ai_chat)
+    """
+    # 自动创建AI会话
+    session = session_manager.create_session(user_id)
+    logger.info(f"AI chat session auto-created for user {user_id}")
+    
+    # 处理AI消息
+    return await _process_ai_message(
+        message, context, lang_ctx, session, session_manager, user_id
+    )
+
+
+async def _process_ai_message(
+    message, context, lang_ctx, session, session_manager, user_id
+) -> bool:
+    """
+    统一的AI消息处理入口 (新增 - 消除重复代码)
+    """
     try:
         # 发送AI处理进度提示
         progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
@@ -160,11 +141,15 @@ async def _handle_existing_session(
             except Exception:
                 pass
         
-        # Stage 1: 理解需求
-        await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
+        # 调用统一的AI处理流程
+        success, ai_response = await process_ai_chat(
+            message, session, context, lang_ctx, update_ai_progress
+        )
         
-        # 调用AI处理（使用'auto'让AI自动判断回复语言）
-        ai_response = await handle_chat_message(text, session, context, 'auto', update_ai_progress)
+        if not success:
+            await message.reply_text(lang_ctx.t('ai_chat_error_session_end'))
+            session_manager.clear_session(user_id)
+            return False
         
         # 检测是否为资源回复（JSON格式）
         if await _handle_resource_response(
@@ -189,54 +174,36 @@ async def _handle_existing_session(
         return False
 
 
-async def _handle_auto_trigger(
-    message, context, lang_ctx, text,
-    session_manager, user_id
-) -> bool:
-    """自动触发AI会话"""
+async def _show_long_text_intent_prompt(
+    message, lang_ctx, text_length, session, session_manager, user_id
+) -> None:
+    """
+    显示长文本意图选择提示 (新增 - 提取UI逻辑)
+    """
+    text = message.text.strip()
     
-    # 自动创建AI会话
-    session = session_manager.create_session(user_id)
-    logger.info(f"AI chat session auto-created for user {user_id}")
+    # 使用i18n获取文本
+    prompt_text = lang_ctx.t('long_text_intent_prompt', length=text_length)
+    note_btn_text = lang_ctx.t('long_text_save_note')
+    chat_btn_text = lang_ctx.t('long_text_continue_chat')
     
-    try:
-        # 发送AI处理进度提示
-        progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
-        
-        # 进度更新回调
-        async def update_ai_progress(stage: str):
-            try:
-                await progress_msg.edit_text(f"🤖 {stage}")
-            except Exception:
-                pass
-        
-        # Stage 1: 理解需求
-        await update_ai_progress(lang_ctx.t('ai_chat_analyzing'))
-        
-        # 使用'auto'让AI自动判断回复语言
-        ai_response = await handle_chat_message(text, session, context, 'auto', update_ai_progress)
-        
-        # 检测是否为资源回复（JSON格式）
-        if await _handle_resource_response(
-            ai_response, message, context, lang_ctx,
-            progress_msg, session_manager, user_id, session
-        ):
-            return True
-        
-        # 编辑消息为最终回复
-        await progress_msg.edit_text(f"🤖 {ai_response}")
-        
-        # 更新会话
-        session_manager.update_session(user_id, session.get('context', {}))
-        
-        logger.info(f"AI chat auto-triggered for user {user_id}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"AI chat error: {e}", exc_info=True)
-        await message.reply_text(lang_ctx.t('ai_chat_error'))
-        session_manager.clear_session(user_id)
-        return False
+    keyboard = [
+        [
+            InlineKeyboardButton(note_btn_text, callback_data=f"longtxt_note:{message.message_id}"),
+            InlineKeyboardButton(chat_btn_text, callback_data=f"longtxt_chat:{message.message_id}")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await message.reply_text(prompt_text, reply_markup=reply_markup)
+    
+    # 暂存消息内容，等待用户选择
+    if 'pending_long_text' not in session.get('context', {}):
+        session['context']['pending_long_text'] = {}
+    session['context']['pending_long_text'][str(message.message_id)] = text
+    session_manager.update_session(user_id, session.get('context', {}))
+    
+    logger.info(f"Long text detected ({text_length} chars), awaiting user choice")
 
 
 async def _handle_resource_response(
@@ -359,8 +326,9 @@ async def _send_resource_list(message, context, lang_ctx, resources, count):
 
 
 async def _handle_continuity_check(message, context, lang_ctx) -> bool:
-    """5分钟追加连贯性检测（仅对文本消息）"""
-    
+    """
+    5分钟追加连贯性检测（仅对文本消息）(重构版 - 使用i18n)
+    """
     last_note_id = context.user_data.get('last_note_id')
     last_note_time = context.user_data.get('last_note_time')
     
@@ -377,34 +345,50 @@ async def _handle_continuity_check(message, context, lang_ctx) -> bool:
     # 保存当前消息文本
     context.user_data['pending_continuity_text'] = message.text
     
-    # 提示用户选择
-    keyboard = [
-        [
-            InlineKeyboardButton("➕ 追加上一条笔记", callback_data=f"continuity:append:{last_note_id}"),
-        ],
-        [
-            InlineKeyboardButton("📝 创建新笔记", callback_data="continuity:new_note"),
-            InlineKeyboardButton("📦 正常归档", callback_data="continuity:archive")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
     # 计算剩余时间
     remaining_seconds = int(300 - time_diff.total_seconds())
     remaining_minutes = remaining_seconds // 60
     remaining_secs = remaining_seconds % 60
+    time_str = f"{remaining_minutes}分{remaining_secs}秒"
+    
+    # 提示用户选择
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                lang_ctx.t('continuity_append'), 
+                callback_data=f"continuity:append:{last_note_id}"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                lang_ctx.t('continuity_new_note'), 
+                callback_data="continuity:new_note"
+            ),
+            InlineKeyboardButton(
+                lang_ctx.t('continuity_archive'), 
+                callback_data="continuity:archive"
+            )
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
     await message.reply_text(
-        f"💡 检测到您在 {remaining_minutes}分{remaining_secs}秒 前保存了笔记 #{last_note_id}\n\n"
-        f"这条消息是否要追加到该笔记？",
+        lang_ctx.t('continuity_prompt', time=time_str, note_id=last_note_id),
         reply_markup=reply_markup
     )
     logger.info(f"Continuity prompt shown for note {last_note_id}")
     return True
 
 
-async def _handle_short_text(message, context, lang_ctx, text, short_text_threshold) -> bool:
-    """处理短文本"""
+async def _handle_short_text(message, context, lang_ctx, text) -> bool:
+    """
+    处理短文本 (重构版 - 使用配置化阈值)
+    """
+    from ...utils.helpers import should_create_note
+    
+    config = get_config()
+    text_thresholds = config.ai.get('text_thresholds', {})
+    short_text_threshold = int(text_thresholds.get('short_text', 50))
     
     # 判断是否是短文字
     is_short, note_type = should_create_note(text)
@@ -419,8 +403,14 @@ async def _handle_short_text(message, context, lang_ctx, text, short_text_thresh
         
         keyboard = [
             [
-                InlineKeyboardButton("📝 保存为笔记", callback_data="short_text:note"),
-                InlineKeyboardButton("📦 归档为内容", callback_data="short_text:archive")
+                InlineKeyboardButton(
+                    lang_ctx.t('button_save_as_note'), 
+                    callback_data="short_text:note"
+                ),
+                InlineKeyboardButton(
+                    lang_ctx.t('button_archive_content'), 
+                    callback_data="short_text:archive"
+                )
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)

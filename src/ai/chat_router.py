@@ -569,3 +569,165 @@ async def generate_response(
         elif language == 'zh-CN':
             error_msg = "处理时出错了，请稍后再试"
         return error_msg
+
+
+# ============================================================================
+# AI Chat Mode Helper Functions (重构版)
+# 提供消息路由判断和统一处理流程，复用现有工具函数
+# ============================================================================
+
+def should_trigger_ai_chat(message, context, config) -> tuple[bool, str]:
+    """
+    判断是否应触发AI对话模式
+    复用helpers.py的工具函数
+    
+    Args:
+        message: Telegram消息对象
+        context: Bot context
+        config: 配置对象
+        
+    Returns:
+        (should_trigger, reason): 是否触发, 原因说明
+    """
+    from ..utils.helpers import is_url
+    
+    # AI功能未启用
+    ai_config = config.ai
+    chat_enabled = bool(ai_config.get('chat_enabled', False))
+    if not chat_enabled:
+        return False, 'chat_disabled'
+    
+    # 只处理文本消息且非转发
+    if not message.text or message.forward_origin:
+        return False, 'not_text_or_forwarded'
+    
+    text = message.text.strip()
+    
+    # 检查是否有其他特殊模式正在进行
+    has_other_mode = (
+        context.user_data.get('waiting_note_for_archive') or
+        context.user_data.get('note_modify_mode') or
+        context.user_data.get('note_append_mode') or
+        (context.user_data.get('refine_note_context') and 
+         context.user_data['refine_note_context'].get('waiting_for_instruction'))
+    )
+    
+    if has_other_mode:
+        return False, 'other_mode_active'
+    
+    # URL检测 - 不触发AI，让其归档
+    if is_url(text):
+        return False, 'url_detected'
+    
+    # 获取文本阈值
+    text_thresholds = ai_config.get('text_thresholds', {})
+    short_text_threshold = int(text_thresholds.get('short_text', 50))
+    
+    # 自动触发条件：短文本且无媒体
+    if (len(text) < short_text_threshold and 
+        not message.media_group_id and
+        not message.photo and 
+        not message.document and 
+        not message.video and
+        not message.audio):
+        return True, 'short_text_auto_trigger'
+    
+    return False, 'does_not_match_criteria'
+
+
+def detect_message_intent(text: str, language: str, config, has_active_session: bool) -> Dict[str, Any]:
+    """
+    检测消息意图（短文本/长文本/连贯性）
+    复用helpers.should_create_note
+    
+    Args:
+        text: 消息文本
+        language: 用户语言
+        config: 配置对象
+        has_active_session: 是否有活跃会话
+        
+    Returns:
+        intent字典: {type, threshold, ...}
+    """
+    from ..utils.helpers import should_create_note
+    
+    text_thresholds = config.ai.get('text_thresholds', {})
+    
+    # 如果在AI会话中，检测长文本意图
+    if has_active_session:
+        # 根据语言选择阈值
+        if language in ['zh-CN', 'zh-TW', 'zh-HK', 'zh-MO']:
+            threshold = int(text_thresholds.get('note_chinese', 150))
+        else:
+            threshold = int(text_thresholds.get('note_english', 250))
+        
+        if len(text) >= threshold:
+            return {
+                'type': 'long_text_in_session',
+                'threshold': threshold,
+                'length': len(text),
+                'should_prompt': True
+            }
+    
+    # 检查短文本
+    is_short, note_type = should_create_note(text)
+    
+    if is_short:
+        short_threshold = int(text_thresholds.get('short_text', 50))
+        return {
+            'type': 'short_text',
+            'note_type': note_type,
+            'length': len(text),
+            'threshold': short_threshold,
+            'should_prompt': len(text) < short_threshold
+        }
+    
+    return {
+        'type': 'normal',
+        'length': len(text)
+    }
+
+
+async def process_ai_chat(
+    message, 
+    session_data: Dict[str, Any], 
+    context, 
+    lang_ctx,
+    progress_callback=None
+) -> tuple[bool, Optional[str]]:
+    """
+    统一的AI消息处理流程
+    消除重复代码，提供可复用的AI调用
+    
+    Args:
+        message: Telegram消息对象
+        session_data: 会话数据
+        context: Bot context
+        lang_ctx: Language context
+        progress_callback: 进度回调函数
+        
+    Returns:
+        (success, response): 处理是否成功, AI响应内容或None
+    """
+    text = message.text.strip()
+    
+    try:
+        # Stage 1: 理解需求
+        if progress_callback:
+            await progress_callback(lang_ctx.t('ai_chat_analyzing'))
+        
+        # 调用AI处理（使用'auto'让AI自动判断回复语言）
+        ai_response = await handle_chat_message(
+            text, 
+            session_data, 
+            context, 
+            'auto', 
+            progress_callback
+        )
+        
+        logger.info(f"AI chat response generated for user")
+        return True, ai_response
+        
+    except Exception as e:
+        logger.error(f"AI chat processing error: {e}", exc_info=True)
+        return False, None

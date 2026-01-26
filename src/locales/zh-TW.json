@@ -181,6 +181,18 @@
   "ai_chat_analyzing": "🧠 分析需求...",
   "ai_chat_gathering": "📊 收集資料...",
   "ai_chat_generating": "💬 生成回覆...",
+  "ai_chat_session_expired": "⚠️ 會話已過期",
+  
+  "long_text_intent_prompt": "📝 您發送了 {length} 個字符。您想做什麼？",
+  "long_text_save_note": "📝 記錄為筆記",
+  "long_text_continue_chat": "💬 繼續對話",
+  
+  "continuity_prompt": "💡 檢測到您在 {time} 前保存了筆記 #{note_id}\n\n這條訊息是否要追加到該筆記？",
+  "continuity_append": "➕ 追加上一條筆記",
+  "continuity_new_note": "📝 創建新筆記",
+  "continuity_archive": "📦 正常歸檔",
+  
+  "resource_send_failed": "❌ 資源發送失敗",
   
   "archive_processing": "⏳ 正在處理...",
   "archive_progress": "進度: {percentage}%",

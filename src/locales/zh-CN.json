@@ -181,6 +181,18 @@
   "ai_chat_analyzing": "🧠 分析需求...",
   "ai_chat_gathering": "📊 收集数据...",
   "ai_chat_generating": "💬 生成回复...",
+  "ai_chat_session_expired": "⚠️ 会话已过期",
+  
+  "long_text_intent_prompt": "📝 您发送了 {length} 个字符。您想做什么？",
+  "long_text_save_note": "📝 记录为笔记",
+  "long_text_continue_chat": "💬 继续对话",
+  
+  "continuity_prompt": "💡 检测到您在 {time} 前保存了笔记 #{note_id}\n\n这条消息是否要追加到该笔记？",
+  "continuity_append": "➕ 追加上一条笔记",
+  "continuity_new_note": "📝 创建新笔记",
+  "continuity_archive": "📦 正常归档",
+  
+  "resource_send_failed": "❌ 资源发送失败",
   
   "archive_processing": "⏳ 正在处理...",
   "archive_progress": "进度: {percentage}%",

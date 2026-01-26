@@ -180,6 +180,18 @@
   "ai_chat_analyzing": "🧠 Analyzing needs...",
   "ai_chat_gathering": "📊 Gathering data...",
   "ai_chat_generating": "💬 Generating response...",
+  "ai_chat_session_expired": "⚠️ Session expired",
+  
+  "long_text_intent_prompt": "📝 You sent {length} characters. What do you want to do?",
+  "long_text_save_note": "📝 Save as Note",
+  "long_text_continue_chat": "💬 Continue Chat",
+  
+  "continuity_prompt": "💡 You saved note #{note_id} {time} ago\n\nDo you want to append this message to that note?",
+  "continuity_append": "➕ Append to Previous Note",
+  "continuity_new_note": "📝 Create New Note",
+  "continuity_archive": "📦 Normal Archive",
+  
+  "resource_send_failed": "❌ Resource send failed",
   
   "archive_processing": "⏳ Processing...",
   "archive_progress": "Progress: {percentage}%",
