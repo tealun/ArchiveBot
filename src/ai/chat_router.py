@@ -79,17 +79,37 @@ async def understand_and_plan(user_message: str, language: str, context: Any, st
                 ai_response = result['choices'][0]['message']['content'].strip()
                 ai_response = re.sub(r'^```json\s*|\s*```$', '', ai_response, flags=re.MULTILINE).strip()
                 
-                plan = json.loads(ai_response)
+                # 调试：输出原始AI响应
+                logger.debug(f"AI raw response: {ai_response[:500]}")
+                
+                try:
+                    plan = json.loads(ai_response)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse AI response as JSON: {e}")
+                    logger.error(f"Raw response: {ai_response}")
+                    return {
+                        'user_goal': 'general_chat',
+                        'user_intent': 'pure_chat',
+                        'need_data': {},
+                        'response_strategy': 'simple_reply'
+                    }
+                
                 user_intent = plan.get('user_intent', 'unknown')
                 user_goal = plan.get('user_goal', 'unknown')
                 response_strategy = plan.get('response_strategy', 'unknown')
                 reasoning = plan.get('reasoning', '')
                 
+                # 如果没有user_intent字段，记录警告
+                if 'user_intent' not in plan:
+                    logger.warning(f"⚠️ AI response missing 'user_intent' field!")
+                    logger.debug(f"Plan keys: {list(plan.keys())}")
+                
                 logger.info(f"🧠 AI Understanding:")
                 logger.info(f"  Intent: {user_intent}")
                 logger.info(f"  Goal: {user_goal}")
                 logger.info(f"  Strategy: {response_strategy}")
-                logger.info(f"  Reasoning: {reasoning}")
+                if reasoning:
+                    logger.info(f"  Reasoning: {reasoning}")
                 
                 return plan
             else:
