@@ -4,24 +4,20 @@ Handles incoming messages for archiving
 """
 
 import logging
-from typing import Optional
-from telegram import Update
+import time
+import asyncio
+from typing import Optional, List, Dict
+from telegram import Update, Message, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 
 from ..utils.language_context import get_language_context
 from .message_aggregator import MessageAggregator
 from ..core.ai_session import get_session_manager
 from ..ai.chat_router import handle_chat_message
-
-# Import helper functions from submodules
-from .handlers import (
-    _cleanup_user_data,
-    _process_single_message,
-    _batch_callback,
-    _handle_note_mode_message,
-    _finalize_note_internal,
-    _is_media_message,
-)
+from ..core.analyzer import ContentAnalyzer
+from ..core.storage_manager import StorageManager
+from ..utils.helpers import format_file_size, truncate_text
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +31,45 @@ def get_message_aggregator() -> MessageAggregator:
     if _message_aggregator is None:
         _message_aggregator = MessageAggregator(batch_window_ms=200, max_batch_size=100)
     return _message_aggregator
+
+
+def _cleanup_user_data(user_data: dict, threshold: int = 50):
+    """
+    清理user_data中的临时数据，防止内存泄漏
+    
+    Args:
+        user_data: 用户数据字典
+        threshold: 触发清理的键数量阈值
+    """
+    if len(user_data) <= threshold:
+        return
+    
+    # 定义需要保留的持久化键（只保留语言设置）
+    persistent_keys = {'language'}
+    
+    # 定义临时键（会自动清理）
+    temporary_keys = [
+        'waiting_note_for_archive', 'note_modify_mode', 'note_id_to_modify',
+        'note_append_mode', 'note_id_to_append', 'pending_command',
+        'refine_note_context', 'pending_short_text'
+    ]
+    
+    # 清理临时键（跳过持久化键和笔记模式相关键）
+    removed_count = 0
+    for key in list(user_data.keys()):
+        # 保留持久化键
+        if key in persistent_keys:
+            continue
+        # 保留笔记模式活跃时的相关键
+        if user_data.get('note_mode') and key in ['note_mode', 'note_messages', 'note_archives', 'note_timeout_job', 'note_start_time']:
+            continue
+        # 清理临时键
+        if key in temporary_keys:
+            user_data.pop(key, None)
+            removed_count += 1
+    
+    if removed_count > 0:
+        logger.info(f"Cleaned up {removed_count} temporary keys from user_data (size: {len(user_data)})")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
