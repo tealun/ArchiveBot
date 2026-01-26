@@ -650,7 +650,9 @@ URL：{analysis.get('url', '')}
             
             # 第二部分：用户评论
             if user_comment:
-                final_note_parts.append("----------------------------------")
+                # 只有前面有内容时才添加分隔线
+                if final_note_parts:
+                    final_note_parts.append("----------------------------------")
                 # 获取用户名
                 from telegram import Update as TelegramUpdate
                 temp_update = TelegramUpdate(update_id=0, message=message)
@@ -660,9 +662,8 @@ URL：{analysis.get('url', '')}
             
             # 第三部分：原始caption（如果有来源信息）
             if original_caption:
-                if user_comment:  # 如果有用户评论，再加一层分隔
-                    final_note_parts.append("----------------------------------")
-                elif note_content:  # 如果只有AI笔记，加一层分隔
+                # 只有前面有内容时才添加分隔线
+                if final_note_parts:
                     final_note_parts.append("----------------------------------")
                 
                 # 获取来源名称
