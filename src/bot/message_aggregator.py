@@ -112,6 +112,33 @@ class MessageBatch:
         
         texts = [msg.text for msg in self.captions if msg.text]
         return "\n".join(texts) if texts else None
+    
+    def get_user_comments_and_captions(self) -> Tuple[Optional[str], Optional[str]]:
+        """
+        区分用户评论和原始caption
+        
+        Returns:
+            (user_comments, original_captions)
+            - user_comments: 用户自己发送的文本消息（非转发）
+            - original_captions: 媒体消息自带的caption字段
+        """
+        user_comments = []
+        original_captions = []
+        
+        # 1. 提取用户自己发送的文本消息（评论）
+        for msg in self.captions:
+            if msg.text and not msg.forward_origin:
+                user_comments.append(msg.text)
+        
+        # 2. 提取媒体消息自带的caption
+        for msg in self.messages:
+            if msg.caption:
+                original_captions.append(msg.caption)
+        
+        user_comment_str = "\n".join(user_comments) if user_comments else None
+        original_caption_str = "\n".join(original_captions) if original_captions else None
+        
+        return user_comment_str, original_caption_str
 
 
 class MessageAggregator:

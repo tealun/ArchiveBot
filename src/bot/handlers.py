@@ -496,7 +496,10 @@ async def _auto_generate_note(
     archive_id: int,
     message: Message,
     analysis: Dict,
-    context: ContextTypes.DEFAULT_TYPE
+    context: ContextTypes.DEFAULT_TYPE,
+    user_comment: Optional[str] = None,
+    original_caption: Optional[str] = None,
+    source_info: Optional[Dict] = None
 ) -> Optional[int]:
     """
     自动生成关联笔记
@@ -505,12 +508,16 @@ async def _auto_generate_note(
     1. 文本内容 >= 阈值：AI生成简洁笔记
     2. 链接：根据链接信息生成笔记
     3. 文档（有AI分析）：整理完整笔记
+    4. 其他媒体类型：整合AI生成 + 用户评论 + 原始caption
     
     Args:
         archive_id: 归档ID
         message: Telegram消息
         analysis: 内容分析结果
         context: Bot context
+        user_comment: 用户附带的评论（可选）
+        original_caption: 转发消息原始的caption（可选）
+        source_info: 来源信息，包含来源名称（可选）
         
     Returns:
         note_id or None
@@ -611,11 +618,70 @@ URL：{analysis.get('url', '')}
                     note_content = f"[自动] {note_content}"
                     logger.info(f"Auto-generated note for document archive {archive_id}")
         
-        # 保存笔记
-        if note_content:
-            note_id = note_manager.add_note(archive_id, note_content)
+        # 4. 其他媒体类型：整合AI生成的笔记 + 用户评论 + 原始caption
+        # 这适用于图片、视频、音频等转发的媒体
+        elif content_type in ['photo', 'video', 'audio', 'voice', 'animation', 'sticker']:
+            # 如果有AI分析结果，生成基础笔记
+            ai_summary = analysis.get('ai_summary')
+            if ai_summary and ai_summarizer and ai_summarizer.is_available():
+                from telegram import Update as TelegramUpdate
+                temp_update = TelegramUpdate(update_id=0, message=message)
+                lang_ctx = get_language_context(temp_update, context)
+                language = lang_ctx.language
+                
+                # 生成AI笔记
+                note_content = await ai_summarizer.generate_note_from_content(
+                    content=ai_summary,
+                    content_type=content_type,
+                    max_length=250,
+                    language=language
+                )
+                
+                if note_content:
+                    note_content = f"[自动] {note_content}"
+        
+        # 构建完整的笔记内容：AI生成 + 用户评论 + 原始caption
+        if note_content or user_comment or original_caption:
+            final_note_parts = []
+            
+            # 第一部分：AI生成的笔记
+            if note_content:
+                final_note_parts.append(note_content)
+            
+            # 第二部分：用户评论
+            if user_comment:
+                final_note_parts.append("----------------------------------")
+                # 获取用户名
+                from telegram import Update as TelegramUpdate
+                temp_update = TelegramUpdate(update_id=0, message=message)
+                user = temp_update.effective_user if hasattr(temp_update, 'effective_user') else message.from_user
+                username = user.first_name if user else "用户"
+                final_note_parts.append(f"[{username}]: {user_comment}")
+            
+            # 第三部分：原始caption（如果有来源信息）
+            if original_caption:
+                if user_comment:  # 如果有用户评论，再加一层分隔
+                    final_note_parts.append("----------------------------------")
+                elif note_content:  # 如果只有AI笔记，加一层分隔
+                    final_note_parts.append("----------------------------------")
+                
+                # 获取来源名称
+                source_name = None
+                if source_info:
+                    source_name = source_info.get('name', '')
+                
+                if source_name:
+                    final_note_parts.append(f"[{source_name}]: {original_caption}")
+                else:
+                    final_note_parts.append(f"[来源]: {original_caption}")
+            
+            # 合并所有部分
+            final_note_content = "\n".join(final_note_parts)
+            
+            # 保存笔记
+            note_id = note_manager.add_note(archive_id, final_note_content)
             if note_id:
-                logger.info(f"Auto-generated note {note_id} for archive {archive_id}")
+                logger.info(f"Auto-generated note {note_id} for archive {archive_id} (with_user_comment={bool(user_comment)}, with_caption={bool(original_caption)})")
                 return note_id
         
         return None
@@ -752,7 +818,7 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     # 批量存储（优化：使用storage_manager的批量方法）
     storage_manager: StorageManager = context.bot_data.get('storage_manager')
     if not storage_manager:
-        return [(False, "Storage manager not initialized") for _ in messages]
+        return [(False, "Storage manager not initialized", None) for _ in messages]
     
     # 调用批量归档（带进度回调和来源信息）
     results = await storage_manager.batch_archive_content(
@@ -765,6 +831,11 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     
     if progress_callback:
         await progress_callback(total, total, lang_ctx.t('batch_progress_complete'))
+    
+    # 为每个成功归档的消息生成笔记
+    # 提取批量用户评论和原始caption（来自batch aggregator）
+    # 注意：这里需要从context.user_data或通过参数传递批次信息
+    # 由于批量处理的特性，我们需要在调用这个函数时传递这些信息
     
     return results
 
@@ -932,8 +1003,58 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                 progress_callback=update_progress
             )
             
+            # 为批量归档生成共享的笔记
+            # 批量消息应该共享一个笔记，关联到第一个成功的归档
+            if results:
+                # 找到第一个成功的归档
+                first_success_archive_id = None
+                for success, msg, archive_id in results:
+                    if success and archive_id:
+                        first_success_archive_id = archive_id
+                        break
+                
+                if first_success_archive_id:
+                    # 从batch中提取用户评论和原始caption
+                    # 需要区分用户的评论文本和媒体消息自带的caption
+                    user_comment = None
+                    original_caption = None
+                    
+                    # 查找用户自己发送的文本消息（非转发，非媒体）
+                    for msg in messages:
+                        if msg.text and not msg.forward_origin and not any([
+                            msg.photo, msg.video, msg.document,
+                            msg.audio, msg.voice, msg.animation
+                        ]):
+                            user_comment = msg.text
+                            break
+                    
+                    # 查找媒体消息自带的caption
+                    for msg in messages:
+                        if msg.caption:
+                            original_caption = msg.caption
+                            break
+                    
+                    # 如果用户评论就是merged_caption且没有其他caption，则只保留用户评论
+                    if user_comment == merged_caption and not original_caption:
+                        pass  # 保持user_comment，不需要额外处理
+                    elif not user_comment and merged_caption:
+                        # merged_caption可能是用户评论
+                        user_comment = merged_caption
+                    
+                    # 为第一个归档生成共享笔记（包含AI生成+用户评论+原始caption）
+                    await _auto_generate_note(
+                        archive_id=first_success_archive_id,
+                        message=messages[0],
+                        analysis=ContentAnalyzer.analyze(messages[0]),
+                        context=context,
+                        user_comment=user_comment,
+                        original_caption=original_caption,
+                        source_info=source_info
+                    )
+                    logger.info(f"Generated shared note for batch, linked to archive {first_success_archive_id}")
+            
             # 统计结果
-            success_count = sum(1 for success, _ in results if success)
+            success_count = sum(1 for success, _, _ in results if success)
             fail_count = len(results) - success_count
             
             if fail_count > 0:

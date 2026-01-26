@@ -71,11 +71,11 @@ class StorageManager:
             progress_callback: 进度回调函数 (current, total, stage)
             
         Returns:
-            [(success, message), ...]
+            [(success, message, archive_id), ...]
         """
         if len(messages) != len(analyses):
             logger.error(f"Messages and analyses count mismatch: {len(messages)} vs {len(analyses)}")
-            return [(False, "Internal error") for _ in messages]
+            return [(False, "Internal error", None) for _ in messages]
         
         results = []
         total = len(messages)
@@ -132,7 +132,7 @@ class StorageManager:
                 content_type = analysis.get('content_type')
                 
                 if content_type == 'error':
-                    results.append((False, self.i18n.t('archive_failed', error=analysis.get('error', 'Unknown'))))
+                    results.append((False, self.i18n.t('archive_failed', error=analysis.get('error', 'Unknown')), None))
                     continue
                 
                 # Determine storage
@@ -216,7 +216,7 @@ class StorageManager:
                     include_ai_info=True
                 )
                 
-                results.append((True, success_msg))
+                results.append((True, success_msg, archive_id))
                 
                 # 更新进度
                 if progress_callback and (i + 1) % max(1, total // 20) == 0:
@@ -224,9 +224,9 @@ class StorageManager:
                 
             except Exception as e:
                 logger.error(f"Error in batch archive item {i}: {e}", exc_info=True)
-                results.append((False, str(e)))
+                results.append((False, str(e), None))
         
-        logger.info(f"Batch archived {sum(1 for s, _ in results if s)}/{len(results)} items")
+        logger.info(f"Batch archived {sum(1 for s, _, _ in results if s)}/{len(results)} items")
         return results
     
     async def archive_content(
