@@ -20,7 +20,10 @@ class I18n:
     SUPPORTED_LANGUAGES = {
         'en': 'English',
         'zh-CN': '简体中文',
-        'zh-TW': '繁體中文'
+        'zh-TW': '繁體中文',
+        'ja': '日本語',
+        'ko': '한국어',
+        'es': 'Español'
     }
     
     # 语言代码映射表：简化代码 -> 完整代码

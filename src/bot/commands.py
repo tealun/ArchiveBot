@@ -325,6 +325,11 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE, l
             ],
             [
                 InlineKeyboardButton("繁體中文", callback_data="lang_zh-TW"),
+                InlineKeyboardButton("日本語", callback_data="lang_ja"),
+            ],
+            [
+                InlineKeyboardButton("한국어", callback_data="lang_ko"),
+                InlineKeyboardButton("Español", callback_data="lang_es"),
             ]
         ]
         

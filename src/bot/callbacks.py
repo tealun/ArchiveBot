@@ -360,6 +360,60 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                             BotCommand("language", "切换语言 (简写: /lang)"),
                         ]
                         telegram_lang = "zh"  # Telegram 使用 zh 作为中文语言代码
+                    elif language == 'ja':
+                        # 日语命令
+                        commands = [
+                            BotCommand("start", "ボット初期化"),
+                            BotCommand("help", "ヘルプ表示"),
+                            BotCommand("search", "アーカイブ検索 (/s)"),
+                            BotCommand("note", "ノート追加"),
+                            BotCommand("notes", "ノート表示"),
+                            BotCommand("tags", "タグ一覧 (/t)"),
+                            BotCommand("stats", "統計情報 (/st)"),
+                            BotCommand("review", "アーカイブレビュー"),
+                            BotCommand("trash", "ゴミ箱"),
+                            BotCommand("export", "データエクスポート"),
+                            BotCommand("backup", "バックアップ管理"),
+                            BotCommand("ai", "AIステータス"),
+                            BotCommand("language", "言語変更 (/lang)"),
+                        ]
+                        telegram_lang = "ja"
+                    elif language == 'ko':
+                        # 韩语命令
+                        commands = [
+                            BotCommand("start", "봇 초기화"),
+                            BotCommand("help", "도움말 표시"),
+                            BotCommand("search", "아카이브 검색 (/s)"),
+                            BotCommand("note", "노트 추가"),
+                            BotCommand("notes", "노트 표시"),
+                            BotCommand("tags", "태그 목록 (/t)"),
+                            BotCommand("stats", "통계 표시 (/st)"),
+                            BotCommand("review", "아카이브 리뷰"),
+                            BotCommand("trash", "휴지통"),
+                            BotCommand("export", "데이터 내보내기"),
+                            BotCommand("backup", "백업 관리"),
+                            BotCommand("ai", "AI 상태"),
+                            BotCommand("language", "언어 변경 (/lang)"),
+                        ]
+                        telegram_lang = "ko"
+                    elif language == 'es':
+                        # 西班牙语命令
+                        commands = [
+                            BotCommand("start", "Inicializar bot"),
+                            BotCommand("help", "Mostrar ayuda"),
+                            BotCommand("search", "Buscar archivos (/s)"),
+                            BotCommand("note", "Añadir nota"),
+                            BotCommand("notes", "Ver notas"),
+                            BotCommand("tags", "Lista de etiquetas (/t)"),
+                            BotCommand("stats", "Mostrar estadísticas (/st)"),
+                            BotCommand("review", "Revisar archivos"),
+                            BotCommand("trash", "Papelera"),
+                            BotCommand("export", "Exportar datos"),
+                            BotCommand("backup", "Gestión de copias"),
+                            BotCommand("ai", "Estado de IA"),
+                            BotCommand("language", "Cambiar idioma (/lang)"),
+                        ]
+                        telegram_lang = "es"
                     else:
                         # 英文命令
                         commands = [
