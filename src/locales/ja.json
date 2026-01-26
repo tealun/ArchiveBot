@@ -186,6 +186,18 @@
   "ai_chat_analyzing": "🧠 ニーズを分析中...",
   "ai_chat_gathering": "📊 データを収集中...",
   "ai_chat_generating": "💬 応答を生成中...",
+  "ai_chat_session_expired": "⚠️ セッションが期限切れです",
+  
+  "long_text_intent_prompt": "📝 {length}文字のメッセージを送信しました。どうしますか？",
+  "long_text_save_note": "📝 ノートとして保存",
+  "long_text_continue_chat": "💬 チャットを続ける",
+  
+  "continuity_prompt": "💡 {time}前にノート #{note_id} を保存しました\n\nこのメッセージを追加しますか？",
+  "continuity_append": "➕ 前のノートに追加",
+  "continuity_new_note": "📝 新しいノートを作成",
+  "continuity_archive": "📦 通常のアーカイブ",
+  
+  "resource_send_failed": "❌ リソースの送信に失敗しました",
   
   "archive_processing": "⏳ 処理中...",
   "archive_progress": "進捗：{percentage}%",

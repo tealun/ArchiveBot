@@ -186,6 +186,18 @@
   "ai_chat_analyzing": "🧠 Analizando necesidades...",
   "ai_chat_gathering": "📊 Recopilando datos...",
   "ai_chat_generating": "💬 Generando respuesta...",
+  "ai_chat_session_expired": "⚠️ Sesión expirada",
+  
+  "long_text_intent_prompt": "📝 Enviaste {length} caracteres. ¿Qué te gustaría hacer?",
+  "long_text_save_note": "📝 Guardar como Nota",
+  "long_text_continue_chat": "💬 Continuar Chat",
+  
+  "continuity_prompt": "💡 Guardaste la nota #{note_id} hace {time}\n\n¿Quieres agregar este mensaje a esa nota?",
+  "continuity_append": "➕ Agregar a Nota Anterior",
+  "continuity_new_note": "📝 Crear Nueva Nota",
+  "continuity_archive": "📦 Archivo Normal",
+  
+  "resource_send_failed": "❌ Fallo al enviar recurso",
   
   "archive_processing": "⏳ Procesando...",
   "archive_progress": "Progreso: {percentage}%",
