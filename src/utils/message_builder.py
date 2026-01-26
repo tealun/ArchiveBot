@@ -338,3 +338,327 @@ class MessageBuilder:
                 sent_count += 1
         
         return sent_count
+    
+    @staticmethod
+    def format_note_detail_reply(
+        note: Dict[str, Any],
+        archive: Optional[Dict[str, Any]] = None
+    ) -> tuple[str, Optional[Any]]:
+        """
+        构建单条笔记的详情展示格式
+        
+        Args:
+            note: 笔记数据，包含：
+                - id: 笔记ID
+                - content: 笔记内容
+                - title: 笔记标题（可选）
+                - created_at: 创建时间
+                - archive_id: 关联的存档ID（可选）
+            archive: 关联的存档数据（可选）
+            
+        Returns:
+            (格式化的消息文本, InlineKeyboardMarkup按钮或None)
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        note_id = note.get('id')
+        note_title = note.get('title', '')
+        note_content = note.get('content', '')
+        created_at = note.get('created_at', '')
+        archive_id = note.get('archive_id')
+        
+        # 构建笔记链接（如果有storage_path）
+        storage_path = note.get('storage_path', '')
+        note_link = ''
+        
+        if storage_path:
+            parts = storage_path.split(':')
+            if len(parts) >= 2:
+                channel_id_str = parts[0].replace('-100', '')
+                message_id = parts[1]
+                link = f"https://t.me/c/{channel_id_str}/{message_id}"
+                note_link = f"<a href='{link}'>#{note_id}</a>"
+            else:
+                note_link = f"#{note_id}"
+        else:
+            note_link = f"#{note_id}"
+        
+        # 构建消息文本
+        if note_title:
+            # 有标题的笔记
+            text = f"📝 [笔记 {note_link}] {note_title}\n"
+            text += "----------------------------------\n"
+            text += f"{note_content}\n"
+            text += "----------------------------------\n"
+            text += f"📅 {created_at}"
+        else:
+            # 没有标题的笔记
+            text = f"📝 [笔记 {note_link}]\n"
+            text += "----------------------------------\n"
+            text += f"{note_content}\n"
+            text += "----------------------------------\n"
+            text += f"📅 {created_at}"
+        
+        # 构建按钮
+        keyboard = []
+        if archive_id:
+            # 关联了存档的笔记
+            keyboard.append([
+                InlineKeyboardButton("✏️ 编辑", callback_data=f"note_edit:{archive_id}:{note_id}"),
+                InlineKeyboardButton("➕ 追加", callback_data=f"note_append:{archive_id}:{note_id}")
+            ])
+            keyboard.append([
+                InlineKeyboardButton("📤 分享", callback_data=f"note_share:{archive_id}:{note_id}"),
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_delete:{note_id}")
+            ])
+        else:
+            # 独立笔记
+            keyboard.append([
+                InlineKeyboardButton("✏️ 编辑", callback_data=f"note_quick_edit:{note_id}"),
+                InlineKeyboardButton("➕ 追加", callback_data=f"note_quick_append:{note_id}")
+            ])
+            keyboard.append([
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_quick_delete:{note_id}")
+            ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+        
+        return text, reply_markup
+    
+    @staticmethod
+    def format_text_archive_reply(
+        archive: Dict[str, Any],
+        notes: Optional[List[Dict[str, Any]]] = None,
+        db_instance=None
+    ) -> tuple[str, Optional[Any]]:
+        """
+        构建单条文本存档的详情展示格式
+        区分带笔记和不带笔记两种情况
+        
+        Args:
+            archive: 存档数据，包含：
+                - id: 存档ID
+                - title: 标题
+                - content: 文本内容
+                - storage_path: 存储路径
+                - created_at: 创建时间
+            notes: 关联的笔记列表（可选）
+            db_instance: 数据库实例（用于检查笔记状态）
+            
+        Returns:
+            (格式化的消息文本, InlineKeyboardMarkup按钮或None)
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        archive_id = archive.get('id')
+        title = archive.get('title', '')
+        content = archive.get('content', '')
+        storage_path = archive.get('storage_path', '')
+        created_at = archive.get('archived_at', archive.get('created_at', ''))
+        
+        # 构建存档链接
+        archive_link = ''
+        if storage_path:
+            parts = storage_path.split(':')
+            if len(parts) >= 2:
+                channel_id_str = parts[0].replace('-100', '')
+                message_id = parts[1]
+                link = f"https://t.me/c/{channel_id_str}/{message_id}"
+                archive_link = f"<a href='{link}'>#{archive_id}</a>"
+            else:
+                archive_link = f"#{archive_id}"
+        else:
+            archive_link = f"#{archive_id}"
+        
+        # 检查是否有笔记
+        has_notes = False
+        if notes:
+            has_notes = len(notes) > 0
+        elif db_instance:
+            has_notes = db_instance.has_notes(archive_id)
+        
+        # 构建消息文本
+        if title:
+            # 有标题的文本存档
+            text = f"📝 [文本 {archive_link}] {title}\n"
+        else:
+            # 没有标题的文本存档
+            text = f"📝 [文本 {archive_link}]\n"
+        
+        text += "----------------------------------\n"
+        text += f"{truncate_text(content, 500)}\n"
+        text += "----------------------------------\n"
+        text += f"📅 {created_at}\n"
+        
+        # 如果有笔记，显示笔记摘要
+        if has_notes and notes:
+            text += "\n💬 关联笔记：\n"
+            for note in notes[:2]:  # 最多显示2条
+                note_preview = truncate_text(note.get('content', ''), 100)
+                text += f"  • {note_preview}\n"
+            if len(notes) > 2:
+                text += f"  ...还有 {len(notes) - 2} 条笔记\n"
+        
+        # 构建按钮
+        keyboard = []
+        if has_notes:
+            # 有笔记的情况
+            keyboard.append([
+                InlineKeyboardButton("✏️ 编辑", callback_data=f"edit_text:{archive_id}"),
+                InlineKeyboardButton("📝 查看笔记", callback_data=f"note:{archive_id}")
+            ])
+            keyboard.append([
+                InlineKeyboardButton("➕ 追加笔记", callback_data=f"note_add:{archive_id}"),
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"delete:{archive_id}")
+            ])
+        else:
+            # 没有笔记的情况
+            keyboard.append([
+                InlineKeyboardButton("✏️ 编辑", callback_data=f"edit_text:{archive_id}"),
+                InlineKeyboardButton("📝 添加笔记", callback_data=f"note_add:{archive_id}")
+            ])
+            keyboard.append([
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"delete:{archive_id}")
+            ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+        
+        return text, reply_markup
+    
+    @staticmethod
+    def format_media_archive_caption(
+        archive: Dict[str, Any],
+        notes: Optional[List[Dict[str, Any]]] = None,
+        max_length: int = 200
+    ) -> str:
+        """
+        构建媒体存档的caption（笔记内容）
+        
+        Args:
+            archive: 存档数据
+            notes: 关联的笔记列表
+            max_length: caption最大长度（字符数）
+            
+        Returns:
+            格式化的caption文本
+        """
+        archive_id = archive.get('id')
+        title = archive.get('title', '')
+        
+        caption = f"📚 {title}\n" if title else f"📚 存档 #{archive_id}\n"
+        
+        if notes and len(notes) > 0:
+            # 合并所有笔记内容
+            all_notes_content = "\n---\n".join([note.get('content', '') for note in notes])
+            
+            # 截断到max_length
+            if len(all_notes_content) > max_length:
+                caption += truncate_text(all_notes_content, max_length - len(caption) - 10)
+                caption += "\n\n💬 [查看完整笔记]"
+            else:
+                caption += all_notes_content
+        
+        return caption
+    
+    @staticmethod
+    def build_media_archive_buttons(
+        archive: Dict[str, Any],
+        has_notes: bool = False
+    ) -> Optional[Any]:
+        """
+        构建媒体存档的操作按钮
+        
+        Args:
+            archive: 存档数据
+            has_notes: 是否有关联笔记
+            
+        Returns:
+            InlineKeyboardMarkup按钮或None
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        archive_id = archive.get('id')
+        storage_path = archive.get('storage_path', '')
+        
+        keyboard = []
+        
+        # 第一行：查看频道消息 | 笔记按钮
+        row1 = []
+        if storage_path:
+            parts = storage_path.split(':')
+            if len(parts) >= 2:
+                channel_id_str = parts[0].replace('-100', '')
+                message_id = parts[1]
+                # 使用callback来跳转，因为InlineKeyboardButton的url参数不支持t.me/c/格式
+                row1.append(InlineKeyboardButton("🔗 查看", callback_data=f"view_channel:{archive_id}"))
+        
+        if has_notes:
+            row1.append(InlineKeyboardButton("📝 笔记", callback_data=f"note:{archive_id}"))
+        else:
+            row1.append(InlineKeyboardButton("📝 添加笔记", callback_data=f"note_add:{archive_id}"))
+        
+        if row1:
+            keyboard.append(row1)
+        
+        # 第二行：删除按钮
+        keyboard.append([
+            InlineKeyboardButton("🗑️ 删除", callback_data=f"delete:{archive_id}")
+        ])
+        
+        return InlineKeyboardMarkup(keyboard) if keyboard else None
+    
+    @staticmethod
+    def format_other_archive_reply(
+        archive: Dict[str, Any],
+        has_notes: bool = False
+    ) -> tuple[str, Optional[Any]]:
+        """
+        构建其他类型存档的详情展示格式
+        用于非文本非媒体类型（如链接、文档等）
+        
+        Args:
+            archive: 存档数据
+            has_notes: 是否有关联笔记
+            
+        Returns:
+            (格式化的消息文本, InlineKeyboardMarkup按钮或None)
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        archive_id = archive.get('id')
+        title = archive.get('title', f"存档 #{archive_id}")
+        storage_path = archive.get('storage_path', '')
+        content_type = archive.get('content_type', '')
+        emoji = get_content_type_emoji(content_type)
+        
+        # 构建标题链接
+        if storage_path:
+            parts = storage_path.split(':')
+            if len(parts) >= 2:
+                channel_id_str = parts[0].replace('-100', '')
+                message_id = parts[1]
+                link = f"https://t.me/c/{channel_id_str}/{message_id}"
+                text = f"{emoji} <a href='{link}'>{title}</a>\n"
+            else:
+                text = f"{emoji} {title}\n"
+        else:
+            text = f"{emoji} {title}\n"
+        
+        text += "----------------------------------"
+        
+        # 构建按钮
+        keyboard = []
+        if has_notes:
+            keyboard.append([
+                InlineKeyboardButton("📝 查看笔记", callback_data=f"note:{archive_id}"),
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"delete:{archive_id}")
+            ])
+        else:
+            keyboard.append([
+                InlineKeyboardButton("📝 添加笔记", callback_data=f"note_add:{archive_id}"),
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"delete:{archive_id}")
+            ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+        
+        return text, reply_markup
