@@ -1,15 +1,9 @@
-name: 自动部署到AWS EC2服务器
+name: 自动部署到服务器
 
 on:
   push:
     branches:
       - main
-    paths:
-      - 'src/**'
-      - 'main.py'
-      - 'requirements.txt'
-      - 'config/**'
-      - '.github/workflows/**'
 
 jobs:
   deploy:
@@ -26,7 +20,7 @@ jobs:
         echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
         echo "sha=$(git log -1 --pretty=%h)" >> $GITHUB_OUTPUT
     
-    - name: 🚀 部署到AWS EC2服务器
+    - name: 🚀 部署到服务器
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SERVER_HOST }}
@@ -39,7 +33,7 @@ jobs:
           echo "🔄 开始部署 ArchiveBot..."
 
           # 进入项目目录
-          cd /www/wwwroot/archivebot
+          cd ${{ secrets.PROJECT_PATH }}
 
           # 备份当前版本
           echo "💾 备份当前版本..."
