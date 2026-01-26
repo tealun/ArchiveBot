@@ -1205,7 +1205,32 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                 except Exception as e:
                     logger.warning(f"Failed to generate AI title: {e}")
             
-            # 转发笔记到Telegram频道
+            # 先保存笔记以获得note_id（不带storage_path）
+            note_manager = context.bot_data.get('note_manager')
+            if not note_manager:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ 笔记管理器未初始化"
+                )
+                return
+            
+            # 如果有归档，关联第一个归档
+            archive_id = archives[0] if archives else None
+            note_id = note_manager.add_note(
+                archive_id, 
+                note_content, 
+                title=note_title,
+                storage_path=None  # 先不设置，等转发后再更新
+            )
+            
+            if not note_id:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ 笔记保存失败"
+                )
+                return
+            
+            # 转发笔记到Telegram频道（使用正确的格式和note_id）
             storage_path = None
             telegram_storage = context.bot_data.get('telegram_storage')
             if telegram_storage:
@@ -1214,9 +1239,8 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                     config = get_config()
                     
                     # 获取笔记频道ID：NOTE -> TEXT -> default
-                    # 优先使用NOTE频道
-                    note_channel_key = config.get('storage.telegram.type_mapping.note', 'text')  # 默认映射到text
-                    note_channel_id = config.get(f'storage.telegram.channels.{note_channel_key}', 0)
+                    # 优先直接获取NOTE频道
+                    note_channel_id = config.get('storage.telegram.channels.note', 0)
                     
                     # 如果NOTE频道未配置，降级到TEXT频道
                     if not note_channel_id:
@@ -1230,11 +1254,8 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                             note_channel_id = config.get('storage.telegram.channel_id', 0)
                     
                     if note_channel_id:
-                        # 准备转发的消息内容
-                        forward_content = f"📝 笔记\n"
-                        if note_title:
-                            forward_content += f"标题：{note_title}\n\n"
-                        forward_content += note_content
+                        # 准备转发的消息内容 - 格式：📝  [笔记 #X] 标题\n\n内容
+                        forward_content = f"📝  [笔记 #{note_id}] {note_title or '无标题'}\n\n{note_content}"
                         
                         # 限制消息长度（Telegram限制）
                         if len(forward_content) > 4000:
@@ -1259,69 +1280,55 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                             channel_id_numeric = channel_id_str.lstrip('-')
                         
                         storage_path = f"https://t.me/c/{channel_id_numeric}/{channel_msg.message_id}"
-                        logger.info(f"Note forwarded to channel: {storage_path}")
+                        
+                        # 更新笔记的storage_path
+                        note_manager.db.execute(
+                            "UPDATE notes SET storage_path = ? WHERE id = ?",
+                            (storage_path, note_id)
+                        )
+                        note_manager.db.commit()
+                        
+                        logger.info(f"Note #{note_id} forwarded to channel: {storage_path}")
                     else:
                         logger.warning("No Telegram channel configured for notes")
                         
                 except Exception as e:
                     logger.error(f"Failed to forward note to channel: {e}", exc_info=True)
             
-            # 保存笔记
-            note_manager = context.bot_data.get('note_manager')
-            if note_manager:
-                # 如果有归档，关联第一个归档
-                archive_id = archives[0] if archives else None
-                note_id = note_manager.add_note(
-                    archive_id, 
-                    note_content, 
-                    title=note_title,
-                    storage_path=storage_path
-                )
-                
-                if note_id:
-                    reason_map = {
-                        'manual': '手动退出',
-                        'timeout': '超时自动保存',
-                        'command': '命令触发'
-                    }
-                    reason_text = reason_map.get(reason, '未知原因')
-                    
-                    # 构建简洁的结果消息
-                    result_parts = [
-                        f"✅ 笔记已保存",
-                        f"📝 笔记 #{note_id}"
-                    ]
-                    
-                    if note_title:
-                        result_parts.append(f"📌 {note_title}")
-                    
-                    result_parts.append(f"📊 文本: {len(messages)} | 媒体: {len(archives)}")
-                    
-                    if archive_id:
-                        result_parts.append(f"📎 关联: #{archive_id}")
-                    
-                    # 添加频道链接（使用HTML格式）
-                    if storage_path:
-                        result_parts.append(f'🔗 <a href="{storage_path}">查看频道消息</a>')
-                    
-                    result_parts.append(f"🔚 {reason_text}")
-                    
-                    await context.bot.send_message(
-                        chat_id=chat_id,
-                        text='\n'.join(result_parts),
-                        parse_mode='HTML',
-                        disable_web_page_preview=True
-                    )
-                else:
-                    await context.bot.send_message(
-                        chat_id=chat_id,
-                        text="❌ 笔记保存失败"
-                    )
-            else:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text="❌ 笔记管理器未初始化"
-                )
+            # 构建成功反馈消息
+            reason_map = {
+                'manual': '手动退出',
+                'timeout': '超时自动保存',
+                'command': '命令触发'
+            }
+            reason_text = reason_map.get(reason, '未知原因')
+            
+            # 构建简洁的结果消息
+            result_parts = [
+                f"✅ 笔记已保存",
+                f"📝 笔记 #{note_id}"
+            ]
+            
+            if note_title:
+                result_parts.append(f"📌 {note_title}")
+            
+            result_parts.append(f"📊 文本: {len(messages)} | 媒体: {len(archives)}")
+            
+            if archive_id:
+                result_parts.append(f"📎 关联: #{archive_id}")
+            
+            # 添加频道链接（使用HTML格式）
+            if storage_path:
+                result_parts.append(f'🔗 <a href="{storage_path}">查看频道消息</a>')
+            
+            result_parts.append(f"🔚 {reason_text}")
+            
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text='\n'.join(result_parts),
+                parse_mode='HTML',
+                disable_web_page_preview=True
+            )
         
         # 立即清除所有笔记模式相关数据，释放内存
         keys_to_remove = ['note_mode', 'note_messages', 'note_archives', 'note_start_time', 'note_timeout_job', 'pending_command']
