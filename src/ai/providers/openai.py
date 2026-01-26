@@ -10,8 +10,8 @@ from typing import Dict, Any, List, Optional
 
 from .base import AIProvider
 from .utils import detect_content_language, is_formal_content
-from ...prompts import PromptManager
-from ....core.ai_cache import AICache, content_hash
+from ai.prompts import PromptManager
+from core.ai_cache import AICache, content_hash
 
 logger = logging.getLogger(__name__)
 
