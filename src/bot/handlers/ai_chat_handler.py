@@ -210,8 +210,10 @@ async def _handle_resource_response(
     ai_response, message, context, lang_ctx,
     progress_msg, session_manager, user_id, session
 ) -> bool:
-    """处理资源回复（JSON格式的响应）"""
-    
+    """
+    处理资源回复（JSON格式的响应）
+    合并版：直接使用MessageBuilder统一处理
+    """
     try:
         response_data = json.loads(ai_response)
         if response_data.get('type') != 'resources':
@@ -227,13 +229,8 @@ async def _handle_resource_response(
         except:
             pass
         
-        if strategy == 'single' and resources:
-            # 单个资源
-            await _send_single_resource(message, context, lang_ctx, resources[0])
-        
-        elif strategy == 'list' and resources:
-            # 多个资源列表
-            await _send_resource_list(message, context, lang_ctx, resources, count)
+        # 统一调用资源发送函数
+        await _send_resources(message, context, lang_ctx, strategy, resources, count)
         
         # 更新会话
         session_manager.update_session(user_id, session.get('context', {}))
@@ -245,184 +242,126 @@ async def _handle_resource_response(
         return False
 
 
-async def _send_single_resource(message, context, lang_ctx, resource):
-    """发送单个资源"""
+async def _send_resources(message, context, lang_ctx, strategy: str, resources: list, count: int):
+    """
+    统一的资源发送函数（合并single和list逻辑）
+    """
+    if not resources:
+        return
     
-    content_type = resource.get('content_type', '')
-    
-    # 获取笔记
+    # 获取公共数据
     note_manager = context.bot_data.get('note_manager')
-    notes = []
-    if note_manager:
-        notes = note_manager.get_notes(resource.get('id'))
-    
-    # 媒体类型：发送实体+caption+按钮
-    if content_type in ['photo', 'video', 'audio', 'voice', 'animation']:
-        caption = MessageBuilder.format_media_archive_caption(resource, notes, max_length=200)
-        result = await MessageBuilder.send_archive_resource(
-            context.bot,
-            message.chat_id,
-            resource,
-            caption=caption
-        )
-        
-        if result:
-            buttons = MessageBuilder.build_media_archive_buttons(resource, has_notes=bool(notes))
-            await message.reply_text("👆 资源已发送", reply_markup=buttons)
-        else:
-            await message.reply_text(lang_ctx.t('resource_send_failed') if hasattr(lang_ctx, 't') else "发送资源失败")
-    
-    # 文本类型：使用文本存档格式
-    elif content_type in ['text', 'article']:
-        db_storage = context.bot_data.get('db_storage')
-        db = db_storage.db if db_storage else None
-        text, reply_markup = MessageBuilder.format_text_archive_reply(resource, notes, db)
-        await message.reply_text(
-            text,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True
-        )
-    
-    # 其他类型：使用其他存档格式
-    else:
-        has_notes = bool(notes)
-        text, reply_markup = MessageBuilder.format_other_archive_reply(resource, has_notes)
-        await message.reply_text(
-            text,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True
-        )
-
-
-async def _send_resource_list(message, context, lang_ctx, resources, count):
-    """发送资源列表"""
-    
     db_storage = context.bot_data.get('db_storage')
     db = db_storage.db if db_storage else None
     
-    i18n = I18n(lang_ctx.language if hasattr(lang_ctx, 'language') else 'zh-CN')
-    list_text = MessageBuilder.format_archive_list(
-        resources,
-        i18n,
-        db_instance=db,
-        with_links=True
-    )
+    if strategy == 'single':
+        # 单个资源：使用MessageBuilder的完整展示
+        resource = resources[0]
+        content_type = resource.get('content_type', '')
+        notes = note_manager.get_notes(resource.get('id')) if note_manager else []
+        
+        # 媒体类型
+        if content_type in ['photo', 'video', 'audio', 'voice', 'animation']:
+            caption = MessageBuilder.format_media_archive_caption(resource, notes, max_length=200)
+            result = await MessageBuilder.send_archive_resource(
+                context.bot, message.chat_id, resource, caption=caption
+            )
+            if result:
+                buttons = MessageBuilder.build_media_archive_buttons(resource, has_notes=bool(notes))
+                await message.reply_text("👆 资源已发送", reply_markup=buttons)
+            else:
+                await message.reply_text(lang_ctx.t('resource_send_failed'))
+        
+        # 文本类型
+        elif content_type in ['text', 'article']:
+            text, reply_markup = MessageBuilder.format_text_archive_reply(resource, notes, db)
+            await message.reply_text(text, reply_markup=reply_markup, 
+                                    parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+        
+        # 其他类型
+        else:
+            text, reply_markup = MessageBuilder.format_other_archive_reply(resource, bool(notes))
+            await message.reply_text(text, reply_markup=reply_markup,
+                                    parse_mode=ParseMode.HTML, disable_web_page_preview=True)
     
-    # 添加标题
-    if lang_ctx.language == 'en':
-        header = f"🔍 Found {count} resource(s):\n\n"
-    elif lang_ctx.language == 'zh-TW':
-        header = f"🔍 找到 {count} 個資源：\n\n"
-    else:
-        header = f"🔍 找到 {count} 个资源：\n\n"
-    
-    await message.reply_text(
-        header + list_text,
-        parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True
-    )
+    elif strategy == 'list':
+        # 多个资源：使用列表格式
+        i18n = I18n(lang_ctx.language)
+        list_text = MessageBuilder.format_archive_list(resources, i18n, db_instance=db, with_links=True)
+        
+        # i18n标题
+        header_key = {
+            'en': f"🔍 Found {count} resource(s):\n\n",
+            'zh-TW': f"🔍 找到 {count} 個資源：\n\n",
+            'zh-CN': f"🔍 找到 {count} 个资源：\n\n"
+        }.get(lang_ctx.language, f"🔍 找到 {count} 个资源：\n\n")
+        
+        await message.reply_text(header_key + list_text, parse_mode=ParseMode.HTML, 
+                                disable_web_page_preview=True)
 
 
 async def _handle_continuity_check(message, context, lang_ctx) -> bool:
-    """
-    5分钟追加连贯性检测（仅对文本消息）(重构版 - 使用i18n)
-    """
+    """5分钟追加连贯性检测（精简版）"""
     last_note_id = context.user_data.get('last_note_id')
     last_note_time = context.user_data.get('last_note_time')
     
     if not (last_note_id and last_note_time and message.text):
         return False
     
-    # 计算时间差
+    # 检查5分钟窗口
     time_diff = datetime.now() - last_note_time
-    
-    # 如果在5分钟窗口内
-    if time_diff.total_seconds() >= 300:  # 5分钟 = 300秒
+    if time_diff.total_seconds() >= 300:
         return False
     
-    # 保存当前消息文本
+    # 保存待处理文本
     context.user_data['pending_continuity_text'] = message.text
     
-    # 计算剩余时间
+    # 计算剩余时间显示
     remaining_seconds = int(300 - time_diff.total_seconds())
-    remaining_minutes = remaining_seconds // 60
-    remaining_secs = remaining_seconds % 60
-    time_str = f"{remaining_minutes}分{remaining_secs}秒"
+    time_str = f"{remaining_seconds // 60}分{remaining_seconds % 60}秒"
     
-    # 提示用户选择
+    # 显示按钮提示
     keyboard = [
-        [
-            InlineKeyboardButton(
-                lang_ctx.t('continuity_append'), 
-                callback_data=f"continuity:append:{last_note_id}"
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                lang_ctx.t('continuity_new_note'), 
-                callback_data="continuity:new_note"
-            ),
-            InlineKeyboardButton(
-                lang_ctx.t('continuity_archive'), 
-                callback_data="continuity:archive"
-            )
-        ]
+        [InlineKeyboardButton(lang_ctx.t('continuity_append'), 
+                            callback_data=f"continuity:append:{last_note_id}")],
+        [InlineKeyboardButton(lang_ctx.t('continuity_new_note'), callback_data="continuity:new_note"),
+         InlineKeyboardButton(lang_ctx.t('continuity_archive'), callback_data="continuity:archive")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     
     await message.reply_text(
         lang_ctx.t('continuity_prompt', time=time_str, note_id=last_note_id),
-        reply_markup=reply_markup
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
     logger.info(f"Continuity prompt shown for note {last_note_id}")
     return True
 
 
 async def _handle_short_text(message, context, lang_ctx, text) -> bool:
-    """
-    处理短文本 (重构版 - 使用配置化阈值)
-    """
+    """处理短文本（精简版）"""
     from ...utils.helpers import should_create_note
     
-    config = get_config()
-    text_thresholds = config.ai.get('text_thresholds', {})
-    short_text_threshold = int(text_thresholds.get('short_text', 50))
-    
-    # 判断是否是短文字
     is_short, note_type = should_create_note(text)
-    
     if not is_short:
         return False
     
-    # 如果非常短（<short_text_threshold字符），询问用户意图
+    config = get_config()
+    short_text_threshold = int(config.ai.get('text_thresholds', {}).get('short_text', 50))
+    
+    # 非常短的文本 - 询问意图
     if len(text) < short_text_threshold:
-        # 保存待处理文本到用户数据
         context.user_data['pending_short_text'] = text
         
         keyboard = [
-            [
-                InlineKeyboardButton(
-                    lang_ctx.t('button_save_as_note'), 
-                    callback_data="short_text:note"
-                ),
-                InlineKeyboardButton(
-                    lang_ctx.t('button_archive_content'), 
-                    callback_data="short_text:archive"
-                )
-            ]
+            [InlineKeyboardButton(lang_ctx.t('button_save_as_note'), callback_data="short_text:note"),
+             InlineKeyboardButton(lang_ctx.t('button_archive_content'), callback_data="short_text:archive")]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await message.reply_text(
-            lang_ctx.t('short_text_prompt'),
-            reply_markup=reply_markup
-        )
+        await message.reply_text(lang_ctx.t('short_text_prompt'), 
+                                reply_markup=InlineKeyboardMarkup(keyboard))
         logger.info(f"Asking user intent for short text: {text[:30]}")
         return True
     
-    # 达到笔记阈值的短文本，直接保存为笔记
+    # 达到阈值的短文本 - 直接保存为笔记
     note_manager = context.bot_data.get('note_manager')
     if note_manager:
         note_id = note_manager.add_note(None, text)
