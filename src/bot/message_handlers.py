@@ -760,3 +760,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
         except:
             pass
+
+
+# Import and re-export media handlers from handlers package
+from .handlers import (
+    handle_photo,
+    handle_video,
+    handle_document,
+    handle_audio,
+    handle_voice,
+    handle_animation,
+    handle_sticker,
+    handle_contact,
+    handle_location
+)
