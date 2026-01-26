@@ -1,0 +1,168 @@
+# Plantilla de configuración de ArchiveBot
+# Copie este archivo como config.yaml y complete sus valores
+
+bot:
+  token: BOT_TOKEN  # Obtenido de @BotFather (se recomienda usar la variable de entorno BOT_TOKEN)
+  owner_id: OWNER_ID  # Su ID de Telegram, obtenido de @userinfobot (se recomienda usar la variable de entorno OWNER_ID)
+  language: "zh-CN"  # Idioma de la interfaz: en, zh-CN, zh-TW
+  polling_interval: 1  # Intervalo de sondeo (segundos)
+  feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # Enlace de comentarios del usuario
+
+features:
+  auto_tag: true  # Generación automática de etiquetas de tipo
+  auto_file_type_tag: false  # Generación automática de etiquetas de tipo de archivo (#imagen, #video, etc.), por defecto false
+  extract_tags_from_caption: false  # Extraer #etiquetas del caption del mensaje reenviado (desactivado por defecto para evitar contaminación de etiquetas)
+  enable_fts: true  # Habilitar búsqueda de texto completo
+  enable_ocr: false  # Habilitar reconocimiento OCR de imágenes
+
+ai:
+  enabled: false  # Habilitar funcionalidad de IA
+  auto_summarize: false  # Resumir automáticamente nuevo contenido archivado
+  auto_generate_tags: false  # Generar automáticamente etiquetas de IA
+  auto_generate_title: true  # Generar automáticamente título de IA para notas (15-20 caracteres)
+  max_generated_tags: 8  # Número máximo de etiquetas generadas automáticamente por IA (5-10 es óptimo, por defecto 8)
+
+  # Configuración unificada de IA (recomendado). Para evitar codificar claves API en duro, se recomienda configurar a través de variables de entorno
+  # y referenciar el nombre de la variable de entorno en api.api_key_env
+  api:
+    provider: AI_API_PROVIDER  # Proveedor: openai, claude, gemini, grok, etc.
+    api_key_env: AI_API_KEY  # Nombre de la variable de entorno (uso recomendado)
+    api_url: AI_API_URL  # Dirección de API personalizada (opcional, o use la variable de entorno AI_API_URL)
+    model: AI_MODEL  # Modelo (o use la variable de entorno AI_MODEL)
+    reasoning_model: AI_REASONING_MODEL  # Modelo de razonamiento para análisis de intención (o use la variable de entorno AI_REASONING_MODEL)
+    temperature: 0.7  # Diversidad de generación (rango entre 0-1)
+    max_tokens: 1000  # Número máximo de tokens
+    timeout: 30  # Tiempo de espera (segundos)
+
+  # Control de tiempo de ejecución y medidas de protección
+  cache_enabled: true            # Habilitar caché de respuestas de IA para evitar llamadas duplicadas y costos
+  cache_path: "data/ai_cache.db" # Ruta de la base de datos de caché (sqlite)
+  cache_ttl_seconds: 604800      # Período de validez de caché (segundos), por defecto 7 días
+  rate_limit_per_minute: 60      # Límite global de llamadas a la API por minuto
+  log_calls: false               # Registrar detalles de llamadas de IA (evitar registrar respuestas completas en producción)
+  retry_on_failure: 1            # Número de reintentos en errores temporales
+  auto_summary_on_forward: true  # Activar resumen automáticamente al reenviar mensaje (nivel de procesador)
+  auto_tagging: true             # Aplicar etiquetas generadas por IA (establecer en false para generar solo sugerencias)
+  
+  # Modo de chat de IA (conversación interactiva)
+  chat_enabled: false           # Habilitar modo de chat de IA automático para mensajes cortos
+  chat_session_ttl_seconds: 600 # Tiempo de espera de sesión (por defecto 10 minutos)
+  chat_history_length: 10       # Número de pares de mensajes conservados en el historial de sesión (por defecto 10, es decir, 20 mensajes)
+  chat_allow_write_ops: false   # Permitir a la IA realizar operaciones de escritura (archivar/eliminar/etiquetar) - mantener false por seguridad
+  chat_use_reasoning: true      # Usar modelo de razonamiento para análisis de intención (habilitado por defecto)
+  
+  # Configuración de umbrales de longitud de texto (gestión unificada)
+  text_thresholds:
+    short_text: 50         # Umbral de determinación de texto corto (activar conversación de IA o confirmación de intención)
+    note_chinese: 150      # Umbral de determinación de nota en chino (usado en modo de interacción de IA para distinguir si texto largo debe convertirse en nota o continuar conversación)
+    note_english: 250      # Umbral de determinación de nota en inglés (usado en modo de interacción de IA para distinguir si texto largo debe convertirse en nota o continuar conversación)
+  
+  # Configuración de exclusión de contenido de referencia de IA (para filtrado de datos de contexto en modo de interacción de IA)
+  exclude_from_context:
+    channel_ids: AI_EXCLUDE_CHANNELS  # Lista de IDs de canales de archivo excluidos, por ejemplo: [-1001234567890, -1009876543210]
+    tags: AI_EXCLUDE_TAGS         # Lista de etiquetas excluidas, por ejemplo: ['privado', 'borrador', 'temporal', 'no_archivar', 'exclude', 'skip']
+
+logging:
+  level: "INFO"  # Nivel de registro: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"  # Ruta del archivo de registro
+  console: true  # Salida a consola
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+storage:
+  database:
+    path: "data/archive.db"  # Ruta del archivo de base de datos
+  
+  backup:
+    auto_interval_hours: 168  # Intervalo de copia de seguridad automática (horas), por defecto 168 horas (7 días/semanal)
+    keep_count: 10           # Número de copias de seguridad a conservar, por defecto conservar las últimas 10
+  
+  telegram:
+    enabled: true  # Habilitar almacenamiento en Telegram
+    # Compatibilidad hacia atrás: configuración de un solo canal antiguo (si se configura channels.default, este elemento se ignora)
+    channel_id: CHANNEL_DEFAULT  # Leer desde variable de entorno
+    
+    # Configuración multicanal (se recomienda usar variables de entorno)
+    channels:
+      default: CHANNEL_DEFAULT  # Leer desde variable de entorno (obligatorio)
+      text: CHANNEL_TEXT  # Leer desde variable de entorno (opcional)
+      ebook: CHANNEL_EBOOK  # Leer desde variable de entorno (opcional)
+      document: CHANNEL_DOCUMENT  # Leer desde variable de entorno (opcional)
+      image: CHANNEL_IMAGE  # Leer desde variable de entorno (opcional)
+      media: CHANNEL_MEDIA  # Leer desde variable de entorno (opcional)
+      note: CHANNEL_NOTE  # Canal dedicado para notas, leer desde variable de entorno (opcional, si no está configurado usa text o default)
+    
+    # Reglas de mapeo de tipo a canal
+    type_mapping:
+      text: text           # Texto plano → Canal de texto
+      link: text           # Enlace → Canal de texto
+      note: text           # Nota → Canal de texto (si el canal note no está configurado)
+      ebook: ebook         # Libro electrónico → Canal de libros electrónicos
+      document: document   # Documento → Canal de documentos
+      image: image         # Imagen → Canal de imágenes
+      animation: image     # GIF animado → Canal de imágenes
+      sticker: image       # Sticker → Canal de imágenes
+      video: media         # Video → Canal de medios
+      audio: media         # Audio → Canal de medios
+      voice: media         # Voz → Canal de medios
+      contact: default     # Contacto → Canal por defecto
+      location: default    # Ubicación → Canal por defecto
+    
+    # Configuración de mapeo de fuente a canal (prioridad más alta que mapeo de tipo)
+    # Especificar canal de almacenamiento según la fuente de reenvío (nombre o ID de canal/grupo)
+    # Múltiples fuentes pueden mapearse al mismo canal, pero una fuente no puede mapearse a múltiples canales
+    source_mapping:
+      # Ejemplo:
+      # - sources: ['Canal Técnico', 'Grupo Desarrollo', -1001234567890]  # Soporta nombre o ID
+      #   channel_id: -1001111111111  # Canal de almacenamiento de destino
+      # - sources: ['Vida Cotidiana']
+      #   channel_id: -1002222222222
+    
+    # Configuración de mapeo de etiqueta a canal (prioridad más alta)
+    # Especificar canal de almacenamiento según etiquetas del mensaje
+    # Múltiples etiquetas pueden mapearse al mismo canal, pero una etiqueta no puede mapearse a múltiples canales
+    tag_mapping:
+      # Ejemplo:
+      # - tags: ['trabajo', 'proyecto', 'tarea']  # Múltiples etiquetas mapeadas al mismo canal
+      #   channel_id: -1001111111111
+      # - tags: ['estudio', 'notas']
+      #   channel_id: -1002222222222
+    
+    # Configuración de almacenamiento de contenido enviado directamente por el usuario (cuando no hay fuente de reenvío)
+    direct_send:
+      # Configuración de canal de envío directo personal (opcional, si no está configurado usa channels del sistema)
+      channels:
+        default: CHANNEL_DIRECT_DEFAULT  # Leer desde variable de entorno (opcional)
+        # Otros canales configuración opcional:
+        # text: CHANNEL_TEXT
+        # ebook: CHANNEL_EBOOK
+        # document: CHANNEL_DOCUMENT
+        # image: CHANNEL_IMAGE
+        # media: CHANNEL_MEDIA
+      
+      # Reglas de mapeo de tipo de envío directo personal (opcional, si no está configurado usa type_mapping del sistema)
+      type_mapping:
+        # Ejemplo (mantener consistencia con type_mapping del sistema):
+        # text: text           # Texto plano → Canal de texto
+        # link: text           # Enlace → Canal de texto
+        # ebook: ebook         # Libro electrónico → Canal de libros electrónicos
+        # document: document   # Documento → Canal de documentos
+        # image: image         # Imagen → Canal de imágenes
+        # animation: image     # GIF animado → Canal de imágenes
+        # sticker: image       # Sticker → Canal de imágenes
+        # video: media         # Video → Canal de medios
+        # audio: media         # Audio → Canal de medios
+        # voice: media         # Voz → Canal de medios
+        # contact: default     # Contacto → Canal por defecto
+        # location: default    # Ubicación → Canal por defecto
+  
+  cloud:
+    google_drive:
+      enabled: false  # Habilitar almacenamiento en Google Drive
+      client_id: ""  # ID de cliente de Google Drive
+      client_secret: ""  # Secreto de cliente de Google Drive
+      folder_name: "ArchiveBot"  # Nombre de la carpeta de almacenamiento
+    
+    aliyun:
+      enabled: false  # Habilitar almacenamiento en Aliyun Drive
+      refresh_token: ""  # Token de actualización de Aliyun Drive
+      folder_name: "归档"  # Nombre de la carpeta de almacenamiento
