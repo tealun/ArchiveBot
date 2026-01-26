@@ -99,10 +99,24 @@ async def understand_and_plan(user_message: str, language: str, context: Any, st
                 response_strategy = plan.get('response_strategy', 'unknown')
                 reasoning = plan.get('reasoning', '')
                 
-                # 如果没有user_intent字段，记录警告
+                # 如果没有user_intent字段，根据response_strategy降级推断
                 if 'user_intent' not in plan:
-                    logger.warning(f"⚠️ AI response missing 'user_intent' field!")
+                    logger.warning(f"⚠️ AI response missing 'user_intent' field! Inferring from strategy...")
                     logger.debug(f"Plan keys: {list(plan.keys())}")
+                    
+                    # 降级映射：strategy -> intent
+                    strategy_to_intent = {
+                        'clarify': 'pure_chat',           # 打招呼、澄清问题
+                        'direct_answer': 'general_query',  # 简单直接回答
+                        'search_results': 'specific_search', # 搜索结果
+                        'data_analysis': 'stats_analysis',   # 数据分析
+                        'resource_reply': 'resource_request' # 资源回复
+                    }
+                    
+                    inferred_intent = strategy_to_intent.get(response_strategy, 'general_query')
+                    plan['user_intent'] = inferred_intent
+                    user_intent = inferred_intent
+                    logger.info(f"✓ Inferred intent: {user_intent} (from strategy: {response_strategy})")
                 
                 logger.info(f"🧠 AI Understanding:")
                 logger.info(f"  Intent: {user_intent}")
