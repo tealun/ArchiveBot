@@ -8,6 +8,8 @@ Handles AI interactive chat mode with 3-stage processing:
 
 Uses language context for multi-language support.
 """
+from __future__ import annotations
+
 import logging
 import re
 import json

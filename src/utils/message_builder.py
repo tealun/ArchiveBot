@@ -2,6 +2,7 @@
 消息构建框架
 提供统一的消息格式化和资源发送功能
 """
+from __future__ import annotations
 
 import logging
 from typing import List, Dict, Any, Optional
