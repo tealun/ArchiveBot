@@ -376,12 +376,11 @@ def main():
         else:
             logger.warning("JobQueue not available - auto backup and cleanup disabled")
         
-        # 设置机器人命令菜单（多语言支持）
+        # 设置机器人命令菜单（多语言支持）- 通过 job_queue 延迟执行避免 event loop 冲突
         from telegram import BotCommand
-        import asyncio
         
-        async def set_bot_commands():
-            """设置机器人命令菜单 - 为所有支持的语言设置"""
+        async def set_bot_commands_job(context: ContextTypes.DEFAULT_TYPE):
+            """设置机器人命令菜单任务 - 为所有支持的语言设置"""
             try:
                 # 定义多语言命令菜单
                 commands_config = {
@@ -477,28 +476,29 @@ def main():
                     ],
                 }
                 
-                # 初始化bot（必须先初始化才能调用API）
-                async with application:
-                    success_count = 0
-                    for language_code, commands in commands_config.items():
-                        try:
-                            await application.bot.set_my_commands(
-                                commands=commands,
-                                language_code=language_code
-                            )
-                            lang_name = language_code if language_code else "default"
-                            logger.info(f"✓ Commands set for language: {lang_name} ({len(commands)} commands)")
-                            success_count += 1
-                        except Exception as e:
-                            lang_name = language_code if language_code else "default"
-                            logger.error(f"Failed to set commands for {lang_name}: {e}")
-                    
-                    logger.info(f"✓ Bot commands menu configured for {success_count}/{len(commands_config)} languages")
+                # 为所有支持的语言设置命令菜单
+                success_count = 0
+                for language_code, commands in commands_config.items():
+                    try:
+                        await context.bot.set_my_commands(
+                            commands=commands,
+                            language_code=language_code
+                        )
+                        lang_name = language_code if language_code else "default"
+                        logger.info(f"✓ Commands set for language: {lang_name} ({len(commands)} commands)")
+                        success_count += 1
+                    except Exception as e:
+                        lang_name = language_code if language_code else "default"
+                        logger.error(f"Failed to set commands for {lang_name}: {e}")
+                
+                logger.info(f"✓ Bot commands menu configured for {success_count}/{len(commands_config)} languages")
             except Exception as e:
                 logger.error(f"Failed to set bot commands: {e}")
         
-        # 在启动前设置命令菜单
-        asyncio.run(set_bot_commands())
+        # 通过 job_queue 延迟执行命令菜单设置（避免 event loop 冲突）
+        if job_queue:
+            job_queue.run_once(set_bot_commands_job, when=5)
+            logger.info("✓ Bot commands setup scheduled (will execute in 5 seconds)")
         
         logger.info("Bot is ready! Starting polling...")
         

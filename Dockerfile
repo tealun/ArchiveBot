@@ -17,6 +17,13 @@ COPY . .
 # 创建数据目录（如果不存在）
 RUN mkdir -p /app/data /app/data/backups /app/data/cache /app/data/temp /app/data/temp/ai_sessions
 
+# 创建非 root 用户并设置权限（安全最佳实践）
+RUN adduser --disabled-password --gecos '' --uid 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# 切换到非 root 用户
+USER appuser
+
 # 环境变量
 ENV PYTHONUNBUFFERED=1
 

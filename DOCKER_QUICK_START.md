@@ -97,7 +97,28 @@ storage:
 
 ---
 
-## 第四步：启动 Bot
+## 第四步：配置数据目录权限（重要）
+
+由于 Docker 容器以非 root 用户（uid 1000）运行，需要确保数据目录权限正确。
+
+### Linux/macOS 用户：
+```bash
+# 确保 data 目录存在并设置权限
+mkdir -p data
+chmod 755 data
+```
+
+如果启动后遇到权限错误，执行：
+```bash
+sudo chown -R 1000:1000 data/
+```
+
+### Windows 用户：
+通常无需额外配置，Docker Desktop 会自动处理权限映射。
+
+---
+
+## 第五步：启动 Bot
 
 **一条命令搞定**：
 
@@ -114,7 +135,7 @@ docker-compose up -d --build
 
 ---
 
-## 第五步：测试 Bot
+## 第六步：测试 Bot
 
 1. 打开 Telegram，找到你的 Bot
 2. 发送 `/start`
