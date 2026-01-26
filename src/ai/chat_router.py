@@ -341,42 +341,44 @@ async def gather_data(need_data: Dict[str, Any], context: Any, user_intent: str 
             
             logger.info(f"⏳ Resource query: type={query_type}, content_types={content_types}, keywords={keywords}, tags={tags}, favorite={favorite_only}, limit={limit}")
             
-                # 应用排除逻辑的辅助函数
-                def apply_exclusions(archives_list):
-                    """应用排除逻辑到归档列表"""
-                    if not archives_list:
-                        return []
-                    
-                    original = len(archives_list)
-                    filtered = archives_list
-                    
-                    # 排除指定频道
-                    if excluded_channels:
-                        filtered = [
-                            a for a in filtered 
-                            if not any(
-                                a.get('storage_path', '').startswith(f"telegram:{ch_id}:") 
-                                for ch_id in excluded_channels
-                            )
-                        ]
-                        if len(filtered) < original:
-                            logger.debug(f"Excluded {original - len(filtered)} from channels")
-                    
-                    # 排除指定标签
-                    if excluded_tags:
-                        tag_manager = context.bot_data.get('tag_manager')
-                        if tag_manager:
-                            final = []
-                            for archive in filtered:
-                                archive_tags = archive.get('tags') or tag_manager.get_archive_tags(archive.get('id'))
-                                if not any(tag in excluded_tags for tag in archive_tags):
-                                    final.append(archive)
-                            filtered = final
-                            if len(filtered) < original:
-                                logger.debug(f"Excluded {original - len(filtered)} by tags")
-                    
-                    return filtered
+            # 应用排除逻辑的辅助函数
+            def apply_exclusions(archives_list):
+                """应用排除逻辑到归档列表"""
+                if not archives_list:
+                    return []
                 
+                original = len(archives_list)
+                filtered = archives_list
+                
+                # 排除指定频道
+                if excluded_channels:
+                    filtered = [
+                        a for a in filtered 
+                        if not any(
+                            a.get('storage_path', '').startswith(f"telegram:{ch_id}:") 
+                            for ch_id in excluded_channels
+                        )
+                    ]
+                    if len(filtered) < original:
+                        logger.debug(f"Excluded {original - len(filtered)} from channels")
+                
+                # 排除指定标签
+                if excluded_tags:
+                    tag_manager = context.bot_data.get('tag_manager')
+                    if tag_manager:
+                        final = []
+                        for archive in filtered:
+                            archive_tags = archive.get('tags') or tag_manager.get_archive_tags(archive.get('id'))
+                            if not any(tag in excluded_tags for tag in archive_tags):
+                                final.append(archive)
+                        filtered = final
+                        if len(filtered) < original:
+                            logger.debug(f"Excluded {original - len(filtered)} by tags")
+                
+                return filtered
+            
+            resources = []
+            
             if query_type == 'random':
                 # 随机获取
                 import random
@@ -424,11 +426,11 @@ async def gather_data(need_data: Dict[str, Any], context: Any, user_intent: str 
                         candidates = [a for a in candidates if a.get('content_type') in content_types]
                         logger.debug(f"Filtered by content_types: {original_count} → {len(candidates)}")
                     if favorite_only and db_storage:
-                    # 应用排除逻辑
-                    candidates = apply_exclusions(candidates)
-                    
                         candidates = [a for a in candidates if db_storage.db.is_favorite(a.get('id'))]
                         logger.debug(f"Filtered by favorite: {original_count} → {len(candidates)}")
+                    
+                    # 应用排除逻辑
+                    candidates = apply_exclusions(candidates)
                     
                     resources = candidates[:limit]
                     logger.info(f"✅ Search: Final {len(resources)} results after filtering")
