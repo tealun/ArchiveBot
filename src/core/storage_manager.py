@@ -6,6 +6,7 @@ Manages content storage across different providers
 import logging
 from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime
+from telegram import Message
 
 from ..storage.database import DatabaseStorage
 from ..storage.telegram import TelegramStorage

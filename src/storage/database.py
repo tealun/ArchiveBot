@@ -3,6 +3,8 @@ Database storage implementation
 Handles database operations for archives, tags, and config
 """
 
+from __future__ import annotations
+
 import sqlite3
 import logging
 import json

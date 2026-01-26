@@ -42,7 +42,9 @@ from src.core.backup_manager import BackupManager
 from src.core.review_manager import ReviewManager
 from src.core.ai_data_cache import AIDataCache
 
-from src.bot import commands, handlers, callbacks
+from src.bot import commands
+from src.bot import message_handlers as handlers
+from src.bot import callback_router as callbacks
 from src.bot.unknown_command import handle_unknown_command
 from src.ai.summarizer import get_ai_summarizer
 
