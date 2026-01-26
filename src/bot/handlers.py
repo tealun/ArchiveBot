@@ -1716,14 +1716,61 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                         pass
                                 
                                     if strategy == 'single' and resources:
-                                        # 单个资源，直接发送文件
-                                        result = await MessageBuilder.send_archive_resource(
-                                            context.bot,
-                                            message.chat_id,
-                                            resources[0]
-                                        )
-                                        if not result:
-                                            await message.reply_text(lang_ctx.t('resource_send_failed') if hasattr(lang_ctx, 't') else "发送资源失败")
+                                        # 单个资源，根据类型决定发送方式
+                                        resource = resources[0]
+                                        content_type = resource.get('content_type', '')
+                                        
+                                        # 获取笔记
+                                        note_manager = context.bot_data.get('note_manager')
+                                        notes = []
+                                        if note_manager:
+                                            notes = note_manager.get_notes(resource.get('id'))
+                                        
+                                        # 媒体类型：发送实体+caption+按钮
+                                        if content_type in ['photo', 'video', 'audio', 'voice', 'animation']:
+                                            # 构建caption
+                                            caption = MessageBuilder.format_media_archive_caption(resource, notes, max_length=200)
+                                            
+                                            # 发送资源
+                                            result = await MessageBuilder.send_archive_resource(
+                                                context.bot,
+                                                message.chat_id,
+                                                resource,
+                                                caption=caption
+                                            )
+                                            
+                                            if result:
+                                                # 发送操作按钮
+                                                buttons = MessageBuilder.build_media_archive_buttons(resource, has_notes=bool(notes))
+                                                await message.reply_text(
+                                                    "👆 资源已发送",
+                                                    reply_markup=buttons
+                                                )
+                                            else:
+                                                await message.reply_text(lang_ctx.t('resource_send_failed') if hasattr(lang_ctx, 't') else "发送资源失败")
+                                        
+                                        # 文本类型：使用文本存档格式
+                                        elif content_type in ['text', 'article']:
+                                            db_storage = context.bot_data.get('db_storage')
+                                            db = db_storage.db if db_storage else None
+                                            text, reply_markup = MessageBuilder.format_text_archive_reply(resource, notes, db)
+                                            await message.reply_text(
+                                                text,
+                                                reply_markup=reply_markup,
+                                                parse_mode=ParseMode.HTML,
+                                                disable_web_page_preview=True
+                                            )
+                                        
+                                        # 其他类型：使用其他存档格式
+                                        else:
+                                            has_notes = bool(notes)
+                                            text, reply_markup = MessageBuilder.format_other_archive_reply(resource, has_notes)
+                                            await message.reply_text(
+                                                text,
+                                                reply_markup=reply_markup,
+                                                parse_mode=ParseMode.HTML,
+                                                disable_web_page_preview=True
+                                            )
                                 
                                     elif strategy == 'list' and resources:
                                         # 多个资源，显示列表
@@ -1826,13 +1873,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                                         pass
                                 
                                     if strategy == 'single' and resources:
-                                        result = await MessageBuilder.send_archive_resource(
-                                            context.bot,
-                                            message.chat_id,
-                                            resources[0]
-                                        )
-                                        if not result:
-                                            await message.reply_text("发送资源失败")
+                                        # 单个资源，根据类型决定发送方式
+                                        resource = resources[0]
+                                        content_type = resource.get('content_type', '')
+                                        
+                                        # 获取笔记
+                                        note_manager = context.bot_data.get('note_manager')
+                                        notes = []
+                                        if note_manager:
+                                            notes = note_manager.get_notes(resource.get('id'))
+                                        
+                                        # 媒体类型：发送实体+caption+按钮
+                                        if content_type in ['photo', 'video', 'audio', 'voice', 'animation']:
+                                            caption = MessageBuilder.format_media_archive_caption(resource, notes, max_length=200)
+                                            result = await MessageBuilder.send_archive_resource(
+                                                context.bot,
+                                                message.chat_id,
+                                                resource,
+                                                caption=caption
+                                            )
+                                            
+                                            if result:
+                                                buttons = MessageBuilder.build_media_archive_buttons(resource, has_notes=bool(notes))
+                                                await message.reply_text("👆 资源已发送", reply_markup=buttons)
+                                            else:
+                                                await message.reply_text("发送资源失败")
+                                        
+                                        # 文本类型：使用文本存档格式
+                                        elif content_type in ['text', 'article']:
+                                            db_storage = context.bot_data.get('db_storage')
+                                            db = db_storage.db if db_storage else None
+                                            text, reply_markup = MessageBuilder.format_text_archive_reply(resource, notes, db)
+                                            await message.reply_text(
+                                                text,
+                                                reply_markup=reply_markup,
+                                                parse_mode=ParseMode.HTML,
+                                                disable_web_page_preview=True
+                                            )
+                                        
+                                        # 其他类型：使用其他存档格式
+                                        else:
+                                            has_notes = bool(notes)
+                                            text, reply_markup = MessageBuilder.format_other_archive_reply(resource, has_notes)
+                                            await message.reply_text(
+                                                text,
+                                                reply_markup=reply_markup,
+                                                parse_mode=ParseMode.HTML,
+                                                disable_web_page_preview=True
+                                            )
                                 
                                     elif strategy == 'list' and resources:
                                         db_storage = context.bot_data.get('db_storage')

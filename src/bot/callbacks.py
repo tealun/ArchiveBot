@@ -954,35 +954,43 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             logger.info(f"User waiting to add note for archive {archive_id}")
             return
         
-        # 构建笔记内容显示
-        notes_text = f"📝 归档 #{archive_id} 的笔记\n\n"
+        # 获取归档信息
+        db_storage = context.bot_data.get('db_storage')
+        archive = None
+        if db_storage:
+            archive = db_storage.get_archive(archive_id)
         
-        # 显示最新的笔记（或所有笔记）
-        for idx, note in enumerate(notes, 1):
-            content = note['content']
-            notes_text += f"{content}\n"
-            if len(notes) > 1:
-                notes_text += f"\n📅 {note['created_at']}\n\n"
-        
+        # 如果只有一条笔记，使用统一的格式化方法
         if len(notes) == 1:
-            notes_text += f"\n📅 {notes[0]['created_at']}"
-        
-        # 添加操作按钮：编辑笔记 | 删除笔记 | 分享笔记
-        keyboard = [[
-            InlineKeyboardButton("✏️ 编辑笔记", callback_data=f"note_edit:{archive_id}:{notes[-1]['id']}"),
-            InlineKeyboardButton("🗑️ 删除笔记", callback_data=f"note_delete:{notes[-1]['id']}")
-        ]]
-        keyboard.append([InlineKeyboardButton("📤 分享笔记", callback_data=f"note_share:{archive_id}:{notes[-1]['id']}")])
-        keyboard.append([InlineKeyboardButton("✖️ 关闭", callback_data=f"note_close")])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            from ..utils.message_builder import MessageBuilder
+            notes_text, reply_markup = MessageBuilder.format_note_detail_reply(notes[0], archive)
+        else:
+            # 多条笔记，显示列表
+            notes_text = f"📝 归档 #{archive_id} 的笔记 (共{len(notes)}条)\n\n"
+            
+            for idx, note in enumerate(notes, 1):
+                content = note['content']
+                notes_text += f"{idx}. {content}\n"
+                notes_text += f"   📅 {note['created_at']}\n\n"
+            
+            # 添加操作按钮：编辑笔记 | 删除笔记 | 分享笔记
+            keyboard = [[
+                InlineKeyboardButton("✏️ 编辑最新", callback_data=f"note_edit:{archive_id}:{notes[-1]['id']}"),
+                InlineKeyboardButton("🗑️ 删除最新", callback_data=f"note_delete:{notes[-1]['id']}")
+            ]]
+            keyboard.append([InlineKeyboardButton("📤 分享最新", callback_data=f"note_share:{archive_id}:{notes[-1]['id']}")])
+            keyboard.append([InlineKeyboardButton("✖️ 关闭", callback_data=f"note_close")])
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
         
         # 先answer，然后发送笔记内容
         await query.answer()
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=notes_text,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
         )
         
         logger.info(f"Displayed {len(notes)} notes for archive {archive_id}")
@@ -1024,46 +1032,26 @@ async def handle_note_view_callback(update: Update, context: ContextTypes.DEFAUL
             await query.answer("笔记不存在", show_alert=True)
             return
         
-        # 构建详情显示
-        content = note['content']
-        created_at = note['created_at']
+        # 获取关联的存档信息（如果需要）
         archive_id = note.get('archive_id')
-        
-        detail_text = f"📝 笔记详情 #{note_id}\n\n"
-        detail_text += f"📅 创建时间：{created_at}\n\n"
-        
+        archive = None
         if archive_id:
-            detail_text += f"📎 所属归档：#{archive_id}\n\n"
-        else:
-            detail_text += f"📎 独立笔记\n\n"
+            db_storage = context.bot_data.get('db_storage')
+            if db_storage:
+                archive = db_storage.get_archive(archive_id)
         
-        detail_text += f"💬 内容：\n{content}"
-        
-        # 添加操作按钮
-        keyboard = []
-        if archive_id:
-            keyboard.append([
-                InlineKeyboardButton("✏️ 编辑", callback_data=f"note_edit:{archive_id}:{note_id}"),
-                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_delete:{note_id}")
-            ])
-            keyboard.append([
-                InlineKeyboardButton("📤 分享", callback_data=f"note_share:{archive_id}:{note_id}")
-            ])
-        else:
-            keyboard.append([
-                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_delete:{note_id}")
-            ])
-        
-        keyboard.append([InlineKeyboardButton("✖️ 关闭", callback_data="note_close")])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # 使用MessageBuilder构建详情
+        from ..utils.message_builder import MessageBuilder
+        detail_text, reply_markup = MessageBuilder.format_note_detail_reply(note, archive)
         
         # Answer并发送详情
         await query.answer()
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=detail_text,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True
         )
         
         logger.info(f"Displayed note detail for note_id={note_id}")
