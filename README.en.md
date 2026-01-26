@@ -35,8 +35,8 @@ ArchiveBot is an open-source Telegram Bot that helps you intelligently categoriz
 - 🔄 **Auto Backup**: Scheduled automatic database backups for data security
 - 🤖 **AI Enhancement**: Grok-4 intelligent analysis (summary/key points/classification/tags)
 - 💬 **AI Chat**: Natural language interaction with automatic intent and language detection
-- � **Smart Resource Reply**: Intelligently identifies intent and directly returns resource files (no fabricated URLs)
-- �🌏 **Multi-language**: English/Simplified Chinese/Traditional Chinese (with regional terms)
+- 💬 **Smart Resource Reply**: Intelligently identifies intent and directly returns resource files (no fabricated URLs)
+- 🌏 **Multi-language**: English/Simplified Chinese/Traditional Chinese (with regional terms)
 - 🔗 **Smart Links**: Automatic extraction of webpage titles, descriptions, and metadata
 - 💾 **Simplified Storage**: Local storage for small data → Channel storage for large files → Reference-only for huge files (three-tier strategy)
 - 🔒 **Privacy Protection**: Completely private data, single-user mode
