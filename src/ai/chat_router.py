@@ -80,8 +80,17 @@ async def understand_and_plan(user_message: str, language: str, context: Any, st
                 ai_response = re.sub(r'^```json\s*|\s*```$', '', ai_response, flags=re.MULTILINE).strip()
                 
                 plan = json.loads(ai_response)
-                logger.info(f"🧠 AI Understanding: {plan.get('user_goal')}")
-                logger.info(f"📋 Response Strategy: {plan.get('response_strategy')}")
+                user_intent = plan.get('user_intent', 'unknown')
+                user_goal = plan.get('user_goal', 'unknown')
+                response_strategy = plan.get('response_strategy', 'unknown')
+                reasoning = plan.get('reasoning', '')
+                
+                logger.info(f"🧠 AI Understanding:")
+                logger.info(f"  Intent: {user_intent}")
+                logger.info(f"  Goal: {user_goal}")
+                logger.info(f"  Strategy: {response_strategy}")
+                logger.info(f"  Reasoning: {reasoning}")
+                
                 return plan
             else:
                 logger.warning(f"Understanding API error: {response.status_code}")
@@ -156,16 +165,18 @@ async def handle_chat_message(
     plan = await understand_and_plan(user_message, language, context, stats)
     
     user_goal = plan.get('user_goal', '')
+    user_intent = plan.get('user_intent', 'general_query')
+    
     if '退出' in user_goal or '結束' in user_goal or 'exit' in user_goal.lower():
         return handle_exit(language)
     if '帮助' in user_goal or '幫助' in user_goal or 'help' in user_goal.lower():
         return handle_help(language)
     
-    # Stage 2: 根据规划获取数据
-    logger.info(f"📊 Stage 2: Gathering data...")
-    if progress_callback:
+    # Stage 2: 根据规划和意图获取数据
+    logger.info(f"📊 Stage 2: Gathering data (intent: {user_intent})...")
+    if progress_callback and user_intent != 'pure_chat':
         await progress_callback(i18n.t('ai_chat_gathering'))
-    data_context = await gather_data(plan.get('need_data', {}), context)
+    data_context = await gather_data(plan.get('need_data', {}), context, user_intent)
     
     # Stage 3: AI生成最终回复
     logger.info(f"💬 Stage 3: Generating response...")
@@ -188,18 +199,24 @@ def handle_help(language: str) -> str:
     return i18n.t('ai_chat_help')
 
 
-async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]:
+async def gather_data(need_data: Dict[str, Any], context: Any, user_intent: str = None) -> Dict[str, Any]:
     """
     根据AI规划收集需要的数据（使用缓存优化性能）
     
     Args:
         need_data: AI规划中需要的数据类型
         context: Bot context
+        user_intent: 用户意图类型（pure_chat/general_query/specific_search/stats_analysis/resource_request）
         
     Returns:
         收集到的数据
     """
     data = {}
+    
+    # 纯聊天模式，直接返回空数据，不做任何查询
+    if user_intent == 'pure_chat':
+        logger.info("🎯 Intent: pure_chat - Skip all data queries")
+        return data
     
     try:
         search_engine = context.bot_data.get('search_engine')
@@ -210,32 +227,73 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
             logger.warning("AI data cache not available")
             return data
         
+        # 获取排除配置（统一处理）
+        from ..utils.config import get_config
+        config = get_config()
+        excluded_channels = config.get('ai.exclude_from_context.channel_ids', [])
+        excluded_tags = config.get('ai.exclude_from_context.tags', [])
+        
+        if excluded_channels or excluded_tags:
+            logger.info(f"⚠️ Exclusion active: channels={excluded_channels}, tags={excluded_tags}")
+        else:
+            logger.debug("✅ No exclusion filters configured")
+        
+        logger.info(f"🎯 Intent: {user_intent or 'unknown'} - Gathering data...")
+        
         # 搜索具体内容（不缓存，走FTS索引）
         if need_data.get('search_keywords'):
             if search_engine:
                 keywords = need_data['search_keywords']
-                results = search_engine.search(keywords, limit=5)
+                results = search_engine.search(keywords, limit=10)
                 if results and results.get('results'):
-                    data['search_results'] = results['results']
-                    logger.info(f"✓ Found {len(results['results'])} search results")
+                    candidates = results['results']
+                    original_count = len(candidates)
+                    
+                    # 应用排除逻辑
+                    if excluded_channels:
+                        candidates = [
+                            a for a in candidates 
+                            if not any(
+                                a.get('storage_path', '').startswith(f"telegram:{ch_id}:") 
+                                for ch_id in excluded_channels
+                            )
+                        ]
+                        logger.debug(f"Filtered by channels: {original_count} → {len(candidates)}")
+                    
+                    if excluded_tags:
+                        # 需要检查每个归档的标签
+                        tag_manager = context.bot_data.get('tag_manager')
+                        if tag_manager:
+                            filtered = []
+                            for archive in candidates:
+                                archive_tags = tag_manager.get_archive_tags(archive.get('id'))
+                                if not any(tag in excluded_tags for tag in archive_tags):
+                                    filtered.append(archive)
+                            candidates = filtered
+                            logger.debug(f"Filtered by tags: {original_count} → {len(candidates)}")
+                    
+                    data['search_results'] = candidates
+                    logger.info(f"✅ Search: Found {len(candidates)} results for '{keywords}' (filtered from {original_count})")
+                else:
+                    logger.info(f"❌ Search: No results for '{keywords}'")  
         
         # 统计数据（缓存5分钟）
         if need_data.get('need_statistics'):
             stats = ai_cache.get_statistics()
             data['statistics'] = stats
-            logger.info(f"✓ Statistics: {stats['total']} archives, {stats['tags']} tags")
+            logger.info(f"✓ Stats: {stats['total']} archives, {stats['tags']} tags, {stats.get('recent_week', 0)} recent")
         
         # 示例归档（缓存5分钟）
         if need_data.get('need_sample_archives'):
             samples = ai_cache.get_recent_samples(limit=10)
             data['sample_archives'] = samples
-            logger.info(f"✓ Sampled {len(samples)} archives")
+            logger.info(f"✓ Samples: {len(samples)} recent archives")
         
         # 标签分析（缓存5分钟）
         if need_data.get('need_tags_analysis'):
             tag_analysis = ai_cache.get_tag_analysis(limit=15)
             data['tag_analysis'] = tag_analysis
-            logger.info(f"✓ Analyzed {len(tag_analysis)} tags")
+            logger.info(f"✓ Tags: Analyzed {len(tag_analysis)} popular tags")
         
         # 最近记录上下文（24小时内，关键词触发）
         if need_data.get('need_recent_context') and db_storage:
@@ -281,8 +339,44 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
             favorite_only = resource_query.get('favorite_only', False)
             limit = resource_query.get('limit', 1)
             
-            resources = []
+            logger.info(f"⏳ Resource query: type={query_type}, content_types={content_types}, keywords={keywords}, tags={tags}, favorite={favorite_only}, limit={limit}")
             
+                # 应用排除逻辑的辅助函数
+                def apply_exclusions(archives_list):
+                    """应用排除逻辑到归档列表"""
+                    if not archives_list:
+                        return []
+                    
+                    original = len(archives_list)
+                    filtered = archives_list
+                    
+                    # 排除指定频道
+                    if excluded_channels:
+                        filtered = [
+                            a for a in filtered 
+                            if not any(
+                                a.get('storage_path', '').startswith(f"telegram:{ch_id}:") 
+                                for ch_id in excluded_channels
+                            )
+                        ]
+                        if len(filtered) < original:
+                            logger.debug(f"Excluded {original - len(filtered)} from channels")
+                    
+                    # 排除指定标签
+                    if excluded_tags:
+                        tag_manager = context.bot_data.get('tag_manager')
+                        if tag_manager:
+                            final = []
+                            for archive in filtered:
+                                archive_tags = archive.get('tags') or tag_manager.get_archive_tags(archive.get('id'))
+                                if not any(tag in excluded_tags for tag in archive_tags):
+                                    final.append(archive)
+                            filtered = final
+                            if len(filtered) < original:
+                                logger.debug(f"Excluded {original - len(filtered)} by tags")
+                    
+                    return filtered
+                
             if query_type == 'random':
                 # 随机获取
                 import random
@@ -292,6 +386,8 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
                 if favorite_only:
                     filters['favorite_only'] = True
                 
+                logger.debug(f"Random query filters: {filters}")
+                
                 # 从数据库获取符合条件的归档
                 all_matches = db_storage.db.get_archives(
                     content_type=content_types[0] if content_types and len(content_types) == 1 else None,
@@ -299,28 +395,43 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
                     limit=100  # 先取100条，然后随机
                 )
                 
+                logger.info(f"➡️ Random query: Retrieved {len(all_matches)} candidates from DB")
+                
                 if all_matches:
                     # 如果有多个类型筛选，进一步过滤
                     if content_types and len(content_types) > 1:
                         all_matches = [a for a in all_matches if a.get('content_type') in content_types]
                     
+                    # 应用排除逻辑
+                    all_matches = apply_exclusions(all_matches)
+                    
                     # 随机选取
                     random.shuffle(all_matches)
                     resources = all_matches[:limit]
+                    logger.info(f"✅ Random: Selected {len(resources)} from {len(all_matches)} after filtering")
                     
             elif query_type == 'search' and keywords:
                 # 搜索模式
                 if search_engine:
+                    logger.debug(f"Search mode: keywords='{keywords}'")
                     search_results = search_engine.search(keywords, limit=limit * 2)
                     candidates = search_results.get('results', [])
+                    logger.info(f"➡️ Search: FTS returned {len(candidates)} results")
                     
                     # 应用筛选
+                    original_count = len(candidates)
                     if content_types:
                         candidates = [a for a in candidates if a.get('content_type') in content_types]
+                        logger.debug(f"Filtered by content_types: {original_count} → {len(candidates)}")
                     if favorite_only and db_storage:
+                    # 应用排除逻辑
+                    candidates = apply_exclusions(candidates)
+                    
                         candidates = [a for a in candidates if db_storage.db.is_favorite(a.get('id'))]
+                        logger.debug(f"Filtered by favorite: {original_count} → {len(candidates)}")
                     
                     resources = candidates[:limit]
+                    logger.info(f"✅ Search: Final {len(resources)} results after filtering")
                     
                     # 添加tags字段（如果没有）
                     tag_manager = context.bot_data.get('tag_manager')
@@ -331,6 +442,7 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
                     
             elif query_type == 'filter':
                 # 筛选模式
+                logger.debug(f"Filter mode: tags={tags}, content_types={content_types}, favorite={favorite_only}")
                 filters = {}
                 if favorite_only:
                     filters['favorite_only'] = True
@@ -340,12 +452,14 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
                     if tag_manager:
                         # 去掉#前缀
                         clean_tags = [t.lstrip('#') for t in tags]
+                        logger.debug(f"Searching by tags: {clean_tags}")
                         # 获取有这些标签的归档
                         tag_archives = set()
                         for tag in clean_tags:
                             archives = tag_manager.get_archives_by_tag(tag, limit=50)
                             tag_archives.update([a['id'] for a in archives])
                         
+                        logger.info(f"➡️ Filter: Found {len(tag_archives)} archives with specified tags")
                         # 获取详细信息
                         resources = [db_storage.get_archive(aid) for aid in tag_archives]
                         resources = [r for r in resources if r]  # 过滤None
@@ -356,15 +470,25 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
                         favorite_only=favorite_only,
                         limit=limit * 2
                     )
+                    logger.info(f"➡️ Filter: Retrieved {len(resources)} recent archives")
+                
+                # 应用排除逻辑
+                resources = apply_exclusions(resources)
                 
                 # 应用类型筛选
                 if content_types and len(content_types) > 1:
+                    original_count = len(resources)
                     resources = [a for a in resources if a.get('content_type') in content_types]
+                    logger.debug(f"Filtered by content_types: {original_count} → {len(resources)}")
                 
                 resources = resources[:limit]
+                logger.info(f"✅ Filter: Final {len(resources)} results")
             
             # 确保资源有storage_path（只有telegram存储的才能发送）
+            original_count = len(resources)
             resources = [r for r in resources if r.get('storage_type') == 'telegram' and r.get('storage_path')]
+            if original_count > len(resources):
+                logger.warning(f"⚠️ Filtered out {original_count - len(resources)} non-telegram resources")
             
             # 添加tags字段（如果没有）
             if resources:
@@ -378,9 +502,9 @@ async def gather_data(need_data: Dict[str, Any], context: Any) -> Dict[str, Any]
             
             if resources:
                 data['resources'] = resources
-                logger.info(f"✓ Found {len(resources)} resources for {query_type} query")
+                logger.info(f"✅ Resource query: {len(resources)} resources ready to send")
             else:
-                logger.info(f"✗ No resources found for {query_type} query")
+                logger.warning(f"❌ Resource query: No resources found (type={query_type}, filters applied)")
         
     except Exception as e:
         logger.error(f"Data gathering error: {e}", exc_info=True)

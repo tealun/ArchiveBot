@@ -48,6 +48,8 @@ class SearchEngine:
             # Parse query
             keyword, tag_names = self._parse_query(query)
             
+            logger.debug(f"🔍 Search query: '{query}' -> keyword='{keyword}', tags={tag_names}")
+            
             # Search with total count
             results, total_count = self.db_storage.search_archives(
                 keyword=keyword,
@@ -56,6 +58,8 @@ class SearchEngine:
                 offset=offset,
                 return_total=True
             )
+            
+            logger.info(f"✅ Search completed: Found {len(results)} results (total: {total_count}) for query '{query}'")
             
             return {
                 'success': True,
@@ -68,7 +72,7 @@ class SearchEngine:
             }
             
         except Exception as e:
-            logger.error(f"Search error: {e}", exc_info=True)
+            logger.error(f"❌ Search error for query '{query}': {e}", exc_info=True)
             return {
                 'success': False,
                 'error': str(e),

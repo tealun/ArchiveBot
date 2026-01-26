@@ -176,11 +176,14 @@ class AIDataCache:
             (week_ago,)
         ).fetchone()[0]
         
-        return {
+        stats = {
             'total': total,
             'tags': tag_count,
             'recent_week': recent
         }
+        
+        logger.debug(f"📊 Statistics computed: {stats}")
+        return stats
     
     def _compute_recent_samples(self, limit: int) -> list:
         """计算最近归档示例（排除指定频道和标签的内容）"""
@@ -247,6 +250,8 @@ class AIDataCache:
         
         if excluded_channel_ids or excluded_tags:
             logger.debug(f"Recent samples filtered: excluded {len(excluded_channel_ids)} channels, {len(excluded_tags)} tags")
+        
+        logger.debug(f"📝 Recent samples: Retrieved {len(result)} items")
         
         return result
     

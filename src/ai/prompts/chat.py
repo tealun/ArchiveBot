@@ -48,6 +48,7 @@ class ChatPrompts:
 
 {{
     "user_goal": "用戶的真實需求（一句話）",
+    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request",
     "question_type": "precise|open",  # precise=具體精準問題, open=開放式問題
     "need_data": {{
         "search_keywords": "如果需要搜尋，提取關鍵詞；否則null",
@@ -69,18 +70,48 @@ class ChatPrompts:
     "reasoning": "分析理由（50字內）"
 }}
 
-規劃要點：
-1. 判斷問題類型
-   - 精準問題：有明確目標、具體範圍、特定需求（如「有多少條歸檔」、「找關於python的內容」）→ 直接專注回答
-   - 開放問題：探索性、無明確範圍、啟發性（如「我歸檔了什麼」、「分析下我的興趣」）→ 可適度發散
-2. 精準問題只返回所需數據，不過度引申
-3. 開放問題可以分析趨勢、提供洞察
-4. 專業友好，不過度熱情
+【意圖判斷要點】（關鍵）：
+1. pure_chat（純聊天）
+   - 打招呼、閒聊、情感交流、問候、感謝、隨意話題
+   - 不涉及歸檔查詢、統計、搜尋
+   - 例：「你好」「最近怎樣」「謝謝」「今天天氣不錯」
+   - need_data全部false，不查詢任何歸檔數據
+
+2. general_query（一般性查詢）
+   - 詢問系統狀態、概覽性資訊、簡單統計
+   - 不需要精確搜尋，只需基礎統計數據
+   - 例：「我有多少歸檔」「標籤有哪些」「最近歸檔了什麼」
+   - 僅need_statistics=true，其他false
+
+3. specific_search（精確搜尋）
+   - 明確關鍵詞、主題、內容的搜尋需求
+   - 需要FTS全文搜尋引擎
+   - 例：「找關於Python的內容」「搜尋AI相關」「有沒有講Docker的」
+   - search_keywords必填，need_statistics可選
+
+4. stats_analysis（統計分析）
+   - 需要詳細統計、趨勢分析、深度洞察
+   - 需要多維度數據：統計+標籤+樣本
+   - 例：「分析我的興趣」「我主要歸檔什麼內容」「歸檔趨勢如何」
+   - need_statistics/need_tags_analysis/need_sample_archives=true
+
+5. resource_request（資源請求）
+   - 明確要求返回實際文件（圖片/視頻/文檔）
+   - 例：「給我一張圖片」「隨機一個視頻」「看看我的文檔」
+   - resource_query.enabled=true
+
+規劃原則：
+- 精準問題只返回所需數據，不過度引申
+- 開放問題可以分析趨勢、提供洞察
+- 純聊天不查詢數據，直接友好回覆
+- 優先判斷是否為純聊天，避免過度查詢
 
 【重要】響應策略選擇：
-- 如果用戶明確要求返回「圖片」「視頻」「文件」等實際資源，必須使用 resource_reply 策略
-- resource_reply 時必須啟用 resource_query，系統會查詢真實文件並直接發送
-- 絕對禁止虛構URL、文件名、file_id等不存在的內容
+- pure_chat → direct_answer（無需數據）
+- general_query → direct_answer（僅基礎統計）
+- specific_search → search_results（搜尋結果）
+- stats_analysis → data_analysis（數據分析）
+- resource_request → resource_reply（資源回覆）
 - 如果查詢不到結果，會如實告知用戶「未找到」，不得編造
 
 只返回JSON。"""
@@ -93,6 +124,7 @@ class ChatPrompts:
 
 {{
     "user_goal": "用户的真实需求（一句话）",
+    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request",
     "question_type": "precise|open",  # precise=具体精准问题, open=开放式问题
     "need_data": {{
         "search_keywords": "如果需要搜索，提取关键词；否则null",
@@ -114,18 +146,48 @@ class ChatPrompts:
     "reasoning": "分析理由（50字内）"
 }}
 
-规划要点：
-1. 判断问题类型
-   - 精准问题：有明确目标、具体范围、特定需求（如「有多少条归档」、「找关于python的内容」）→ 直接专注回答
-   - 开放问题：探索性、无明确范围、启发性（如「我归档了什么」、「分析下我的兴趣」）→ 可适度发散
-2. 精准问题只返回所需数据，不过度引申
-3. 开放问题可以分析趋势、提供洞察
-4. 专业友好，不过度热情
+【意图判断要点】（关键）：
+1. pure_chat（纯聊天）
+   - 打招呼、闲聊、情感交流、问候、感谢、随意话题
+   - 不涉及归档查询、统计、搜索
+   - 例：「你好」「最近怎么样」「谢谢」「今天天气不错」
+   - need_data全部false，不查询任何归档数据
+
+2. general_query（一般性查询）
+   - 询问系统状态、概览性信息、简单统计
+   - 不需要精确搜索，只需基础统计数据
+   - 例：「我有多少归档」「标签有哪些」「最近归档了什么」
+   - 仅need_statistics=true，其他false
+
+3. specific_search（精确搜索）
+   - 明确关键词、主题、内容的搜索需求
+   - 需要FTS全文搜索引擎
+   - 例：「找关于Python的内容」「搜索AI相关」「有没有讲Docker的」
+   - search_keywords必填，need_statistics可选
+
+4. stats_analysis（统计分析）
+   - 需要详细统计、趋势分析、深度洞察
+   - 需要多维度数据：统计+标签+样本
+   - 例：「分析我的兴趣」「我主要归档什么内容」「归档趋势如何」
+   - need_statistics/need_tags_analysis/need_sample_archives=true
+
+5. resource_request（资源请求）
+   - 明确要求返回实际文件（图片/视频/文档）
+   - 例：「给我一张图片」「随机一个视频」「看看我的文档」
+   - resource_query.enabled=true
+
+规划原则：
+- 精准问题只返回所需数据，不过度引申
+- 开放问题可以分析趋势、提供洞察
+- 纯聊天不查询数据，直接友好回复
+- 优先判断是否为纯聊天，避免过度查询
 
 【重要】响应策略选择：
-- 如果用户明确要求返回「图片」「视频」「文件」等实际资源，必须使用 resource_reply 策略
-- resource_reply 时必须启用 resource_query，系统会查询真实文件并直接发送
-- 绝对禁止虚构URL、文件名、file_id等不存在的内容
+- pure_chat → direct_answer（无需数据）
+- general_query → direct_answer（仅基础统计）
+- specific_search → search_results（搜索结果）
+- stats_analysis → data_analysis（数据分析）
+- resource_request → resource_reply（资源回复）
 - 如果查询不到结果，会如实告知用户「未找到」，不得编造
 
 只返回JSON。"""
@@ -144,12 +206,15 @@ Please understand the user's need and plan the response. Return JSON (no markdow
 
 {{
     "user_goal": "User's actual need (one sentence)",
+    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request",
     "question_type": "precise|open",  # precise=specific targeted question, open=exploratory question
     "need_data": {{
         "search_keywords": "If search needed, extract keywords; otherwise null",
         "need_statistics": true/false,
         "need_sample_archives": true/false,
-        "need_tags_analysis": true/false,        "need_recent_context": true/false,  # If mentions "recent" "lately" "just" etc time words        "resource_query": {{  # If user needs actual files/photos/videos/resources
+        "need_tags_analysis": true/false,
+        "need_recent_context": true/false,  # If mentions "recent" "lately" "just" etc time words
+        "resource_query": {{  # If user needs actual files/photos/videos/resources
             "enabled": true/false,
             "type": "random|search|filter",  # random/search/filter
             "content_types": ["photo", "video", "document"],  # type filter, null=any
@@ -163,19 +228,49 @@ Please understand the user's need and plan the response. Return JSON (no markdow
     "reasoning": "Analysis rationale (50 chars)"
 }}
 
-Planning guidelines:
-1. Determine question type
-   - Precise: Clear goal, specific scope (e.g., "how many archives", "find Python content") → Focus on direct answer
-   - Open: Exploratory, no clear scope (e.g., "what did I archive", "analyze my interests") → Can expand moderately
-2. Precise questions return only required data, don't over-extend
-3. Open questions can analyze trends and provide insights
-4. Professional and friendly, not overly enthusiastic
+【Intent Detection Guidelines】(CRITICAL):
+1. pure_chat (Pure chat)
+   - Greetings, casual talk, emotional exchange, thanks, random topics
+   - No archive query/stats/search involved
+   - e.g., "hello", "how are you", "thanks", "nice weather today"
+   - ALL need_data should be false, don't query any archive data
 
-【CRITICAL】Response strategy selection:
-- If user explicitly requests actual "photos", "videos", "files" or other resources, MUST use resource_reply strategy
-- When using resource_reply, MUST enable resource_query - system will query real files and send directly
-- ABSOLUTELY FORBIDDEN to fabricate URLs, filenames, file_ids or any non-existent content
-- If no results found, system will honestly tell user "not found" - DO NOT make up content
+2. general_query (General query)
+   - Ask system status, overview info, simple statistics
+   - No precise search needed, only basic stats
+   - e.g., "how many archives do I have", "what tags", "recent archives"
+   - ONLY need_statistics=true, others false
+
+3. specific_search (Specific search)
+   - Clear keywords, topics, content search needs
+   - Requires FTS full-text search engine
+   - e.g., "find Python content", "search AI related", "any Docker tutorials"
+   - search_keywords required, need_statistics optional
+
+4. stats_analysis (Statistical analysis)
+   - Need detailed stats, trend analysis, deep insights
+   - Multi-dimensional data: stats+tags+samples
+   - e.g., "analyze my interests", "what do I mainly archive", "archive trends"
+   - need_statistics/need_tags_analysis/need_sample_archives=true
+
+5. resource_request (Resource request)
+   - Explicitly ask for actual files (photos/videos/docs)
+   - e.g., "give me a photo", "random video", "show my documents"
+   - resource_query.enabled=true
+
+Planning principles:
+- Precise questions return only required data, don't over-extend
+- Open questions can analyze trends and provide insights
+- Pure chat needs no data, respond friendly directly
+- Prioritize detecting pure_chat to avoid over-querying
+
+【CRITICAL】Response strategy mapping:
+- pure_chat → direct_answer (no data needed)
+- general_query → direct_answer (basic stats only)
+- specific_search → search_results (search results)
+- stats_analysis → data_analysis (data analysis)
+- resource_request → resource_reply (resource reply)
+- If no results found, honestly tell user "not found" - DO NOT fabricate
 
 Return JSON only."""
     
