@@ -1214,23 +1214,20 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                     config = get_config()
                     
                     # 获取笔记频道ID：NOTE -> TEXT -> default
-                    channels_config = config.storage.get('telegram', {}).get('channels', {})
-                    type_mapping = config.storage.get('telegram', {}).get('type_mapping', {})
-                    
                     # 优先使用NOTE频道
-                    note_channel_key = type_mapping.get('note', 'text')  # 默认映射到text
-                    note_channel_id = channels_config.get(note_channel_key, 0)
+                    note_channel_key = config.get('storage.telegram.type_mapping.note', 'text')  # 默认映射到text
+                    note_channel_id = config.get(f'storage.telegram.channels.{note_channel_key}', 0)
                     
                     # 如果NOTE频道未配置，降级到TEXT频道
                     if not note_channel_id:
-                        note_channel_id = channels_config.get('text', 0)
+                        note_channel_id = config.get('storage.telegram.channels.text', 0)
                     
                     # 如果TEXT频道也未配置，使用默认频道
                     if not note_channel_id:
-                        note_channel_id = channels_config.get('default', 0)
+                        note_channel_id = config.get('storage.telegram.channels.default', 0)
                         if not note_channel_id:
                             # 兼容旧配置
-                            note_channel_id = config.storage.get('telegram', {}).get('channel_id', 0)
+                            note_channel_id = config.get('storage.telegram.channel_id', 0)
                     
                     if note_channel_id:
                         # 准备转发的消息内容
