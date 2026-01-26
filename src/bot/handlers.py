@@ -1193,7 +1193,7 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                     # 获取用户语言设置
                     from ..utils.config import get_config
                     config = get_config()
-                    user_language = context.user_data.get('language', config.bot.get('language', 'zh-CN'))
+                    user_language = context.user_data.get('language', config.get('bot.language', 'zh-CN'))
                     
                     # 使用AI生成标题（32字以内）
                     note_title = await ai_summarizer.generate_title_from_text(
@@ -1248,11 +1248,15 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                         )
                         
                         # 生成频道消息链接
-                        channel_username = str(note_channel_id)
-                        if channel_username.startswith('-100'):
-                            channel_id_numeric = channel_username[4:]
+                        # Telegram频道ID格式：-100XXXXXXXXXX
+                        # 转换为链接格式：https://t.me/c/XXXXXXXXXX/message_id
+                        channel_id_str = str(note_channel_id)
+                        if channel_id_str.startswith('-100'):
+                            # 移除-100前缀
+                            channel_id_numeric = channel_id_str[4:]
                         else:
-                            channel_id_numeric = channel_username.lstrip('-')
+                            # 处理其他格式（理论上不应该出现）
+                            channel_id_numeric = channel_id_str.lstrip('-')
                         
                         storage_path = f"https://t.me/c/{channel_id_numeric}/{channel_msg.message_id}"
                         logger.info(f"Note forwarded to channel: {storage_path}")

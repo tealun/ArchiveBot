@@ -407,7 +407,7 @@ class AISummarizer:
             logger.warning("AI enabled but no API key provided in config.api")
             # 继续允许 provider 初始化失败后的 graceful behavior
         
-        provider_type = global_config.get('ai.api.provider') or api.get('provider', 'openai')
+        provider_type = (global_config.get('ai.api.provider') or api.get('provider', 'openai')).lower()
         
         if provider_type in ['openai', 'grok']:
             try:
