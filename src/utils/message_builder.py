@@ -341,6 +341,91 @@ class MessageBuilder:
         return sent_count
     
     @staticmethod
+    def format_notes_list(
+        notes: List[Dict[str, Any]],
+        config,
+        lang_ctx
+    ) -> tuple[str, Optional[Any]]:
+        """
+        构建笔记列表的格式化展示
+        
+        Args:
+            notes: 笔记列表
+            config: 配置对象
+            lang_ctx: 语言上下文
+            
+        Returns:
+            (格式化的消息文本, InlineKeyboardMarkup按钮或None)
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        if not notes:
+            return lang_ctx.t('notes_list_empty'), None
+        
+        result_text = lang_ctx.t('notes_list_header', count=len(notes)) + "\n"
+        
+        keyboard = []
+        for idx, note in enumerate(notes, 1):
+            note_id = note['id']
+            created_at = note['created_at']
+            content = note['content']
+            archive_id = note.get('archive_id')
+            title = note.get('title', '')
+            
+            # 使用分割线分隔每条笔记
+            result_text += "\n━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            # 第一行：笔记ID和标题
+            if title:
+                result_text += f"📝 <b>笔记 #{note_id}</b> - {title}\n"
+            else:
+                result_text += f"📝 <b>笔记 #{note_id}</b>\n"
+            
+            # 第二行：时间和类型
+            note_type = "自动" if archive_id else "手动"
+            result_text += f"📅 {created_at} | 🏷️ {note_type}\n"
+            
+            # 第三行：内容预览
+            content_preview = truncate_text(content, 80)
+            result_text += f"💬 {content_preview}\n"
+            
+            # 第四行：所属归档（如果有）
+            if archive_id:
+                archive_title = note.get('archive_title', f'归档 #{archive_id}')
+                storage_path = note.get('storage_path')
+                storage_type = note.get('storage_type')
+                
+                # 生成跳转链接
+                if storage_path and storage_type == 'telegram':
+                    parts = storage_path.split(':')
+                    if len(parts) >= 2:
+                        channel_id = parts[0].replace('-100', '')
+                        message_id = parts[1]
+                    else:
+                        channel_id = str(config.telegram_channel_id).replace('-100', '')
+                        message_id = storage_path
+                    
+                    link = f"https://t.me/c/{channel_id}/{message_id}"
+                    result_text += f"📎 归档：<a href='{link}'>{archive_title}</a>\n"
+                else:
+                    result_text += f"📎 归档：{archive_title}\n"
+            
+            # 添加查看按钮
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{idx}. 查看完整内容",
+                    callback_data=f"note_view:{note_id}"
+                )
+            ])
+        
+        # 添加尾部分割线
+        result_text += "\n━━━━━━━━━━━━━━━━━━━━\n"
+        result_text += f"\n📊 共 {len(notes)} 条笔记"
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        return result_text, reply_markup
+    
+    @staticmethod
     def format_note_detail_reply(
         note: Dict[str, Any],
         archive: Optional[Dict[str, Any]] = None

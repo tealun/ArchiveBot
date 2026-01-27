@@ -155,78 +155,17 @@ async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         page_size = 10
         results = note_manager.get_all_notes(limit=page_size, offset=page * page_size)
         
-        if not results:
-            await update.message.reply_text(lang_ctx.t('notes_list_empty'))
-            return
-        
         # 获取配置
         config = get_config()
         
-        # 构建输出
-        from ..utils.helpers import truncate_text
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        # 使用 MessageBuilder 格式化笔记列表
+        from ...utils.message_builder import MessageBuilder
+        result_text, reply_markup = MessageBuilder.format_notes_list(
+            notes=results,
+            config=config,
+            lang_ctx=lang_ctx
+        )
         
-        result_text = lang_ctx.t('notes_list_header', count=len(results)) + "\n"
-        
-        keyboard = []
-        for idx, note in enumerate(results, 1):
-            note_id = note['id']
-            created_at = note['created_at']
-            content = note['content']
-            archive_id = note.get('archive_id')
-            title = note.get('title', '')
-            
-            # 使用分割线分隔每条笔记
-            result_text += "\n━━━━━━━━━━━━━━━━━━━━\n\n"
-            
-            # 第一行：笔记ID和标题
-            if title:
-                result_text += f"📝 <b>笔记 #{note_id}</b> - {title}\n"
-            else:
-                result_text += f"📝 <b>笔记 #{note_id}</b>\n"
-            
-            # 第二行：时间和类型
-            note_type = "自动" if archive_id else "手动"
-            result_text += f"📅 {created_at} | 🏷️ {note_type}\n"
-            
-            # 第三行：内容预览
-            content_preview = truncate_text(content, 80)
-            result_text += f"💬 {content_preview}\n"
-            
-            # 第四行：所属归档（如果有）
-            if archive_id:
-                archive_title = note.get('archive_title', f'归档 #{archive_id}')
-                storage_path = note.get('storage_path')
-                storage_type = note.get('storage_type')
-                
-                # 生成跳转链接
-                if storage_path and storage_type == 'telegram':
-                    parts = storage_path.split(':')
-                    if len(parts) >= 2:
-                        channel_id = parts[0].replace('-100', '')
-                        message_id = parts[1]
-                    else:
-                        channel_id = str(config.telegram_channel_id).replace('-100', '')
-                        message_id = storage_path
-                    
-                    link = f"https://t.me/c/{channel_id}/{message_id}"
-                    result_text += f"📎 归档：<a href='{link}'>{archive_title}</a>\n"
-                else:
-                    result_text += f"📎 归档：{archive_title}\n"
-            
-            # 添加查看按钮
-            keyboard.append([
-                InlineKeyboardButton(
-                    f"{idx}. 查看完整内容",
-                    callback_data=f"note_view:{note_id}"
-                )
-            ])
-        
-        # 添加尾部分割线
-        result_text += "\n━━━━━━━━━━━━━━━━━━━━\n"
-        result_text += f"\n📊 共 {len(results)} 条笔记"
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             result_text, 
             parse_mode=ParseMode.HTML,
