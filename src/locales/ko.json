@@ -1,28 +1,17 @@
 {
   "welcome": "👋 ArchiveBot에 오신 것을 환영합니다!\n\n🤖 당신만의 스마트 아카이브 어시스턴트\n\n<b>핵심 기능:</b>\n📦 만능 아카이브 - 텍스트/이미지/동영상/문서/링크\n🏷️ 스마트 태그 - 자동 분류 및 태그 추출\n🤖 AI 강화 - 요약 생성/핵심 포인트 추출/스마트 제목\n🔍 강력한 검색 - 전문 검색/태그 필터/시간 범위\n💾 유연한 저장소 - Telegram 채널 + 데이터베이스 백업\n📝 노트 관리 - 연결된 아카이브/독립 실행형/AI 지원\n🗑️ 안전한 작업 - 휴지통/백업/내보내기 형식\n\n<b>빠른 시작:</b>\n• 콘텐츠를 전송하여 아카이브\n• #해시태그로 사용자 정의 태그 추가\n• /help로 전체 명령어 목록 확인\n\n<b>오픈소스:</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\n아카이브를 시작하세요! 🚀",
-  
   "help": "📖 도움말\n\n<b>콘텐츠 아카이브:</b>\n• 콘텐츠를 직접 전송\n• #태그 형식으로 태그 추가\n• 메시지 전달로 출처 기록\n• 일괄 전달 자동 집계\n\n<b>기본 명령어:</b>\n/start - 봇 초기화\n/help - 도움말 표시\n/search (/s) &lt;키워드&gt; - 아카이브 검색\n/tags (/t) - 모든 태그 표시\n/stats (/st) - 통계 표시\n/review - 아카이브 리뷰 및 통계\n\n<b>노트:</b>\n/note (/n) - 아카이브에 노트 추가\n/notes - 모든 노트 표시\n\n<b>데이터 관리:</b>\n/trash - 휴지통 표시\n/export - 데이터 내보내기 (JSON/HTML/Markdown)\n/backup - 데이터베이스 백업 및 복원\n\n<b>기타:</b>\n/ai - AI 상태\n/language (/la) - 언어 변경\n\n<b>검색 팁:</b>\n• 키워드: /s python\n• 태그: /s #tech\n• 조합: /s #tech python\n• 결과를 클릭하여 채널로 이동\n\n<b>AI 기능:</b>\n• 스마트 요약 생성\n• 핵심 포인트 자동 추출\n• 태그 제안 (일괄 공유)\n• 지능형 분류",
-  
   "unauthorized": "⛔ 권한 없음\n\n죄송합니다. 이 봇은 개인용입니다.",
-  
   "archive_success": "✅ 아카이브 완료\n\n{title_link}📝 유형: {content_type}\n🏷️ 태그: {tags}\n💾 저장소: {storage_type}\n📌 출처: {source}\n🕐 시간: {time}",
-  "archive_success_with_size": "✅ 아카이브 완료\n\n{title_link}📝 유형: {content_type}\n📦 크기: {file_size}\n🏷️ 태그: {tags}\n💾 저장소: {storage_type}\n📌 출처: {source}\n🕐 시간: {time}",  
+  "archive_success_with_size": "✅ 아카이브 완료\n\n{title_link}📝 유형: {content_type}\n📦 크기: {file_size}\n🏷️ 태그: {tags}\n💾 저장소: {storage_type}\n📌 출처: {source}\n🕐 시간: {time}",
   "archive_failed": "❌ 아카이브 실패\n\n오류: {error}\n다시 시도해주세요.",
-  
   "search_no_keyword": "검색 키워드를 입력하세요.\n\n예: /search python",
-  
   "search_no_results": "🔍 결과를 찾을 수 없습니다\n\n키워드: {keyword}\n\n다른 키워드를 시도하거나 /tags로 태그 목록을 확인하세요",
-  
   "search_results": "🔍 검색 결과 ({count}개)\n\n키워드: {keyword}\n\n{results}",
-  
   "tags_empty": "아직 태그가 없습니다.\n\n콘텐츠를 아카이브하여 태그를 생성하세요!",
-  
   "tags_list": "🏷️ 모든 태그 ({count}개)\n\n{tags}",
-  
   "stats": "📊 통계\n\n📦 총 아카이브: {total_archives}\n🏷️ 총 태그: {total_tags}\n💾 콘텐츠 크기: {storage_used}\n💾 데이터베이스 크기: {db_size}\n📅 마지막 아카이브: {last_archive}",
-  
   "language_changed": "✅ 언어가 한국어로 변경되었습니다",
-  
   "language_select": "🌍 언어 선택\n\n📍 현재 언어: {current_language}\n\n선호하는 언어를 선택하세요:",
   "language_name_en": "English",
   "language_name_zh-CN": "简体中文",
@@ -30,13 +19,9 @@
   "language_name_ja": "日本語",
   "language_name_ko": "한국어",
   "language_name_es": "Español",
-  
   "processing": "⏳ 처리 중...",
-  
   "error_occurred": "❌ 오류가 발생했습니다\n\n{error}\n\n다시 시도하거나 관리자에게 문의하세요.",
-  
   "rate_limit_exceeded": "⚠️ 속도 제한 초과\n\n{wait_time}초 후에 다시 시도하세요.",
-  
   "tag_text": "텍스트",
   "tag_image": "이미지",
   "tag_video": "동영상",
@@ -48,19 +33,29 @@
   "tag_animation": "애니메이션",
   "tag_contact": "연락처",
   "tag_location": "위치",
-  
   "storage_database": "데이터베이스",
   "storage_telegram": "Telegram 채널",
   "storage_cloud": "클라우드 저장소",
   "storage_reference": "참조만",
-  
+  "optimizer_search_suggestions": "💡 제안：\n• 더 간단한 키워드를 시도해보세요\n• 오타가 있는지 확인하세요\n• /tags 로 태그 탐색\n• /stats 로 아카이브 개요 확인",
+  "optimizer_filter_suggestions_with_tags": "💡 {count}개의 결과를 찾았습니다. 태그로 필터링: {tags}",
+  "optimizer_filter_suggestions_no_tags": "💡 {count}개의 결과를 찾았습니다. 가장 관련성 높은 항목을 표시합니다.",
+  "optimizer_expand_suggestions": "💡 더 보고 싶으신가요? 더 넓은 키워드를 시도하거나 /tags 를 확인하세요",
+  "optimizer_onboarding_hint": "📝 아카이브가 비어 있습니다. 메시지를 전달하거나 콘텐츠를 보내서 시작하세요!",
+  "optimizer_tagging_hint": "💡 팁: 아카이브할 때 해시태그를 추가하면 더 잘 정리할 수 있습니다!",
+  "optimizer_resource_suggestions": "💡 다시 시도하시겠습니까? '하나 더'라고 보내서 더 많은 리소스 가져오기",
+  "command_guide_note": "💡 /note <아카이브_ID> 를 사용하거나 아카이브 메시지에 답장하여 노트 추가",
+  "command_guide_trash": "💡 /trash 를 사용하여 휴지통 보기（삭제된 아카이브를 복원하거나 영구 삭제할 수 있습니다）",
+  "command_guide_export": "💡 /export 를 사용하여 데이터 내보내기（JSON/HTML/Markdown 형식 지원）",
+  "command_guide_backup": "💡 /backup 을 사용하여 데이터베이스 백업 또는 복원",
+  "command_guide_language": "💡 /language 를 사용하여 인터페이스 언어 변경",
+  "command_guide_tags": "💡 /tags 를 사용하여 모든 태그 보기, 또는 #태그 를 보내서 필터링",
   "button_language_en": "English",
   "button_language_zh_cn": "简体中文",
   "button_language_zh_tw": "繁體中文",
   "button_language_ja": "日本語",
   "button_language_ko": "한국어",
   "button_language_es": "Español",
-  
   "note_added": "✅ 노트가 추가되었습니다\n\n📝 노트 ID: #{note_id}\n📦 아카이브 ID: #{archive_id}",
   "note_add_failed": "❌ 노트 추가 실패\n\n아카이브 ID가 올바른지 확인하세요.",
   "note_no_archive_id": "아카이브 ID를 입력하세요.\n\n예: /note 123 또는 /n 123",
@@ -73,7 +68,6 @@
   "no_notes_search_results": "🔍 '{query}'를 포함하는 노트를 찾을 수 없습니다.",
   "notes_search_results": "🔍 노트 검색 결과 ({count}개)\n\n키워드: {query}",
   "archive": "아카이브",
-  
   "trash_manager_not_initialized": "❌ 휴지통 기능이 초기화되지 않았습니다\n\n봇을 다시 시작하세요.",
   "trash_empty": "🗑️ 휴지통이 비어 있습니다\n\n삭제된 아카이브가 없습니다.",
   "trash_list": "🗑️ 휴지통 ({count}개 항목)",
@@ -91,14 +85,12 @@
   "trash_invalid_command": "❌ 잘못된 명령어\n\n사용법:\n/trash - 휴지통 보기\n/trash restore <id> - 아카이브 복원\n/trash delete <id> - 영구 삭제\n/trash empty [days] - 휴지통 비우기",
   "archive_moved_to_trash": "✅ 아카이브 #{archive_id}가 휴지통으로 이동되었습니다",
   "archive_delete_failed": "❌ 아카이브 #{archive_id} 삭제 실패\n\n아카이브가 이미 삭제되었을 수 있습니다.",
-  
   "export_manager_not_initialized": "❌ 내보내기 기능이 초기화되지 않았습니다\n\n봇을 다시 시작하세요.",
   "export_processing": "📦 데이터를 내보내는 중...",
   "export_tag_usage": "사용법: /export tag <태그_이름> [형식]\n\n예: /export tag tech markdown",
   "export_invalid_format": "❌ 잘못된 형식\n\n지원 형식: markdown, json, csv",
   "export_failed": "❌ 내보내기 실패\n\n나중에 다시 시도하세요.",
   "export_success": "✅ 내보내기 성공\n\n📄 파일: {filename}\n📊 크기: {size} 바이트",
-
   "backup_manager_not_initialized": "❌ 백업 기능이 초기화되지 않았습니다\n\n봇을 다시 시작하세요.",
   "backup_none": "🗃️ 백업을 찾을 수 없습니다.",
   "backup_list_header": "🗃️ 백업 ({count}개)",
@@ -117,7 +109,6 @@
   "backup_status": "📊 데이터베이스 상태\n크기: {size} 바이트\n아카이브: {archives}\n노트: {notes}\n삭제됨: {deleted}\n마지막 아카이브: {last}",
   "backup_status_failed": "❌ 데이터베이스 상태를 가져오지 못했습니다",
   "backup_invalid_command": "❌ 잘못된 하위 명령어\n\n사용법: /backup [create|restore|delete|cleanup|status]",
-  
   "review_usage": "📊 리뷰 및 통계\n\n기간을 선택하여 활동을 확인하세요:\n\n<b>기능:</b>\n• 아카이브 트렌드 분석\n• 활동 일수 카운트\n• 상위 태그 통계\n• 랜덤 아카이브 발견",
   "review_period_week": "지난 7일",
   "review_period_month": "지난 30일",
@@ -130,9 +121,7 @@
   "review_no_data": "📊 이 기간 동안 활동이 없습니다.\n\n아카이브를 시작하여 통계를 확인하세요!",
   "review_invalid_period": "❌ 잘못된 기간\n\n사용: week, month, 또는 year",
   "review_manager_not_initialized": "❌ 리뷰 기능이 초기화되지 않았습니다\n\n봇을 다시 시작하세요.",
-  
   "tags_button_list_header": "🏷️ 태그 목록 ({count}개)\n\n태그를 클릭하여 관련 콘텐츠 보기:",
-  
   "ai_status_enabled": "✅ 상태: 활성화됨",
   "ai_status_available": "✅ 서비스: 사용 가능",
   "ai_status_unavailable": "⚠️ 서비스: 사용 불가\nAPI 키 설정을 확인하세요",
@@ -147,23 +136,20 @@
   "ai_status_auto_summarize": "자동 요약: {status}",
   "ai_status_auto_tags": "\n자동 태그: {status}",
   "ai_status_enable_guide": "\n\n💡 *활성화 방법*\n1. config/config.yaml 편집\n2. ai.enabled: true로 설정\n3. ai.api.provider와 ai.api.api_key 구성\n4. 봇 재시작\n\n지원 제공자: OpenAI, Claude, Qwen",
-  
   "pagination_page_of": "{total}페이지 중 {current}페이지",
   "button_previous_page": "⬅️ 이전",
   "button_next_page": "➡️ 다음",
   "button_back_to_tags": "🔙 태그 목록으로",
-  
   "note_mode_enter": "📝 <b>노트 모드 활성화</b>\n\n노트 내용을 보내주세요:\n• 💬 텍스트 메시지\n• 🖼️ 이미지\n• 🎤 음성\n\n💡 아카이브 메시지에 답장하여 노트를 연결할 수도 있습니다\n\n/cancel로 종료",
   "note_mode_archive_linked": "📝 <b>노트 모드 활성화</b>\n\n📎 아카이브 #{archive_id}에 연결됨\n\n노트 내용을 보내주세요:\n• 💬 텍스트 메시지\n• 🖼️ 이미지\n• 🎤 음성\n\n/cancel로 종료",
   "note_mode_saved": "✅ 노트가 저장되었습니다\n\n📝 노트 ID: #{note_id}",
   "note_mode_saved_with_archive": "✅ 노트가 저장되었습니다\n\n📝 노트 ID: #{note_id}\n📎 연결된 아카이브: #{archive_id}",
   "note_mode_cancelled": "❌ 노트 모드가 취소되었습니다",
   "note_mode_save_failed": "❌ 노트 저장 실패\n\n나중에 다시 시도하세요.",
-  "notes_list_empty": "📝 아직 노트가 없습니다\n\n/note (/n) 명령어 또는 아카이브 목록의 📝 버튼을 사용하여 노트를 생성하세요.",
+  "notes_list_empty": "📝 노트가 없습니다\n\n/note 명령어로 노트를 추가하세요",
   "notes_list_header": "📝 노트 ({count}개)",
   "button_add_note": "📝 노트",
   "nothing_to_cancel": "ℹ️ 진행 중인 작업이 없습니다.",
-  
   "invalid_command": "⚠️ 명령어처럼 보이지만 잘못되었거나 찾을 수 없습니다.\n\n/help로 사용 가능한 명령어를 확인하세요.",
   "short_text_prompt": "💬 무엇을 하시겠습니까?",
   "button_save_as_note": "📝 노트로 저장",
@@ -176,7 +162,6 @@
   "short_text_archived": "✅ 아카이브되었습니다 (ID: #{archive_id})\n\n내용: {content}",
   "short_text_archive_failed": "❌ 아카이브 실패",
   "short_text_expired": "⚠️ 세션이 만료되었습니다. 다시 전송하세요",
-  
   "ai_chat_exit": "👋 AI 채팅 모드를 종료했습니다",
   "ai_chat_help": "🤖 AI 어시스턴트 기능:\n\n• 스마트 채팅: 알고 싶은 것을 말씀해주세요\n• 아카이브 검색: 주제별로 콘텐츠 찾기\n• 통계 보기: 아카이브 통계 확인\n• 콘텐츠 분석: 아카이브 심층 분석\n• 종료: '종료'를 전송하여 세션 종료\n\n참고: 세션은 10분간 활동이 없으면 자동 종료됩니다",
   "ai_chat_thinking": "🤔 생각 중...",
@@ -187,18 +172,14 @@
   "ai_chat_gathering": "📊 데이터 수집 중...",
   "ai_chat_generating": "💬 응답 생성 중...",
   "ai_chat_session_expired": "⚠️ 세션이 만료되었습니다",
-  
   "long_text_intent_prompt": "📝 {length}자를 보냈습니다. 무엇을 하시겠습니까?",
   "long_text_save_note": "📝 노트로 저장",
   "long_text_continue_chat": "💬 채팅 계속하기",
-  
   "continuity_prompt": "💡 {time} 전에 노트 #{note_id}를 저장했습니다\n\n이 메시지를 추가하시겠습니까?",
   "continuity_append": "➕ 이전 노트에 추가",
   "continuity_new_note": "📝 새 노트 생성",
   "continuity_archive": "📦 일반 아카이브",
-  
   "resource_send_failed": "❌ 리소스 전송 실패",
-  
   "archive_processing": "⏳ 처리 중...",
   "archive_progress": "진행률: {percentage}%",
   "archive_duplicate_file": "⚠️ 파일이 이미 존재합니다",
@@ -208,25 +189,21 @@
   "archive_duplicate_file_tags": "🏷️ 태그: {tags}",
   "archive_duplicate_unknown_title": "알 수 없음",
   "archive_duplicate_unknown_time": "알 수 없음",
-  
   "batch_processing_start": "📦 일괄 처리 시작\n총: {total}개 항목\n진행률: 0% (0/{total})",
   "batch_processing_progress": "📦 일괄 처리 중\n단계: {stage}\n진행률: {percentage}% ({current}/{total})\n예상 남은 시간: {remaining}초",
   "batch_processing_complete": "✅ 일괄 아카이브 완료\n\n성공: {success}개\n실패: {fail}개\n\n💡 팁: /search를 사용하여 아카이브된 콘텐츠를 찾으세요",
   "batch_processing_complete_no_fail": "✅ 일괄 아카이브 완료\n\n성공: {success}개\n\n💡 팁: /search를 사용하여 아카이브된 콘텐츠를 찾으세요",
-  
   "note_modified": "✅ 노트가 수정되었습니다\n\n📝 아카이브 #{archive_id}",
   "note_appended": "✅ 노트가 추가되었습니다\n\n📝 아카이브 #{archive_id}",
   "note_added_to_archive": "✅ 아카이브 #{archive_id}에 노트가 추가되었습니다\n\n📝 노트 ID: #{note_id}",
   "note_add_failed_error": "❌ 노트 추가 실패",
   "note_manager_uninitialized": "❌ 노트 관리자가 초기화되지 않았습니다",
-  
   "ai_refining_note": "🤖 처리 중...",
   "ai_refine_note_success": "✅ **노트가 정리되었습니다**\n\n📝 아카이브 #{archive_id}\n\n정리된 내용:\n{content}",
   "ai_refine_note_save_failed": "❌ 정리된 노트 저장 실패",
   "ai_refine_note_failed": "❌ AI 처리 실패",
   "ai_refine_note_error": "❌ 정리 실패: {error}",
   "ai_feature_disabled": "❌ AI 기능이 활성화되지 않았습니다",
-  
   "progress_analyzing_content": "📋 콘텐츠 분석 중",
   "progress_checking_duplicates": "🔍 중복 확인 중",
   "progress_ai_analysis": "🤖 AI 분석 중",
@@ -239,16 +216,13 @@
   "progress_saving_archive": "💾 아카이브 저장 중",
   "progress_complete": "✅ 완료",
   "progress_failed": "❌ 처리 실패",
-  
   "batch_progress_analyzing": "콘텐츠 분석 중",
   "batch_progress_extracting_tags": "태그 추출 중",
   "batch_progress_ai_generating_tags": "AI 태그 생성 중",
   "batch_progress_applying_tags": "태그 적용 중",
   "batch_progress_storing": "채널에 저장 중",
   "batch_progress_complete": "완료",
-  
   "unknown_command_message": "⚠️ 명령어처럼 보이지만 올바르지 않거나 존재하지 않습니다.\n/help로 사용 가능한 명령어를 확인하세요.",
-  
   "callback_closed": "닫기",
   "callback_tag_no_content": "태그 #{tag}에 콘텐츠가 없습니다",
   "callback_tag_header": "🏷️ 태그: #{tag}",
@@ -256,8 +230,17 @@
   "callback_favorite_unmarked": "🤍 즐겨찾기 해제됨",
   "callback_note_has": "📝 √ 노트 있음",
   "callback_note_no": "📝 노트 없음",
-  
   "error_search_engine_not_initialized": "검색 엔진이 초기화되지 않았습니다",
   "error_tag_manager_not_initialized": "태그 관리자가 초기화되지 않았습니다",
-  "error_database_not_initialized": "데이터베이스 저장소가 초기화되지 않았습니다"
+  "error_database_not_initialized": "데이터베이스 저장소가 초기화되지 않았습니다",
+  "setting_menu_title": "⚙️ 시스템 설정\n\n구성할 카테고리를 선택하세요:",
+  "setting_category_basic": "⚙️ 기본 설정",
+  "setting_category_features": "🎛️ 기능 토글",
+  "setting_category_ai": "🤖 AI 설정",
+  "setting_category_storage": "💾 저장소 설정",
+  "setting_category_logging": "📝 로깅 설정",
+  "setting_updated": "✅ 설정이 업데이트되었습니다\n\n<b>{name}</b>\n새 값: <code>{value}</code>\n\n⚠️ 참고: 일부 설정은 Bot을 재시작해야 적용됩니다",
+  "setting_update_failed": "❌ 설정 업데이트 실패\n\n{error}",
+  "setting_invalid_value": "❌ 잘못된 값\n\n{error}",
+  "setting_restart_required": "⚠️ 참고: 일부 설정은 Bot을 재시작해야 적용됩니다"
 }

@@ -9,6 +9,30 @@ class SummarizePrompts:
     """内容摘要分析相关的 prompt 模板"""
     
     @staticmethod
+    def get_role_description(is_formal: bool, language: str = 'zh-CN') -> str:
+        """
+        获取角色描述（供其他模块复用）
+        
+        Args:
+            is_formal: 是否使用正式风格
+            language: 语言代码
+            
+        Returns:
+            角色描述字符串
+        """
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            if is_formal:
+                return "你是一位專業的技術資訊分析師，擅長處理技術文件、學術資料和專業內容。" if is_traditional else "你是一位专业的技术信息分析师，擅长处理技术文档、学术资料和专业内容。"
+            else:
+                return "你是個很會整理資訊的助手，對各種內容都有獨到的理解。" if is_traditional else "你是个很会整理信息的助手，对各种内容都有独到的理解。"
+        else:
+            if is_formal:
+                return "You are a professional technical information analyst specializing in technical documentation, academic materials, and professional content."
+            else:
+                return "You're a helpful assistant who's great at organizing information and understanding various types of content."
+    
+    @staticmethod
     def get_prompt(
         content: str,
         is_formal: bool,

@@ -4,6 +4,7 @@ Note mode handlers
 
 import logging
 from typing import List, Optional, Dict
+from datetime import datetime
 from telegram import Update, Message
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -211,20 +212,31 @@ async def note_timeout_callback(context: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = job_data['chat_id']
         user_id = job_data['user_id']
         
+        logger.info(f"Note timeout callback triggered for user {user_id}")
+        
         # 使用application.user_data来访问用户数据
         # context.user_data在job中可能为空，需要通过user_id访问
-        from telegram.ext._utils.types import UD
-        user_data = context.application.user_data.get(user_id, {})
+        # 注意：user_id可能是str或int，统一转换为int
+        user_id_int = int(user_id) if isinstance(user_id, str) else user_id
+        
+        # application.user_data的key是整数类型的user_id
+        if user_id_int not in context.application.user_data:
+            logger.debug(f"Note timeout callback: user {user_id_int} has no user_data, skipping")
+            return
+        
+        user_data = context.application.user_data[user_id_int]
         
         # 检查用户是否还在笔记模式
         if not user_data.get('note_mode'):
-            logger.debug(f"Note timeout callback: user {user_id} not in note mode, skipping")
+            logger.debug(f"Note timeout callback: user {user_id_int} not in note mode, skipping")
             return
         
-        # 生成并保存笔记（传递user_data确保数据访问正确）
-        await _finalize_note_internal(context, chat_id, user_id, reason="timeout")
+        logger.info(f"Processing note timeout for user {user_id_int} (has {len(user_data.get('note_messages', []))} messages)")
         
-        logger.info(f"Note mode timeout for user {user_id}")
+        # 生成并保存笔记（传递user_data确保数据访问正确）
+        await _finalize_note_internal(context, chat_id, user_id_int, reason="timeout")
+        
+        logger.info(f"Note mode timeout completed for user {user_id_int}")
         
     except Exception as e:
         logger.error(f"Error in note timeout callback: {e}", exc_info=True)
@@ -237,24 +249,47 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
     Args:
         context: Bot context
         chat_id: Chat ID
-        user_id: User ID（用于访问user_data）
+        user_id: User ID（用于访问user_data，必须是int类型）
         reason: 退出原因 (manual, timeout, command)
     """
     try:
+        # 确保user_id是整数类型
+        user_id_int = int(user_id) if isinstance(user_id, str) else user_id
+        
         # 在job回调中，context.user_data可能为空，需要从application.user_data获取
         if reason == "timeout":
-            user_data = context.application.user_data.get(user_id, {})
+            if user_id_int not in context.application.user_data:
+                logger.warning(f"User {user_id_int} not found in application.user_data")
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="📝 笔记模式已超时\n\n⚠️ 未找到用户数据"
+                )
+                return
+            user_data = context.application.user_data[user_id_int]
         else:
             user_data = context.user_data
         
         messages = user_data.get('note_messages', [])
         archives = user_data.get('note_archives', [])
         
+        logger.debug(f"Finalizing note for user {user_id_int}: {len(messages)} messages, {len(archives)} archives, reason={reason}")
+        
         if not messages:
             await context.bot.send_message(
                 chat_id=chat_id,
                 text="📝 笔记模式已退出\n\n⚠️ 未记录到任何消息"
             )
+            # 清理数据
+            if reason == "timeout":
+                user_data_to_clean = context.application.user_data.get(user_id_int, {})
+            else:
+                user_data_to_clean = context.user_data
+            
+            keys_to_remove = ['note_mode', 'note_messages', 'note_archives', 'note_start_time', 'note_timeout_job', 'pending_command']
+            for key in keys_to_remove:
+                user_data_to_clean.pop(key, None)
+            
+            return
         else:
             # 合并所有文本消息（使用生成器减少内存）
             note_content = '\n\n'.join(messages)
@@ -426,7 +461,13 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
         # 立即清除所有笔记模式相关数据，释放内存
         # 根据reason决定清除哪个user_data
         if reason == "timeout":
-            user_data_to_clean = context.application.user_data.get(user_id, {})
+            # 确保user_id_int已定义
+            user_id_int = int(user_id) if isinstance(user_id, str) else user_id
+            if user_id_int in context.application.user_data:
+                user_data_to_clean = context.application.user_data[user_id_int]
+            else:
+                logger.warning(f"Cannot clean user_data for user {user_id_int}: not found in application.user_data")
+                return
         else:
             user_data_to_clean = context.user_data
         
@@ -434,8 +475,13 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
         for key in keys_to_remove:
             user_data_to_clean.pop(key, None)
         
+        logger.info(f"Note finalized and cleaned up for user {user_id}, reason={reason}")
+        
     except Exception as e:
         logger.error(f"Error finalizing note: {e}", exc_info=True)
         # 确保即使出错也清理内存
-        for key in ['note_mode', 'note_messages', 'note_archives', 'note_start_time', 'note_timeout_job', 'pending_command']:
-            context.user_data.pop(key, None)
+        try:
+            for key in ['note_mode', 'note_messages', 'note_archives', 'note_start_time', 'note_timeout_job', 'pending_command']:
+                context.user_data.pop(key, None)
+        except:
+            pass

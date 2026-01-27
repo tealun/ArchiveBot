@@ -19,6 +19,7 @@ from .commands import (
     export_command,
     backup_command,
     review_command,
+    setting_command,
 )
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     'export_command',
     'backup_command',
     'review_command',
+    'setting_command',
 ]

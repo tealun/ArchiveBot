@@ -84,8 +84,9 @@ class OpenAIProvider(AIProvider):
                     'full': '完整分析，包含摘要和关键点'
                 }
             
-            # 判断是否为正式内容
-            is_formal = is_formal_content(content[:1000], content_type)
+            # 从 prompts 模块获取角色描述
+            from ..prompts.summarize import SummarizePrompts
+            role_desc = SummarizePrompts.get_role_description(is_formal, content_lang)
             
             # 构建上下文信息
             file_size_str = f"{file_size / 1024 / 1024:.2f}MB" if file_size > 0 else "文本内容"
@@ -97,75 +98,16 @@ class OpenAIProvider(AIProvider):
 • 内容主要语言是{content_lang}
 • 深度要求：{depth_instruction[analysis_depth]}"""
             
-            # 根据内容风格选择不同的prompt
-            if is_formal:
-                # 正式风格 - 技术/严肃/知识类
-                role_desc = "你是一位专业的技术信息分析师，擅长处理技术文档、学术资料和专业内容。"
-                task_desc = """请帮我分析这份内容，需要你做到：
-• 准确提炼核心技术要点和关键信息
-• 建立清晰的知识分类体系
-• 生成便于检索的专业标签"""
-                
-                example = """参考示例（技术类）：
-输入：《深入理解计算机系统》第三版.pdf
-输出：{{
-  "summary": "经典计算机系统教材，系统讲解计算机组成原理、操作系统和程序优化",
-  "key_points": ["计算机体系结构基础", "系统级编程技术", "性能优化方法论"],
-  "category": "技术",
-  "suggested_tags": ["计算机系统", "教材", "系统编程", "技术书籍", "PDF文档"]
-}}"""
-                
-                quality_guide = """输出规范：
-• 摘要控制在30-100字，客观准确地描述核心内容
-• 关键点每个10-30字，聚焦于重要信息而非细枝末节
-• 分类选择一个最合适的主类别
-• 标签5个，组合使用主题词和属性词，要精准可搜索
-  正例："Python教程"、"机器学习"、"技术文档"
-  反例："文件"、"资料"（过于宽泛）"""
-            else:
-                # 轻松风格 - 生活/娱乐/日常类
-                role_desc = "你是个很会整理信息的助手，对各种内容都有独到的理解。"
-                task_desc = """帮我看看这个内容讲了什么，你需要：
-• 用简洁的话说清楚核心内容
-• 给它找个合适的分类
-• 打上几个好用的标签，方便以后找"""
-                
-                example = """给你看个例子：
-输入：华尔街之狼电影片段.mp4
-输出：{{
-  "summary": "一段关于华尔街交易员生活的电影片段，奢华、疯狂又充满欲望",
-  "key_points": ["讲金融圈的故事", "华尔街背景", "根据真人真事改编"],
-  "category": "娱乐",
-  "suggested_tags": ["电影片段", "金融题材", "传记电影", "影视收藏", "小李子"]
-}}"""
-                
-                quality_guide = """输出要求：
-• 摘要30-100字左右，说清楚就行，别太刻板
-• 关键点每个10-30字，抓住要点即可
-• 分类选一个最贴切的
-• 标签给5个，既要准确又要实用
-  可以参考："美食教程"、"旅行照片"、"电影推荐"
-  别用这种："内容"、"文件"（太模糊了）"""
-            
-            prompt = f"""{role_desc}
-{task_desc}
-
-{context_info}
-
-{example}
-
-{quality_guide}
-
-待分析的内容：
-{content[:4000]}
-
-请用JSON格式回复（{language_instruction}）：
-{{
-  "summary": "简短总结（1-2句话）",
-  "key_points": ["关键点1", "关键点2", "关键点3"],
-  "category": "内容分类（参考：{example_categories}）",
-  "suggested_tags": ["标签1", "标签2", "标签3", "标签4", "标签5"]
-}}"""
+            # 使用 SummarizePrompts 统一生成 prompt
+            prompt = SummarizePrompts.get_prompt(
+                content=content,
+                is_formal=is_formal,
+                language=content_lang,
+                language_instruction=language_instruction,
+                context_info=context_info,
+                example_categories=example_categories,
+                example_tags=example_tags
+            )
         else:
             # English prompt with style adaptation
             is_formal = is_formal_content(content[:1000], content_type)

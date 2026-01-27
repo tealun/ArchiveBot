@@ -48,8 +48,13 @@ class ChatPrompts:
 
 {{
     "user_goal": "用戶的真實需求（一句話）",
-    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request",
+    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request|command_request|contextual_reference|clarification|guided_inquiry",
     "question_type": "precise|open",  # precise=具體精準問題, open=開放式問題
+    "command_type": "note|trash|export|backup|language|tag_operation",  # 僅當user_intent=command_request時填寫
+    "command_params": {{}},  # 僅當user_intent=command_request時填寫，如{{"archive_id": 123, "tag": "Python"}}
+    "context_reference": {{}},  # 僅當user_intent=contextual_reference時填寫，如{{"type": "previous_result", "action": "get_more"}}
+    "clarification_type": "confirm|reject|cancel",  # 僅當user_intent=clarification時填寫
+    "inquiry_params": {{}},  # 僅當user_intent=guided_inquiry時填寫，如{{"topic": "how_to_use", "stage": "initial"}}
     "need_data": {{
         "search_keywords": "如果需要搜尋，提取關鍵詞；否則null",
         "need_statistics": true/false,
@@ -100,6 +105,32 @@ class ChatPrompts:
    - 例：「給我一張圖片」「隨機一個視頻」「看看我的文檔」
    - resource_query.enabled=true
 
+6. command_request（操作指令）
+   - 用戶要求執行系統操作或命令
+   - 例：「刪除歸檔123」「導出數據」「備份資料庫」「切換語言」
+   - 需要提取：command_type（note/trash/export/backup/language/tag_operation）
+   - 需要提取：command_params（如歸檔ID、標籤名等）
+   - need_data可選（視操作需要）
+
+7. contextual_reference（上下文引用）
+   - 引用之前的對話、結果或操作
+   - 例：「剛才那個」「再來一個」「上一個」「第二個結果」
+   - 需要提取：type（previous_result/previous_query/previous_item）
+   - 需要提取：action（get_more/view_detail/use_same_query）
+   - 依賴對話歷史解析上下文
+
+8. clarification（確認對話）
+   - 對系統提問或待確認操作的回應
+   - 例：「是的」「確定」「好」「取消」「不了」
+   - 需要提取：clarification_type（confirm/reject/cancel）
+   - 依賴會話中的 pending_action（待確認操作）
+
+9. guided_inquiry（引導式探詢）
+   - 請求多步驟引導或學習如何使用功能
+   - 例：「如何使用」「怎麼操作」「教我」「功能介紹」
+   - 需要提取：inquiry_params（topic, stage）
+   - 可能需要知識庫和系統文檔支持
+
 規劃原則：
 - 精準問題只返回所需數據，不過度引申
 - 開放問題可以分析趨勢、提供洞察
@@ -112,6 +143,10 @@ class ChatPrompts:
 - specific_search → search_results（搜尋結果）
 - stats_analysis → data_analysis（數據分析）
 - resource_request → resource_reply（資源回覆）
+- command_request → execute_command（執行指令）
+- contextual_reference → context_based_action（基於上下文的操作）
+- clarification → process_confirmation（處理確認回應）
+- guided_inquiry → provide_guidance（提供引導）
 - 如果查詢不到結果，會如實告知用戶「未找到」，不得編造
 
 只返回JSON。"""
@@ -124,8 +159,13 @@ class ChatPrompts:
 
 {{
     "user_goal": "用户的真实需求（一句话）",
-    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request",
+    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request|command_request|contextual_reference|clarification|guided_inquiry",
     "question_type": "precise|open",  # precise=具体精准问题, open=开放式问题
+    "command_type": "note|trash|export|backup|language|tag_operation",  # 仅当user_intent=command_request时填写
+    "command_params": {{}},  # 仅当user_intent=command_request时填写，如{{"archive_id": 123, "tag": "Python"}}
+    "context_reference": {{}},  # 仅当user_intent=contextual_reference时填写，如{{"type": "previous_result", "action": "get_more"}}
+    "clarification_type": "confirm|reject|cancel",  # 仅当user_intent=clarification时填写
+    "inquiry_params": {{}},  # 仅当user_intent=guided_inquiry时填写，如{{"topic": "how_to_use", "stage": "initial"}}
     "need_data": {{
         "search_keywords": "如果需要搜索，提取关键词；否则null",
         "need_statistics": true/false,
@@ -176,6 +216,32 @@ class ChatPrompts:
    - 例：「给我一张图片」「随机一个视频」「看看我的文档」
    - resource_query.enabled=true
 
+6. command_request（操作指令）
+   - 用户要求执行系统操作或命令
+   - 例：「删除归档123」「导出数据」「备份数据库」「切换语言」
+   - 需要提取：command_type（note/trash/export/backup/language/tag_operation）
+   - 需要提取：command_params（如归档ID、标签名等）
+   - need_data可选（视操作需要）
+
+7. contextual_reference（上下文引用）
+   - 引用之前的对话、结果或操作
+   - 例：「刚才那个」「再来一个」「上一个」「第二个结果」
+   - 需要提取：type（previous_result/previous_query/previous_item）
+   - 需要提取：action（get_more/view_detail/use_same_query）
+   - 依赖对话历史解析上下文
+
+8. clarification（确认对话）
+   - 对系统提问或待确认操作的回应
+   - 例：「是的」「确定」「好」「取消」「不了」
+   - 需要提取：clarification_type（confirm/reject/cancel）
+   - 依赖会话中的 pending_action（待确认操作）
+
+9. guided_inquiry（引导式探询）
+   - 请求多步骤引导或学习如何使用功能
+   - 例：「如何使用」「怎么操作」「教我」「功能介绍」
+   - 需要提取：inquiry_params（topic, stage）
+   - 可能需要知识库和系统文档支持
+
 规划原则：
 - 精准问题只返回所需数据，不过度引申
 - 开放问题可以分析趋势、提供洞察
@@ -188,6 +254,10 @@ class ChatPrompts:
 - specific_search → search_results（搜索结果）
 - stats_analysis → data_analysis（数据分析）
 - resource_request → resource_reply（资源回复）
+- command_request → execute_command（执行指令）
+- contextual_reference → context_based_action（基于上下文的操作）
+- clarification → process_confirmation（处理确认回应）
+- guided_inquiry → provide_guidance（提供引导）
 - 如果查询不到结果，会如实告知用户「未找到」，不得编造
 
 只返回JSON。"""
@@ -206,8 +276,13 @@ Please understand the user's need and plan the response. Return JSON (no markdow
 
 {{
     "user_goal": "User's actual need (one sentence)",
-    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request",
-    "question_type": "precise|open",  # precise=specific targeted question, open=exploratory question
+    "user_intent": "pure_chat|general_query|specific_search|stats_analysis|resource_request|command_request|contextual_reference|clarification|guided_inquiry",
+    "question_type": "precise|open",  # precise=specific question, open=open-ended question
+    "command_type": "note|trash|export|backup|language|tag_operation",  # Only fill when user_intent=command_request
+    "command_params": {{}},  # Only fill when user_intent=command_request, e.g. {{"archive_id": 123, "tag": "Python"}}
+    "context_reference": {{}},  # Only fill when user_intent=contextual_reference, e.g. {{"type": "previous_result", "action": "get_more"}}
+    "clarification_type": "confirm|reject|cancel",  # Only fill when user_intent=clarification
+    "inquiry_params": {{}},  # Only fill when user_intent=guided_inquiry, e.g. {{"topic": "how_to_use", "stage": "initial"}}
     "need_data": {{
         "search_keywords": "If search needed, extract keywords; otherwise null",
         "need_statistics": true/false,
@@ -258,6 +333,32 @@ Please understand the user's need and plan the response. Return JSON (no markdow
    - e.g., "give me a photo", "random video", "show my documents"
    - resource_query.enabled=true
 
+6. command_request (Command request)
+   - User requests to execute system operations or commands
+   - e.g., "delete archive 123", "export data", "backup database", "change language"
+   - Need to extract: command_type (note/trash/export/backup/language/tag_operation)
+   - Need to extract: command_params (e.g., archive ID, tag name, etc.)
+   - need_data is optional (depends on operation)
+
+7. contextual_reference (Contextual reference)
+   - References previous conversation, results, or actions
+   - e.g., "that one", "one more", "the previous one", "the second result"
+   - Need to extract: type (previous_result/previous_query/previous_item)
+   - Need to extract: action (get_more/view_detail/use_same_query)
+   - Relies on conversation history to parse context
+
+8. clarification (Clarification)
+   - Response to system questions or pending confirmations
+   - e.g., "yes", "sure", "ok", "cancel", "no"
+   - Need to extract: clarification_type (confirm/reject/cancel)
+   - Relies on pending_action in session (pending operation to confirm)
+
+9. guided_inquiry (Guided inquiry)
+   - Request multi-step guidance or learning how to use features
+   - e.g., "how to use", "how to operate", "teach me", "feature introduction"
+   - Need to extract: inquiry_params (topic, stage)
+   - May need knowledge base and system documentation support
+
 Planning principles:
 - Precise questions return only required data, don't over-extend
 - Open questions can analyze trends and provide insights
@@ -270,6 +371,10 @@ Planning principles:
 - specific_search → search_results (search results)
 - stats_analysis → data_analysis (data analysis)
 - resource_request → resource_reply (resource reply)
+- command_request → execute_command (execute command)
+- contextual_reference → context_based_action (context-based action)
+- clarification → process_confirmation (handle confirmation response)
+- guided_inquiry → provide_guidance (provide guidance)
 - If no results found, honestly tell user "not found" - DO NOT fabricate
 
 Return JSON only."""

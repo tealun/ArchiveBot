@@ -67,6 +67,15 @@ from .backup import (
     handle_backup_delete_all_callback
 )
 
+# Setting callbacks
+from .setting import (
+    handle_setting_category_callback,
+    handle_setting_item_callback,
+    handle_setting_set_callback,
+    handle_setting_back_callback,
+    handle_setting_input
+)
+
 __all__ = [
     # Language
     'handle_language_callback',
@@ -111,4 +120,10 @@ __all__ = [
     # Backup
     'handle_backup_keep_callback',
     'handle_backup_delete_all_callback',
+    # Setting
+    'handle_setting_category_callback',
+    'handle_setting_item_callback',
+    'handle_setting_set_callback',
+    'handle_setting_back_callback',
+    'handle_setting_input',
 ]

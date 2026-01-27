@@ -1,39 +1,24 @@
 {
   "welcome": "👋 Welcome to ArchiveBot!\n\n🤖 Your Intelligent Personal Archive Assistant\n\n<b>Core Features:</b>\n📦 Universal Archiving - Text/Images/Videos/Documents/Links\n🏷️ Smart Tags - Auto-classification & tag extraction\n🤖 AI Enhanced - Summarization/Key points/Smart titles\n🔍 Powerful Search - Full-text/Tag filtering/Time range\n💾 Flexible Storage - Telegram channel + Database backup\n📝 Notes Management - Linked archives/Standalone/AI assist\n🗑️ Safe Operations - Trash bin/Backup/Export formats\n\n<b>Quick Start:</b>\n• Send any content to archive\n• Use #hashtags for custom tags\n• Send /help for complete command list\n\n<b>Open Source:</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\nLet's start archiving! 🚀",
-  
   "help": "📖 Help\n\n<b>Archive Content:</b>\n• Send me any content directly\n• Add tags using #tag format\n• Forward messages to record source\n• Batch forwarding auto-aggregation\n\n<b>Basic Commands:</b>\n/start - Initialize bot\n/help - View this help\n/search (/s) &lt;keyword&gt; - Search archives\n/tags (/t) - View all tags\n/stats (/st) - View statistics\n/review - Archive review & stats\n\n<b>Notes:</b>\n/note (/n) - Add note to archive\n/notes - View all notes\n\n<b>Data Management:</b>\n/trash - View trash bin\n/export - Export data (JSON/HTML/Markdown)\n/backup - Backup & restore database\n\n<b>Other:</b>\n/ai - AI status\n/language (/la) - Change language\n\n<b>Search Tips:</b>\n• Keyword: /s python\n• Tag: /s #tech\n• Combined: /s #tech python\n• Click results to jump to channel\n\n<b>AI Features:</b>\n• Smart summary generation\n• Auto extract key points\n• Tag suggestions (batch shared)\n• Intelligent categorization",
-  
   "unauthorized": "⛔ Unauthorized\n\nSorry, this bot is for private use only.",
-  
   "archive_success": "✅ Archived successfully\n\n{title_link}📝 Type: {content_type}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n📌 Source: {source}\n🕐 Time: {time}",
-  "archive_success_with_size": "✅ Archived successfully\n\n{title_link}📝 Type: {content_type}\n📦 Size: {file_size}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n📌 Source: {source}\n🕐 Time: {time}",  
+  "archive_success_with_size": "✅ Archived successfully\n\n{title_link}📝 Type: {content_type}\n📦 Size: {file_size}\n🏷️ Tags: {tags}\n💾 Storage: {storage_type}\n📌 Source: {source}\n🕐 Time: {time}",
   "archive_failed": "❌ Archive failed\n\nError: {error}\nPlease try again.",
-  
   "search_no_keyword": "Please provide search keyword.\n\nExample: /search python",
-  
   "search_no_results": "🔍 No results found\n\nKeyword: {keyword}\n\nTry other keywords or check tag list with /tags",
-  
   "search_results": "🔍 Search Results ({count})\n\nKeyword: {keyword}\n\n{results}",
-  
   "tags_empty": "No tags yet.\n\nStart archiving content to create tags!",
-  
   "tags_list": "🏷️ All Tags ({count})\n\n{tags}",
-  
   "stats": "📊 Statistics\n\n📦 Total Archives: {total_archives}\n🏷️ Total Tags: {total_tags}\n💾 Content Size: {storage_used}\n💾 Database Size: {db_size}\n📅 Last Archive: {last_archive}",
-  
   "language_changed": "✅ Language changed to English",
-  
   "language_select": "🌍 Select Language\n\n📍 Current Language: {current_language}\n\nPlease choose your preferred language:",
   "language_name_en": "English",
   "language_name_zh-CN": "简体中文 (Simplified Chinese)",
   "language_name_zh-TW": "繁體中文 (Traditional Chinese)",
-  
   "processing": "⏳ Processing...",
-  
   "error_occurred": "❌ An error occurred\n\n{error}\n\nPlease try again or contact administrator.",
-  
   "rate_limit_exceeded": "⚠️ Rate limit exceeded\n\nPlease wait {wait_time} seconds before trying again.",
-  
   "tag_text": "text",
   "tag_image": "image",
   "tag_video": "video",
@@ -45,16 +30,26 @@
   "tag_animation": "animation",
   "tag_contact": "contact",
   "tag_location": "location",
-  
   "storage_database": "Database",
   "storage_telegram": "Telegram Channel",
   "storage_cloud": "Cloud Storage",
   "storage_reference": "Reference Only",
-  
+  "optimizer_search_suggestions": "💡 Suggestions:\n• Try simpler keywords\n• Check for typos\n• Use /tags to browse by tags\n• Use /stats to see what's in your archive",
+  "optimizer_filter_suggestions_with_tags": "💡 {count} results found. Try filtering by tags: {tags}",
+  "optimizer_filter_suggestions_no_tags": "💡 {count} results found. Showing top matches.",
+  "optimizer_expand_suggestions": "💡 Want more? Try broader keywords or check /tags",
+  "optimizer_onboarding_hint": "📝 Your archive is empty. Start by forwarding messages or sending content!",
+  "optimizer_tagging_hint": "💡 Tip: Add hashtags when archiving for better organization!",
+  "optimizer_resource_suggestions": "💡 Try again? Send 'one more' to get more resources",
+  "command_guide_note": "💡 Use /note <archive_id> or reply to archive message to add notes",
+  "command_guide_trash": "💡 Use /trash to view trash bin (deleted archives can be restored or permanently deleted here)",
+  "command_guide_export": "💡 Use /export to export data (JSON/HTML/Markdown formats supported)",
+  "command_guide_backup": "💡 Use /backup to backup or restore database",
+  "command_guide_language": "💡 Use /language to change interface language",
+  "command_guide_tags": "💡 Use /tags to view all tags, or send #tag to filter",
   "button_language_en": "English",
   "button_language_zh_cn": "简体中文",
   "button_language_zh_tw": "繁體中文",
-  
   "note_added": "✅ Note added\n\n📝 Note ID: #{note_id}\n📦 Archive ID: #{archive_id}",
   "note_add_failed": "❌ Failed to add note\n\nPlease check if the archive ID is correct.",
   "note_no_archive_id": "Please provide an archive ID.\n\nExample: /note 123 or /n 123",
@@ -67,7 +62,6 @@
   "no_notes_search_results": "🔍 No notes found containing '{query}'.",
   "notes_search_results": "🔍 Note search results ({count})\n\nKeyword: {query}",
   "archive": "Archive",
-  
   "trash_manager_not_initialized": "❌ Trash feature not initialized\n\nPlease restart the bot.",
   "trash_empty": "🗑️ Trash is empty\n\nNo deleted archives.",
   "trash_list": "🗑️ Trash ({count} items)",
@@ -85,14 +79,12 @@
   "trash_invalid_command": "❌ Invalid command\n\nUsage:\n/trash - View trash\n/trash restore <id> - Restore archive\n/trash delete <id> - Delete permanently\n/trash empty [days] - Empty trash",
   "archive_moved_to_trash": "✅ Archive #{archive_id} moved to trash",
   "archive_delete_failed": "❌ Failed to delete archive #{archive_id}\n\nArchive may already be deleted.",
-  
   "export_manager_not_initialized": "❌ Export feature not initialized\n\nPlease restart the bot.",
   "export_processing": "📦 Exporting data...",
   "export_tag_usage": "Usage: /export tag <tag_name> [format]\n\nExample: /export tag tech markdown",
   "export_invalid_format": "❌ Invalid format\n\nSupported formats: markdown, json, csv",
   "export_failed": "❌ Export failed\n\nPlease try again later.",
   "export_success": "✅ Export successful\n\n📄 File: {filename}\n📊 Size: {size} bytes",
-
   "backup_manager_not_initialized": "❌ Backup feature not initialized\n\nPlease restart the bot.",
   "backup_none": "🗃️ No backups found.",
   "backup_list_header": "🗃️ Backups ({count})",
@@ -111,7 +103,6 @@
   "backup_status": "📊 Database status\nSize: {size} bytes\nArchives: {archives}\nNotes: {notes}\nDeleted: {deleted}\nLast archive: {last}",
   "backup_status_failed": "❌ Failed to get database status",
   "backup_invalid_command": "❌ Invalid subcommand\n\nUsage: /backup [create|restore|delete|cleanup|status]",
-  
   "review_usage": "📊 Review & Statistics\n\nSelect a time period to view your activity:\n\n<b>Features:</b>\n• Archive trend analysis\n• Active days count\n• Top tags statistics\n• Random archive discovery",
   "review_period_week": "Last 7 Days",
   "review_period_month": "Last 30 Days",
@@ -124,9 +115,7 @@
   "review_no_data": "📊 No activity during this period.\n\nStart archiving to see statistics!",
   "review_invalid_period": "❌ Invalid period\n\nUse: week, month, or year",
   "review_manager_not_initialized": "❌ Review feature not initialized\n\nPlease restart the bot.",
-  
   "tags_button_list_header": "🏷️ Tag List ({count})\n\nClick tags to view related content:",
-  
   "ai_status_enabled": "✅ Status: Enabled",
   "ai_status_available": "✅ Service: Available",
   "ai_status_unavailable": "⚠️ Service: Unavailable\nPlease check API key configuration",
@@ -141,23 +130,20 @@
   "ai_status_auto_summarize": "Auto Summary: {status}",
   "ai_status_auto_tags": "\nAuto Tags: {status}",
   "ai_status_enable_guide": "\n\n💡 *How to Enable*\n1. Edit config/config.yaml\n2. Set ai.enabled: true\n3. Configure ai.api.provider and ai.api.api_key\n4. Restart the bot\n\nSupported providers: OpenAI, Claude, Qwen",
-  
   "pagination_page_of": "Page {current} of {total}",
   "button_previous_page": "⬅️ Previous",
   "button_next_page": "➡️ Next",
   "button_back_to_tags": "🔙 Back to Tags",
-  
   "note_mode_enter": "📝 <b>Note Mode Activated</b>\n\nPlease send your note content:\n• 💬 Text message\n• 🖼️ Image\n• 🎤 Voice\n\n💡 You can also reply to an archive message to link the note\n\nSend /cancel to exit note mode",
   "note_mode_archive_linked": "📝 <b>Note Mode Activated</b>\n\n📎 Linked to Archive #{archive_id}\n\nPlease send your note content:\n• 💬 Text message\n• 🖼️ Image\n• 🎤 Voice\n\nSend /cancel to exit note mode",
   "note_mode_saved": "✅ Note saved\n\n📝 Note ID: #{note_id}",
   "note_mode_saved_with_archive": "✅ Note saved\n\n📝 Note ID: #{note_id}\n📎 Linked Archive: #{archive_id}",
   "note_mode_cancelled": "❌ Note mode cancelled",
   "note_mode_save_failed": "❌ Failed to save note\n\nPlease try again later.",
-  "notes_list_empty": "📝 No notes yet\n\nUse /note (/n) command or click the 📝 button in archive lists to create notes.",
+  "notes_list_empty": "📝 No notes yet\n\nUse /note to add notes",
   "notes_list_header": "📝 Notes ({count})",
   "button_add_note": "📝 Note",
   "nothing_to_cancel": "ℹ️ No operation in progress.",
-  
   "invalid_command": "⚠️ This looks like a command, but is invalid or not found.\n\nSend /help to see all available commands.",
   "short_text_prompt": "💬 What would you like to do?",
   "button_save_as_note": "📝 Save as Note",
@@ -170,7 +156,6 @@
   "short_text_archived": "✅ Archived (ID: #{archive_id})\n\nContent: {content}",
   "short_text_archive_failed": "❌ Archive failed",
   "short_text_expired": "⚠️ Session expired, please resend",
-  
   "ai_chat_exit": "👋 AI chat mode ended",
   "ai_chat_help": "🤖 AI Assistant Features:\n\n• Smart Chat: Tell me what you want to know\n• Search Archives: Find content by topic\n• View Stats: Check archive statistics\n• Content Analysis: Deep dive into your archives\n• Exit: Send 'exit' to end session\n\nNote: Session expires after 10 minutes of inactivity",
   "ai_chat_thinking": "🤔 Thinking...",
@@ -181,18 +166,14 @@
   "ai_chat_gathering": "📊 Gathering data...",
   "ai_chat_generating": "💬 Generating response...",
   "ai_chat_session_expired": "⚠️ Session expired",
-  
   "long_text_intent_prompt": "📝 You sent {length} characters. What do you want to do?",
   "long_text_save_note": "📝 Save as Note",
   "long_text_continue_chat": "💬 Continue Chat",
-  
   "continuity_prompt": "💡 You saved note #{note_id} {time} ago\n\nDo you want to append this message to that note?",
   "continuity_append": "➕ Append to Previous Note",
   "continuity_new_note": "📝 Create New Note",
   "continuity_archive": "📦 Normal Archive",
-  
   "resource_send_failed": "❌ Resource send failed",
-  
   "archive_processing": "⏳ Processing...",
   "archive_progress": "Progress: {percentage}%",
   "archive_duplicate_file": "⚠️ File already exists",
@@ -202,25 +183,21 @@
   "archive_duplicate_file_tags": "🏷️ Tags: {tags}",
   "archive_duplicate_unknown_title": "Unknown",
   "archive_duplicate_unknown_time": "Unknown",
-  
   "batch_processing_start": "📦 Batch processing started\nTotal: {total} items\nProgress: 0% (0/{total})",
   "batch_processing_progress": "📦 Batch processing\nStage: {stage}\nProgress: {percentage}% ({current}/{total})\nEst. remaining: {remaining}s",
   "batch_processing_complete": "✅ Batch archiving complete\n\nSuccess: {success} items\nFailed: {fail} items\n\n💡 Tip: Use /search to find archived content",
   "batch_processing_complete_no_fail": "✅ Batch archiving complete\n\nSuccess: {success} items\n\n💡 Tip: Use /search to find archived content",
-  
   "note_modified": "✅ Note modified\n\n📝 Archive #{archive_id}",
   "note_appended": "✅ Note appended\n\n📝 Archive #{archive_id}",
   "note_added_to_archive": "✅ Note added to archive #{archive_id}\n\n📝 Note ID: #{note_id}",
   "note_add_failed_error": "❌ Failed to add note",
   "note_manager_uninitialized": "❌ Note manager not initialized",
-  
   "ai_refining_note": "🤖 Processing...",
   "ai_refine_note_success": "✅ **Note refined**\n\n📝 Archive #{archive_id}\n\nRefined content:\n{content}",
   "ai_refine_note_save_failed": "❌ Failed to save refined note",
   "ai_refine_note_failed": "❌ AI processing failed",
   "ai_refine_note_error": "❌ Refinement failed: {error}",
   "ai_feature_disabled": "❌ AI features not enabled",
-  
   "progress_analyzing_content": "📋 Analyzing content",
   "progress_checking_duplicates": "🔍 Checking duplicates",
   "progress_ai_analysis": "🤖 AI analysis",
@@ -233,16 +210,13 @@
   "progress_saving_archive": "💾 Saving archive",
   "progress_complete": "✅ Complete",
   "progress_failed": "❌ Processing failed",
-  
   "batch_progress_analyzing": "Analyzing content",
   "batch_progress_extracting_tags": "Extracting tags",
   "batch_progress_ai_generating_tags": "AI generating tags",
   "batch_progress_applying_tags": "Applying tags",
   "batch_progress_storing": "Storing to channel",
   "batch_progress_complete": "Complete",
-  
   "unknown_command_message": "⚠️ This appears to be a command, but it's incorrect or doesn't exist.\nSend /help to see all available commands.",
-  
   "callback_closed": "Closed",
   "callback_tag_no_content": "No content under tag #{tag}",
   "callback_tag_header": "🏷️ Tag: #{tag}",
@@ -250,8 +224,17 @@
   "callback_favorite_unmarked": "🤍 Not favorited",
   "callback_note_has": "📝 √ Has notes",
   "callback_note_no": "📝 No notes",
-  
   "error_search_engine_not_initialized": "Search engine not initialized",
   "error_tag_manager_not_initialized": "Tag manager not initialized",
-  "error_database_not_initialized": "Database storage not initialized"
+  "error_database_not_initialized": "Database storage not initialized",
+  "setting_menu_title": "⚙️ System Settings\n\nSelect a category to configure:",
+  "setting_category_basic": "⚙️ Basic Settings",
+  "setting_category_features": "🎛️ Feature Toggles",
+  "setting_category_ai": "🤖 AI Settings",
+  "setting_category_storage": "💾 Storage Settings",
+  "setting_category_logging": "📝 Logging Settings",
+  "setting_updated": "✅ Setting Updated\n\n<b>{name}</b>\nNew value: <code>{value}</code>\n\n⚠️ Note: Some settings require restarting the bot to take effect",
+  "setting_update_failed": "❌ Setting Update Failed\n\n{error}",
+  "setting_invalid_value": "❌ Invalid Value\n\n{error}",
+  "setting_restart_required": "⚠️ Note: Some settings require restarting the bot to take effect"
 }

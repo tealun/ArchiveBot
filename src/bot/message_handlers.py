@@ -57,6 +57,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         message = update.message
         lang_ctx = get_language_context(update, context)
         
+        # 优先检查：配置输入模式
+        from .callbacks.setting import handle_setting_input
+        if await handle_setting_input(update, context):
+            return
+        
         # 优先检查：笔记模式
         if context.user_data.get('note_mode'):
             await _handle_note_mode_message(update, context, lang_ctx)

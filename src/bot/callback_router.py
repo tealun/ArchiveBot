@@ -54,6 +54,12 @@ from .callbacks import (
     # Backup
     handle_backup_keep_callback,
     handle_backup_delete_all_callback,
+    # Setting
+    handle_setting_category_callback,
+    handle_setting_item_callback,
+    handle_setting_set_callback,
+    handle_setting_back_callback,
+    handle_setting_input,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,6 +157,14 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_backup_keep_callback(update, context)
         elif callback_data == 'backup_delete_all':
             await handle_backup_delete_all_callback(update, context)
+        elif callback_data.startswith('setting_cat:'):
+            await handle_setting_category_callback(update, context)
+        elif callback_data.startswith('setting_item:'):
+            await handle_setting_item_callback(update, context)
+        elif callback_data.startswith('setting_set:'):
+            await handle_setting_set_callback(update, context)
+        elif callback_data == 'setting_back':
+            await handle_setting_back_callback(update, context)
         elif callback_data == 'noop':
             # 不做任何操作（日期显示按钮）
             pass

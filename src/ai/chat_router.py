@@ -206,6 +206,26 @@ async def handle_chat_message(
     if '帮助' in user_goal or '幫助' in user_goal or 'help' in user_goal.lower():
         return handle_help(language)
     
+    # 处理 command_request 意图（操作指令）
+    if user_intent == 'command_request':
+        logger.info(f"⚙️ Command request detected: {plan.get('command_type', 'unknown')}")
+        return await handle_command_request(plan, context, language)
+    
+    # 处理 contextual_reference 意图（上下文引用）
+    if user_intent == 'contextual_reference':
+        logger.info(f"🔗 Contextual reference detected: {plan.get('context_reference', {})}")
+        return await handle_contextual_reference(plan, session_data, context, language, user_message)
+    
+    # 处理 clarification 意图（确认对话）
+    if user_intent == 'clarification':
+        logger.info(f"✅ Clarification detected: {plan.get('clarification_type', 'confirm')}")
+        return await handle_clarification(plan, session_data, context, language, user_message)
+    
+    # 处理 guided_inquiry 意图（引导式探询）
+    if user_intent == 'guided_inquiry':
+        logger.info(f"📚 Guided inquiry detected: {plan.get('inquiry_params', {})}")
+        return await handle_guided_inquiry(plan, session_data, context, language, user_message)
+    
     # Stage 2: 根据规划和意图获取数据
     logger.info(f"📊 Stage 2: Gathering data (intent: {user_intent})...")
     if progress_callback and user_intent != 'pure_chat':
@@ -236,6 +256,385 @@ def handle_help(language: str) -> str:
     from ..utils.i18n import I18n
     i18n = I18n(language)
     return i18n.t('ai_chat_help')
+
+
+async def handle_command_request(plan: Dict[str, Any], context: Any, language: str) -> str:
+    """
+    处理操作指令意图（command_request）
+    
+    Args:
+        plan: AI 理解规划结果
+        context: Bot context
+        language: 语言代码
+        
+    Returns:
+        执行结果消息
+    """
+    from ..utils.i18n import I18n
+    i18n = I18n(language)
+    
+    command_type = plan.get('command_type', 'unknown')
+    command_params = plan.get('command_params', {})
+    
+    # 当前版本：引导用户使用对应命令
+    # TODO: 未来版本直接执行命令（需要权限验证和错误处理）
+    
+    command_guides = {
+        'note': i18n.t('command_guide_note', language) if hasattr(i18n, 't') else "💡 使用 /note <归档ID> 添加笔记",
+        'trash': i18n.t('command_guide_trash', language) if hasattr(i18n, 't') else "💡 使用 /trash 查看回收站并删除",
+        'export': i18n.t('command_guide_export', language) if hasattr(i18n, 't') else "💡 使用 /export 导出数据",
+        'backup': i18n.t('command_guide_backup', language) if hasattr(i18n, 't') else "💡 使用 /backup 备份或恢复数据库",
+        'language': i18n.t('command_guide_language', language) if hasattr(i18n, 't') else "💡 使用 /language 切换语言",
+        'tag_operation': i18n.t('command_guide_tags', language) if hasattr(i18n, 't') else "💡 使用 /tags 管理标签"
+    }
+    
+    guide_message = command_guides.get(command_type, "")
+    
+    if language.startswith('zh'):
+        is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+        if is_traditional:
+            return f"⚙️ 收到您的操作請求！\n\n{guide_message}\n\n💬 我會在未來版本中支援直接執行命令。"
+        else:
+            return f"⚙️ 收到您的操作请求！\n\n{guide_message}\n\n💬 我会在未来版本中支持直接执行命令。"
+    else:
+        return f"⚙️ Command request received!\n\n{guide_message}\n\n💬 Direct command execution will be supported in future versions."
+
+
+async def handle_contextual_reference(
+    plan: Dict[str, Any], 
+    session_data: Dict[str, Any],
+    context: Any,
+    language: str,
+    user_message: str
+) -> str:
+    """
+    处理上下文引用意图（contextual_reference）
+    
+    Args:
+        plan: AI 理解规划结果
+        session_data: 会话数据
+        context: Bot context
+        language: 语言代码
+        user_message: 用户消息
+        
+    Returns:
+        基于上下文的回复
+    """
+    from ..utils.i18n import I18n
+    from ..core.ai_session import get_session_manager
+    
+    i18n = I18n(language)
+    session_manager = get_session_manager()
+    
+    # 获取对话历史
+    session_id = session_data.get('session_id')
+    history = session_manager.get_conversation_history(session_id, limit=3) if session_id else []
+    
+    context_ref = plan.get('context_reference', {})
+    ref_type = context_ref.get('type', 'previous_result')
+    action = context_ref.get('action', 'get_more')
+    
+    # 如果没有历史记录
+    if not history:
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            if is_traditional:
+                return "🤔 抱歉，我沒有找到之前的對話記錄。\n\n💡 您可以直接告訴我您想查找什麼內容。"
+            else:
+                return "🤔 抱歉，我没有找到之前的对话记录。\n\n💡 您可以直接告诉我您想查找什么内容。"
+        else:
+            return "🤔 Sorry, I couldn't find previous conversation history.\n\n💡 You can directly tell me what you want to find."
+    
+    # 获取最近一轮的上下文
+    last_turn = history[-1]
+    last_intent = last_turn.get('intent')
+    last_result = last_turn.get('result_summary', {})
+    
+    # 根据引用类型和动作处理
+    if action == 'get_more' and last_intent == 'resource_request':
+        # "再来一个" - 重复上次的资源请求
+        logger.info(f"🔄 Repeating last resource request")
+        # 重新执行资源请求
+        need_data = plan.get('need_data', {})
+        if not need_data.get('resource_query', {}).get('enabled'):
+            # 从历史中恢复资源查询参数
+            need_data['resource_query'] = {
+                'enabled': True,
+                'type': 'random',
+                'limit': 1
+            }
+        data_context = await gather_data(need_data, context, 'resource_request')
+        from .response_optimizer import ResponseOptimizer
+        data_context = ResponseOptimizer.optimize('resource_request', data_context, user_message, language)
+        return await generate_response(user_message, plan, data_context, session_data, context, language)
+    
+    # 其他上下文引用 - 当前版本返回友好提示
+    if language.startswith('zh'):
+        is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+        if is_traditional:
+            return f"🔗 我理解您在引用之前的內容。\n\n上一輪對話：「{last_turn.get('user_message', '')}」\n\n💡 當前版本的上下文引用功能正在完善中，請直接描述您的需求。"
+        else:
+            return f"🔗 我理解您在引用之前的内容。\n\n上一轮对话：「{last_turn.get('user_message', '')}」\n\n💡 当前版本的上下文引用功能正在完善中，请直接描述您的需求。"
+    else:
+        return f"🔗 I understand you're referring to previous content.\n\nLast conversation: \"{last_turn.get('user_message', '')}\"\n\n💡 Contextual reference features are being enhanced. Please describe your needs directly."
+
+
+async def handle_clarification(
+    plan: Dict[str, Any],
+    session_data: Dict[str, Any],
+    context: Any,
+    language: str,
+    user_message: str
+) -> str:
+    """
+    处理确认对话意图（clarification）
+    
+    Args:
+        plan: AI 理解规划结果
+        session_data: 会话数据
+        context: Bot context
+        language: 语言代码
+        user_message: 用户消息
+        
+    Returns:
+        确认回应
+    """
+    from ..utils.i18n import I18n
+    from ..core.ai_session import get_session_manager
+    
+    i18n = I18n(language)
+    session_manager = get_session_manager()
+    
+    # 获取待确认操作
+    session_id = session_data.get('session_id')
+    pending_action = session_manager.get_pending_action(session_id) if session_id else None
+    
+    # 提取确认类型
+    clarification_type = plan.get('clarification_type', 'confirm')
+    
+    # 如果没有待确认操作
+    if not pending_action:
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            if is_traditional:
+                return "🤔 我好像沒有需要您確認的操作。\n\n💡 您可以直接告訴我您想做什麼。"
+            else:
+                return "🤔 我好像没有需要您确认的操作。\n\n💡 您可以直接告诉我您想做什么。"
+        else:
+            return "🤔 I don't have any pending action that needs your confirmation.\n\n💡 You can directly tell me what you want to do."
+    
+    # 提取待确认操作信息
+    action_type = pending_action.get('type')
+    action_params = pending_action.get('params', {})
+    action_description = pending_action.get('description', '')
+    
+    # 根据确认类型处理
+    if clarification_type == 'cancel':
+        # 用户取消操作
+        session_manager.clear_pending_action(session_id)
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            if is_traditional:
+                return f"✅ 已取消操作：{action_description}\n\n如有其他需要，請隨時告訴我。"
+            else:
+                return f"✅ 已取消操作：{action_description}\n\n如有其他需要，请随时告诉我。"
+        else:
+            return f"✅ Operation cancelled: {action_description}\n\nLet me know if you need anything else."
+    
+    elif clarification_type == 'reject':
+        # 用户拒绝操作
+        session_manager.clear_pending_action(session_id)
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            if is_traditional:
+                return f"✅ 好的，我不會執行這個操作。\n\n如有其他需要，請隨時告訴我。"
+            else:
+                return f"✅ 好的，我不会执行这个操作。\n\n如有其他需要，请随时告诉我。"
+        else:
+            return f"✅ Okay, I won't proceed with this operation.\n\nLet me know if you need anything else."
+    
+    else:  # confirm
+        # 用户确认操作 - 当前版本仅返回提示，实际操作执行需要根据 action_type 调用相应的系统模块
+        session_manager.clear_pending_action(session_id)
+        
+        # TODO: 根据 action_type 执行实际操作
+        # 例如：
+        # if action_type == 'delete_archive':
+        #     archive_id = action_params.get('archive_id')
+        #     await execute_delete_archive(archive_id, context)
+        # elif action_type == 'clear_trash':
+        #     await execute_clear_trash(context)
+        # ...
+        
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            if is_traditional:
+                return f"✅ 收到確認。\n\n💡 當前版本的確認執行功能正在完善中（操作類型：{action_type}）。\n\n如需立即執行，請使用相應的命令。"
+            else:
+                return f"✅ 收到确认。\n\n💡 当前版本的确认执行功能正在完善中（操作类型：{action_type}）。\n\n如需立即执行，请使用相应的命令。"
+        else:
+            return f"✅ Confirmation received.\n\n💡 Confirmation execution feature is being enhanced (action type: {action_type}).\n\nFor immediate execution, please use the corresponding command."
+
+
+async def handle_guided_inquiry(
+    plan: Dict[str, Any],
+    session_data: Dict[str, Any],
+    context: Any,
+    language: str,
+    user_message: str
+) -> str:
+    """
+    处理引导式探询意图（guided_inquiry）
+    
+    Args:
+        plan: AI 理解规划结果
+        session_data: 会话数据
+        context: Bot context
+        language: 语言代码
+        user_message: 用户消息
+        
+    Returns:
+        引导式回复
+    """
+    from ..utils.i18n import I18n
+    from .knowledge_base import get_knowledge_base
+    
+    i18n = I18n(language)
+    
+    # 提取探询参数
+    inquiry_params = plan.get('inquiry_params', {})
+    topic = inquiry_params.get('topic', 'general')
+    stage = inquiry_params.get('stage', 'initial')
+    
+    # 获取知识库内容
+    kb = get_knowledge_base()
+    knowledge = kb.get_knowledge() if kb else ""
+    
+    # 根据主题提供引导
+    if 'how_to_use' in topic or 'tutorial' in topic or '如何使用' in user_message or '怎么' in user_message:
+        # 提供系统使用指南
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            if is_traditional:
+                return f"""📚 **ArchiveBot 使用指南**
+
+**核心功能：**
+1️⃣ **轉發收藏** - 將消息轉發給 bot 自動歸檔
+2️⃣ **智能搜索** - 使用關鍵詞或 AI 對話快速查找
+3️⃣ **標籤管理** - 用 #標籤 組織內容
+4️⃣ **筆記生成** - AI 自動為歸檔生成摘要筆記
+
+**快速開始：**
+• 轉發任何消息給我即可收藏
+• 使用 /search 關鍵詞搜索內容
+• 使用 /ai 進入智能對話模式
+• 使用 /stats 查看統計數據
+
+**進階功能：**
+• /note - 生成歸檔筆記
+• /export - 導出數據
+• /backup - 備份數據庫
+• /tags - 管理標籤
+
+💡 **提示：** 您可以直接用自然語言問我任何問題，例如：「最近收藏了什麼？」「幫我找關於 Python 的歸檔」
+
+{knowledge}
+
+需要更詳細的某個功能說明嗎？"""
+            else:
+                return f"""📚 **ArchiveBot 使用指南**
+
+**核心功能：**
+1️⃣ **转发收藏** - 将消息转发给 bot 自动归档
+2️⃣ **智能搜索** - 使用关键词或 AI 对话快速查找
+3️⃣ **标签管理** - 用 #标签 组织内容
+4️⃣ **笔记生成** - AI 自动为归档生成摘要笔记
+
+**快速开始：**
+• 转发任何消息给我即可收藏
+• 使用 /search 关键词搜索内容
+• 使用 /ai 进入智能对话模式
+• 使用 /stats 查看统计数据
+
+**进阶功能：**
+• /note - 生成归档笔记
+• /export - 导出数据
+• /backup - 备份数据库
+• /tags - 管理标签
+
+💡 **提示：** 您可以直接用自然语言问我任何问题，例如：「最近收藏了什么？」「帮我找关于 Python 的归档」
+
+{knowledge}
+
+需要更详细的某个功能说明吗？"""
+        else:
+            return f"""📚 **ArchiveBot User Guide**
+
+**Core Features:**
+1️⃣ **Forward to Save** - Forward any message to bot for archiving
+2️⃣ **Smart Search** - Find content using keywords or AI chat
+3️⃣ **Tag Management** - Organize with #tags
+4️⃣ **Note Generation** - AI generates summary notes for archives
+
+**Quick Start:**
+• Forward any message to me to save
+• Use /search keyword to find content
+• Use /ai to enter smart chat mode
+• Use /stats to view statistics
+
+**Advanced Features:**
+• /note - Generate archive notes
+• /export - Export data
+• /backup - Backup database
+• /tags - Manage tags
+
+💡 **Tip:** You can ask me anything in natural language, e.g., "What did I save recently?" "Find archives about Python"
+
+{knowledge}
+
+Need more details about any specific feature?"""
+    
+    elif 'command' in topic or 'feature' in topic or '功能' in user_message:
+        # 提供命令列表
+        return handle_help(language)
+    
+    else:
+        # 通用引导
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            if is_traditional:
+                return f"""📖 我可以幫您了解：
+
+1. **如何使用系統** - 基本操作和快速開始
+2. **功能介紹** - 詳細的功能說明
+3. **命令列表** - 所有可用命令
+4. **常見問題** - 使用技巧和解答
+
+{knowledge}
+
+您想了解哪方面呢？直接告訴我即可。"""
+            else:
+                return f"""📖 我可以帮您了解：
+
+1. **如何使用系统** - 基本操作和快速开始
+2. **功能介绍** - 详细的功能说明
+3. **命令列表** - 所有可用命令
+4. **常见问题** - 使用技巧和解答
+
+{knowledge}
+
+您想了解哪方面呢？直接告诉我即可。"""
+        else:
+            return f"""📖 I can help you learn about:
+
+1. **How to use the system** - Basic operations and quick start
+2. **Feature introduction** - Detailed feature explanations
+3. **Command list** - All available commands
+4. **FAQ** - Tips and troubleshooting
+
+{knowledge}
+
+What would you like to know? Just tell me directly."""
 
 
 async def gather_data(need_data: Dict[str, Any], context: Any, user_intent: str = None) -> Dict[str, Any]:
@@ -683,6 +1082,39 @@ async def generate_response(
                 # 保留最近的N对对话
                 if len(session_data['context']['history']) > max_history_messages:
                     session_data['context']['history'] = session_data['context']['history'][-max_history_messages:]
+                
+                # 同时保存到 ai_session 的对话历史（用于上下文引用）
+                session_id = session_data.get('session_id')
+                if session_id:
+                    from ..core.ai_session import get_session_manager
+                    session_manager = get_session_manager()
+                    
+                    # 提取结果数据用于上下文引用
+                    result_data = None
+                    user_intent = plan.get('user_intent')
+                    if user_intent == 'specific_search':
+                        search_results = data_context.get('search_results', [])
+                        result_data = {
+                            'type': 'search',
+                            'count': len(search_results),
+                            'items': [{'id': r.get('id'), 'title': r.get('title')} for r in search_results[:3]]
+                        }
+                    elif user_intent == 'resource_request':
+                        resources = data_context.get('resources', [])
+                        result_data = {
+                            'type': 'resource',
+                            'count': len(resources),
+                            'items': resources[:3]
+                        }
+                    
+                    session_manager.add_conversation_turn(
+                        session_id=session_id,
+                        user_message=user_message,
+                        bot_response=reply,
+                        intent=user_intent,
+                        result_data=result_data,
+                        max_history=5
+                    )
                 
                 logger.info(f"✓ Response generated: {reply[:50]}... (history: {len(session_data['context']['history'])} messages)")
                 return reply

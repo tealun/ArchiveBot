@@ -13,6 +13,7 @@ from .trash import trash_command
 from .export import export_command
 from .backup import backup_command
 from .review import review_command
+from .setting import setting_command
 
 __all__ = [
     'start_command',
@@ -29,4 +30,5 @@ __all__ = [
     'export_command',
     'backup_command',
     'review_command',
+    'setting_command',
 ]

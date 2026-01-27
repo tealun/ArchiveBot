@@ -254,6 +254,7 @@ def main():
         application.add_handler(CommandHandler("ai", owner_only(commands.ai_status_command)))
         application.add_handler(CommandHandler(["stats", "st"], owner_only(commands.stats_command)))
         application.add_handler(CommandHandler(["language", "la"], owner_only(commands.language_command)))
+        application.add_handler(CommandHandler(["setting", "set"], owner_only(commands.setting_command)))
         application.add_handler(CommandHandler(["note", "n"], owner_only(commands.note_command)))  # /n as short alias
         application.add_handler(CommandHandler("notes", owner_only(commands.notes_command)))
         application.add_handler(CommandHandler("cancel", owner_only(commands.cancel_command)))

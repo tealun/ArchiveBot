@@ -1,40 +1,24 @@
 {
   "welcome": "👋 歡迎使用 ArchiveBot！\n\n🤖 您的專屬智能歸檔助手\n\n<b>核心功能：</b>\n📦 全能歸檔 - 文字/圖片/影片/文件/連結\n🏷️ 智能標籤 - 自動分類與標籤提取\n🤖 AI 增強 - 摘要生成/關鍵點提取/智能標題\n🔍 高效搜尋 - 全文檢索/標籤篩選/時間範圍\n💾 靈活存儲 - Telegram頻道/資料庫雙備份\n📝 筆記管理 - 關聯歸檔/獨立筆記/AI輔助\n🗑️ 安全管理 - 垃圾箱/備份/導出多格式\n\n<b>快速開始：</b>\n• 發送任何內容即可歸檔\n• 使用 #標籤 添加自訂標籤\n• 發送 /help 查看完整指令清單\n\n<b>專案開源：</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\n讓我們開始歸檔之旅！🚀",
-  
   "help": "📖 說明\n\n<b>歸檔內容：</b>\n• 直接傳送任何內容給我\n• 使用 #標籤 格式新增標籤\n• 轉發訊息自動記錄來源\n• 批次轉發自動聚合處理\n\n<b>基礎命令：</b>\n/start - 初始化機器人\n/help - 檢視此說明\n/search (/s) &lt;關鍵詞&gt; - 搜尋歸檔\n/tags (/t) - 檢視所有標籤\n/stats (/st) - 檢視統計資訊\n/review - 存檔回顧與統計\n\n<b>筆記功能：</b>\n/note (/n) - 新增筆記到歸檔\n/notes - 檢視所有筆記\n\n<b>資料管理：</b>\n/trash - 檢視資源回收筒\n/export - 匯出資料（JSON/HTML/Markdown）\n/backup - 備份與復原資料庫\n\n<b>其他：</b>\n/ai - AI功能狀態\n/language (/la) - 切換語言\n\n<b>搜尋技巧：</b>\n• 關鍵詞：/s python\n• 標籤：/s #技術\n• 組合：/s #技術 python\n• 點擊結果可跳轉到頻道\n\n<b>AI功能：</b>\n• 智慧摘要生成\n• 自動擷取關鍵點\n• 標籤推薦（批次共享）\n• 內容智慧分類",
-  
   "unauthorized": "⛔ 未授權\n\n抱歉，此機器人僅供私人使用。",
-  
   "archive_success": "✅ 歸檔成功\n\n{title_link}📝 類型: {content_type}\n🏷️ 標籤: {tags}\n💾 儲存: {storage_type}\n📌 來源: {source}\n🕐 時間: {time}",
   "archive_success_with_size": "✅ 歸檔成功\n\n{title_link}📝 類型: {content_type}\n📦 大小: {file_size}\n🏷️ 標籤: {tags}\n💾 儲存: {storage_type}\n📌 來源: {source}\n🕐 時間: {time}",
-  
   "archive_failed": "❌ 歸檔失敗\n\n錯誤：{error}\n請重試。",
-  
   "search_no_keyword": "請提供搜尋關鍵詞。\n\n範例：/search python",
-  
   "search_no_results": "🔍 未找到結果\n\n關鍵詞：{keyword}\n\n嘗試其他關鍵詞或使用 /tags 檢視標籤列表",
-  
   "search_results": "🔍 搜尋結果 ({count})\n\n關鍵詞：{keyword}\n\n{results}",
-  
   "tags_empty": "暫無標籤。\n\n開始歸檔內容以建立標籤！",
-  
   "tags_list": "🏷️ 所有標籤 ({count})\n\n{tags}",
-  
   "stats": "📊 統計資訊\n\n📦 總歸檔數：{total_archives}\n🏷️ 總標籤數：{total_tags}\n💾 內容總量：{storage_used}\n💾 資料庫大小：{db_size}\n📅 最後歸檔：{last_archive}",
-  
   "language_changed": "✅ 語言已切換為繁體中文",
-  
   "language_select": "🌍 選擇語言\n\n📍 目前語言：{current_language}\n\n請選擇您偏好的語言：",
   "language_name_en": "English",
   "language_name_zh-CN": "简体中文",
   "language_name_zh-TW": "繁體中文",
-  
   "processing": "⏳ 處理中...",
-  
   "error_occurred": "❌ 發生錯誤\n\n{error}\n\n請重試或聯絡管理員。",
-  
   "rate_limit_exceeded": "⚠️ 請求過於頻繁\n\n請等待 {wait_time} 秒後再試。",
-  
   "tag_text": "文字",
   "tag_image": "圖片",
   "tag_video": "影片",
@@ -46,16 +30,26 @@
   "tag_animation": "動畫",
   "tag_contact": "聯絡人",
   "tag_location": "位置",
-  
   "storage_database": "資料庫",
   "storage_telegram": "Telegram 頻道",
   "storage_cloud": "雲端儲存",
   "storage_reference": "僅引用",
-  
+  "optimizer_search_suggestions": "💡 建議：\n• 試試更簡單的關鍵詞\n• 檢查是否有錯別字\n• 使用 /tags 瀏覽標籤\n• 使用 /stats 查看歸檔概況",
+  "optimizer_filter_suggestions_with_tags": "💡 找到 {count} 個結果，可以用標籤篩選：{tags}",
+  "optimizer_filter_suggestions_no_tags": "💡 找到 {count} 個結果，顯示最相關的。",
+  "optimizer_expand_suggestions": "💡 想要更多？試試更寬泛的關鍵詞或查看 /tags",
+  "optimizer_onboarding_hint": "📝 您的歸檔還是空的。開始轉發訊息或發送內容吧！",
+  "optimizer_tagging_hint": "💡 提示：歸檔時加上標籤（#hashtag），方便管理！",
+  "optimizer_resource_suggestions": "💡 再試一次？發送『再來一個』獲取更多資源",
+  "command_guide_note": "💡 使用 /note <歸檔ID> 或回覆歸檔訊息來新增筆記",
+  "command_guide_trash": "💡 使用 /trash 查看資源回收筒（已刪除的歸檔可在此復原或永久刪除）",
+  "command_guide_export": "💡 使用 /export 匯出資料（支援JSON/HTML/Markdown格式）",
+  "command_guide_backup": "💡 使用 /backup 備份或復原資料庫",
+  "command_guide_language": "💡 使用 /language 切換介面語言",
+  "command_guide_tags": "💡 使用 /tags 查看所有標籤，或發送 #標籤 來篩選",
   "button_language_en": "English",
   "button_language_zh_cn": "简体中文",
   "button_language_zh_tw": "繁體中文",
-  
   "note_added": "✅ 筆記已新增\n\n📝 筆記ID: #{note_id}\n📦 歸檔ID: #{archive_id}",
   "note_add_failed": "❌ 新增筆記失敗\n\n請檢查歸檔ID是否正確。",
   "note_no_archive_id": "請提供歸檔ID。\n\n範例：/note 123 或 /n 123",
@@ -68,7 +62,6 @@
   "no_notes_search_results": "🔍 未找到包含 '{query}' 的筆記。",
   "notes_search_results": "🔍 筆記搜尋結果 ({count}條)\n\n關鍵詞：{query}",
   "archive": "歸檔",
-  
   "trash_manager_not_initialized": "❌ 垃圾桶功能未初始化\n\n請重啟機器人。",
   "trash_empty": "🗑️ 垃圾桶是空的\n\n暫無已刪除的歸檔。",
   "trash_list": "🗑️ 垃圾桶 ({count}項)",
@@ -86,14 +79,12 @@
   "trash_invalid_command": "❌ 無效的命令\n\n用法：\n/trash - 查看垃圾桶\n/trash restore <id> - 恢復歸檔\n/trash delete <id> - 永久刪除\n/trash empty [days] - 清空垃圾桶",
   "archive_moved_to_trash": "✅ 歸檔 #{archive_id} 已移動到垃圾桶",
   "archive_delete_failed": "❌ 刪除歸檔 #{archive_id} 失敗\n\n歸檔可能已被刪除。",
-  
   "export_manager_not_initialized": "❌ 匯出功能未初始化\n\n請重啟機器人。",
   "export_processing": "📦 正在匯出資料...",
   "export_tag_usage": "用法：/export tag <標籤名> [格式]\n\n範例：/export tag 技術 markdown",
   "export_invalid_format": "❌ 無效的格式\n\n支援的格式：markdown, json, csv",
   "export_failed": "❌ 匯出失敗\n\n請稍後重試。",
   "export_success": "✅ 匯出成功\n\n📄 檔案名：{filename}\n📊 大小：{size} 位元組",
-
   "backup_manager_not_initialized": "❌ 備份功能未初始化\n\n請重啟機器人。",
   "backup_none": "🗃️ 暫無備份檔案。",
   "backup_list_header": "🗃️ 備份列表（{count} 個）",
@@ -112,7 +103,6 @@
   "backup_status": "📊 資料庫狀態\n大小：{size} 位元組\n歸檔：{archives}\n筆記：{notes}\n已刪除：{deleted}\n最後歸檔：{last}",
   "backup_status_failed": "❌ 無法取得資料庫狀態",
   "backup_invalid_command": "❌ 無效的子命令\n\n用法：/backup [create|restore|delete|cleanup|status]",
-  
   "review_usage": "📊 回顧與統計\n\n選擇時間段查看活動情況：\n\n<b>功能：</b>\n• 封存趨勢分析\n• 活躍天數統計\n• 熱門標籤排行\n• 隨機封存回顧",
   "review_period_week": "最近7天",
   "review_period_month": "最近30天",
@@ -125,9 +115,7 @@
   "review_no_data": "📊 此期間暫無活動。\n\n開始封存以查看統計資訊！",
   "review_invalid_period": "❌ 無效的時間段\n\n請使用：week、month 或 year",
   "review_manager_not_initialized": "❌ 回顧功能未初始化\n\n請重啟機器人。",
-  
   "tags_button_list_header": "🏷️ 標籤列表 ({count} 個)\n\n點擊標籤查看相關內容：",
-  
   "ai_status_enabled": "✅ 狀態: 已啟用",
   "ai_status_available": "✅ 服務: 可用",
   "ai_status_unavailable": "⚠️ 服務: 不可用\n請檢查API金鑰配置是否正確",
@@ -142,23 +130,20 @@
   "ai_status_auto_summarize": "自動總結: {status}",
   "ai_status_auto_tags": "\n自動標籤: {status}",
   "ai_status_enable_guide": "\n\n💡 *如何啟用*\n1. 編輯 config/config.yaml\n2. 設定 ai.enabled: true\n3. 配置 ai.api.provider 和 ai.api.api_key\n4. 重啟機器人\n\n支援的提供商：OpenAI, Claude, Qwen",
-  
   "pagination_page_of": "第{current}頁/共{total}頁",
   "button_previous_page": "⬅️ 上一頁",
   "button_next_page": "➡️ 下一頁",
   "button_back_to_tags": "🔙 返回標籤列表",
-  
   "note_mode_enter": "📝 <b>已進入筆記模式</b>\n\n請發送你的筆記內容：\n• 💬 文字訊息\n• 🖼️ 圖片\n• 🎤 語音\n\n💡 你也可以回覆一條歸檔訊息來關聯筆記\n\n發送 /cancel 取消筆記模式",
   "note_mode_archive_linked": "📝 <b>已進入筆記模式</b>\n\n📎 已關聯到歸檔 #{archive_id}\n\n請發送你的筆記內容：\n• 💬 文字訊息\n• 🖼️ 圖片\n• 🎤 語音\n\n發送 /cancel 取消筆記模式",
   "note_mode_saved": "✅ 筆記已儲存\n\n📝 筆記ID: #{note_id}",
   "note_mode_saved_with_archive": "✅ 筆記已儲存\n\n📝 筆記ID: #{note_id}\n📎 關聯歸檔: #{archive_id}",
   "note_mode_cancelled": "❌ 已取消筆記模式",
   "note_mode_save_failed": "❌ 筆記儲存失敗\n\n請稍後重試。",
-  "notes_list_empty": "📝 暫無筆記\n\n使用 /note (/n) 命令或點擊歸檔列表中的 📝 按鈕來建立筆記。",
+  "notes_list_empty": "📝 暫無筆記\n\n使用 /note 添加筆記",
   "notes_list_header": "📝 筆記列表 ({count}條)",
   "button_add_note": "📝 筆記",
   "nothing_to_cancel": "ℹ️ 沒有正在進行的操作。",
-  
   "invalid_command": "⚠️ 這似乎是一個命令，但格式不正確或命令不存在。\n\n發送 /help 查看所有可用命令。",
   "short_text_prompt": "💬 請問您需要做什麼呢？",
   "button_save_as_note": "📝 儲存為筆記",
@@ -171,7 +156,6 @@
   "short_text_archived": "✅ 已歸檔 (ID: #{archive_id})\n\n內容：{content}",
   "short_text_archive_failed": "❌ 歸檔失敗",
   "short_text_expired": "⚠️ 會話已過期，請重新發送文本",
-  
   "ai_chat_exit": "👋 已退出AI助手模式",
   "ai_chat_help": "🤖 AI助手功能：\n\n• 智慧對話：直接告訴我你想了解什麼\n• 搜尋歸檔：找某個主題的內容\n• 查看統計：了解歸檔資料\n• 分析內容：深入了解歸檔特點\n• 退出：發送\"退出\"結束會話\n\n提示：會話10分鐘無活動自動結束",
   "ai_chat_thinking": "🤔 正在思考...",
@@ -182,18 +166,14 @@
   "ai_chat_gathering": "📊 收集資料...",
   "ai_chat_generating": "💬 生成回覆...",
   "ai_chat_session_expired": "⚠️ 會話已過期",
-  
   "long_text_intent_prompt": "📝 您發送了 {length} 個字符。您想做什麼？",
   "long_text_save_note": "📝 記錄為筆記",
   "long_text_continue_chat": "💬 繼續對話",
-  
   "continuity_prompt": "💡 檢測到您在 {time} 前保存了筆記 #{note_id}\n\n這條訊息是否要追加到該筆記？",
   "continuity_append": "➕ 追加上一條筆記",
   "continuity_new_note": "📝 創建新筆記",
   "continuity_archive": "📦 正常歸檔",
-  
   "resource_send_failed": "❌ 資源發送失敗",
-  
   "archive_processing": "⏳ 正在處理...",
   "archive_progress": "進度: {percentage}%",
   "archive_duplicate_file": "⚠️ 文件已存在",
@@ -203,25 +183,21 @@
   "archive_duplicate_file_tags": "🏷️ 標籤：{tags}",
   "archive_duplicate_unknown_title": "未知",
   "archive_duplicate_unknown_time": "未知",
-  
   "batch_processing_start": "📦 批量處理開始\n總數: {total} 條\n進度: 0% (0/{total})",
   "batch_processing_progress": "📦 批量處理中\n階段: {stage}\n進度: {percentage}% ({current}/{total})\n預計剩餘: {remaining}秒",
   "batch_processing_complete": "✅ 批量歸檔完成\n\n成功: {success} 條\n失敗: {fail} 條\n\n💡 提示: 使用 /search 搜索已歸檔內容",
   "batch_processing_complete_no_fail": "✅ 批量歸檔完成\n\n成功: {success} 條\n\n💡 提示: 使用 /search 搜索已歸檔內容",
-  
   "note_modified": "✅ 筆記已修改\n\n📝 歸檔 #{archive_id}",
   "note_appended": "✅ 筆記已追加\n\n📝 歸檔 #{archive_id}",
   "note_added_to_archive": "✅ 筆記已添加到歸檔 #{archive_id}\n\n📝 筆記ID: #{note_id}",
   "note_add_failed_error": "❌ 筆記添加失敗",
   "note_manager_uninitialized": "❌ 筆記管理器未初始化",
-  
   "ai_refining_note": "🤖 正在處理...",
   "ai_refine_note_success": "✅ **筆記已精煉**\n\n📝 歸檔 #{archive_id}\n\n精煉後內容：\n{content}",
   "ai_refine_note_save_failed": "❌ 保存精煉後的筆記失敗",
   "ai_refine_note_failed": "❌ AI處理失敗",
   "ai_refine_note_error": "❌ 精煉失敗: {error}",
   "ai_feature_disabled": "❌ AI功能未啟用",
-  
   "progress_analyzing_content": "📋 分析內容",
   "progress_checking_duplicates": "🔍 檢查重複文件",
   "progress_ai_analysis": "🤖 AI智能分析",
@@ -234,16 +210,13 @@
   "progress_saving_archive": "💾 保存歸檔",
   "progress_complete": "✅ 完成",
   "progress_failed": "❌ 處理失敗",
-  
   "batch_progress_analyzing": "分析內容",
   "batch_progress_extracting_tags": "提取標籤",
   "batch_progress_ai_generating_tags": "AI生成標籤",
   "batch_progress_applying_tags": "應用標籤",
   "batch_progress_storing": "存儲到頻道",
   "batch_progress_complete": "完成",
-  
   "unknown_command_message": "⚠️ 這似乎是一個命令，但格式不正確或命令不存在。\n發送 /help 查看所有可用命令。",
-  
   "callback_closed": "已關閉",
   "callback_tag_no_content": "標籤 #{tag} 下暫無內容",
   "callback_tag_header": "🏷️ 標籤: #{tag}",
@@ -251,8 +224,17 @@
   "callback_favorite_unmarked": "🤍 未精選",
   "callback_note_has": "📝 √ 有筆記",
   "callback_note_no": "📝 無筆記",
-  
   "error_search_engine_not_initialized": "Search engine not initialized",
   "error_tag_manager_not_initialized": "Tag manager not initialized",
-  "error_database_not_initialized": "Database storage not initialized"
+  "error_database_not_initialized": "Database storage not initialized",
+  "setting_menu_title": "⚙️ 系統配置\n\n請選擇要配置的分類：",
+  "setting_category_basic": "⚙️ 基礎設定",
+  "setting_category_features": "🎛️ 功能開關",
+  "setting_category_ai": "🤖 AI設定",
+  "setting_category_storage": "💾 儲存設定",
+  "setting_category_logging": "📝 記錄檔設定",
+  "setting_updated": "✅ 配置已更新\n\n<b>{name}</b>\n新值：<code>{value}</code>\n\n⚠️ 注意：部分配置需要重啟Bot才能生效",
+  "setting_update_failed": "❌ 配置更新失敗\n\n{error}",
+  "setting_invalid_value": "❌ 無效的值\n\n{error}",
+  "setting_restart_required": "⚠️ 注意：部分配置需要重啟Bot才能生效"
 }

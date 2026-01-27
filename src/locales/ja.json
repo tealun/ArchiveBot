@@ -1,28 +1,17 @@
 {
   "welcome": "👋 ArchiveBotへようこそ！\n\n🤖 あなた専用のインテリジェント・アーカイブアシスタント\n\n<b>主要機能：</b>\n📦 万能アーカイブ - テキスト/画像/動画/ドキュメント/リンク\n🏷️ スマートタグ - 自動分類とタグ抽出\n🤖 AI強化 - 要約生成/キーポイント抽出/スマートタイトル\n🔍 強力な検索 - 全文検索/タグフィルタ/時間範囲\n💾 柔軟なストレージ - Telegramチャンネル + データベースバックアップ\n📝 ノート管理 - アーカイブリンク/スタンドアロン/AIアシスト\n🗑️ 安全な操作 - ゴミ箱/バックアップ/エクスポート形式\n\n<b>クイックスタート：</b>\n• コンテンツを送信してアーカイブ\n• #ハッシュタグでカスタムタグを追加\n• /helpでコマンド一覧を表示\n\n<b>オープンソース：</b>\n⭐ GitHub: https://github.com/tealun/ArchiveBot\n\nアーカイブを始めましょう！🚀",
-  
   "help": "📖 ヘルプ\n\n<b>コンテンツのアーカイブ：</b>\n• コンテンツを直接送信\n• #タグ形式でタグを追加\n• メッセージを転送してソースを記録\n• 一括転送で自動集約\n\n<b>基本コマンド：</b>\n/start - ボット初期化\n/help - このヘルプを表示\n/search (/s) &lt;キーワード&gt; - アーカイブ検索\n/tags (/t) - 全タグ表示\n/stats (/st) - 統計情報表示\n/review - アーカイブレビューと統計\n\n<b>ノート：</b>\n/note (/n) - アーカイブにノートを追加\n/notes - 全ノート表示\n\n<b>データ管理：</b>\n/trash - ゴミ箱表示\n/export - データエクスポート (JSON/HTML/Markdown)\n/backup - データベースバックアップと復元\n\n<b>その他：</b>\n/ai - AIステータス\n/language (/la) - 言語変更\n\n<b>検索のヒント：</b>\n• キーワード：/s python\n• タグ：/s #tech\n• 組み合わせ：/s #tech python\n• 結果をクリックしてチャンネルへジャンプ\n\n<b>AI機能：</b>\n• スマート要約生成\n• キーポイントの自動抽出\n• タグ提案（バッチ共有）\n• インテリジェント分類",
-  
   "unauthorized": "⛔ 未認証\n\n申し訳ございません。このボットは個人使用のみです。",
-  
   "archive_success": "✅ アーカイブ完了\n\n{title_link}📝 タイプ：{content_type}\n🏷️ タグ：{tags}\n💾 ストレージ：{storage_type}\n📌 ソース：{source}\n🕐 時刻：{time}",
-  "archive_success_with_size": "✅ アーカイブ完了\n\n{title_link}📝 タイプ：{content_type}\n📦 サイズ：{file_size}\n🏷️ タグ：{tags}\n💾 ストレージ：{storage_type}\n📌 ソース：{source}\n🕐 時刻：{time}",  
+  "archive_success_with_size": "✅ アーカイブ完了\n\n{title_link}📝 タイプ：{content_type}\n📦 サイズ：{file_size}\n🏷️ タグ：{tags}\n💾 ストレージ：{storage_type}\n📌 ソース：{source}\n🕐 時刻：{time}",
   "archive_failed": "❌ アーカイブ失敗\n\nエラー：{error}\n再試行してください。",
-  
   "search_no_keyword": "検索キーワードを入力してください。\n\n例：/search python",
-  
   "search_no_results": "🔍 結果が見つかりません\n\nキーワード：{keyword}\n\n他のキーワードを試すか、/tagsでタグリストを確認してください",
-  
   "search_results": "🔍 検索結果（{count}件）\n\nキーワード：{keyword}\n\n{results}",
-  
   "tags_empty": "タグがまだありません。\n\nコンテンツをアーカイブしてタグを作成しましょう！",
-  
   "tags_list": "🏷️ 全タグ（{count}件）\n\n{tags}",
-  
   "stats": "📊 統計情報\n\n📦 総アーカイブ数：{total_archives}\n🏷️ 総タグ数：{total_tags}\n💾 コンテンツサイズ：{storage_used}\n💾 データベースサイズ：{db_size}\n📅 最終アーカイブ：{last_archive}",
-  
   "language_changed": "✅ 言語を日本語に変更しました",
-  
   "language_select": "🌍 言語選択\n\n📍 現在の言語：{current_language}\n\n使用言語を選択してください：",
   "language_name_en": "English",
   "language_name_zh-CN": "简体中文",
@@ -30,13 +19,9 @@
   "language_name_ja": "日本語",
   "language_name_ko": "한국어",
   "language_name_es": "Español",
-  
   "processing": "⏳ 処理中...",
-  
   "error_occurred": "❌ エラーが発生しました\n\n{error}\n\n再試行するか、管理者に連絡してください。",
-  
   "rate_limit_exceeded": "⚠️ レート制限を超えました\n\n{wait_time}秒後に再試行してください。",
-  
   "tag_text": "テキスト",
   "tag_image": "画像",
   "tag_video": "動画",
@@ -48,19 +33,29 @@
   "tag_animation": "アニメーション",
   "tag_contact": "連絡先",
   "tag_location": "位置情報",
-  
   "storage_database": "データベース",
   "storage_telegram": "Telegramチャンネル",
   "storage_cloud": "クラウドストレージ",
   "storage_reference": "参照のみ",
-  
+  "optimizer_search_suggestions": "💡 提案：\n• よりシンプルなキーワードをお試しください\n• スペルミスがないか確認してください\n• /tags でタグを閲覧\n• /stats でアーカイブの概要を確認",
+  "optimizer_filter_suggestions_with_tags": "💡 {count}件の結果が見つかりました。タグでフィルタリング：{tags}",
+  "optimizer_filter_suggestions_no_tags": "💡 {count}件の結果が見つかりました。最も関連性の高いものを表示しています。",
+  "optimizer_expand_suggestions": "💡 もっと見たいですか？より広範なキーワードをお試しください、または /tags を確認",
+  "optimizer_onboarding_hint": "📝 アーカイブが空です。メッセージを転送するか、コンテンツを送信して始めましょう！",
+  "optimizer_tagging_hint": "💡 ヒント：アーカイブ時にハッシュタグを追加すると管理しやすくなります！",
+  "optimizer_resource_suggestions": "💡 もう一度試してみますか？「もう1つ」と送信してさらにリソースを取得",
+  "command_guide_note": "💡 /note <アーカイブID> を使用するか、アーカイブメッセージに返信してノートを追加",
+  "command_guide_trash": "💡 /trash を使用してゴミ箱を表示（削除されたアーカイブを復元または完全削除できます）",
+  "command_guide_export": "💡 /export を使用してデータをエクスポート（JSON/HTML/Markdown形式対応）",
+  "command_guide_backup": "💡 /backup を使用してデータベースをバックアップまたは復元",
+  "command_guide_language": "💡 /language を使用してインターフェース言語を変更",
+  "command_guide_tags": "💡 /tags を使用してすべてのタグを表示、または #タグ を送信してフィルタリング",
   "button_language_en": "English",
   "button_language_zh_cn": "简体中文",
   "button_language_zh_tw": "繁體中文",
   "button_language_ja": "日本語",
   "button_language_ko": "한국어",
   "button_language_es": "Español",
-  
   "note_added": "✅ ノートを追加しました\n\n📝 ノートID：#{note_id}\n📦 アーカイブID：#{archive_id}",
   "note_add_failed": "❌ ノートの追加に失敗しました\n\nアーカイブIDが正しいか確認してください。",
   "note_no_archive_id": "アーカイブIDを入力してください。\n\n例：/note 123 または /n 123",
@@ -73,7 +68,6 @@
   "no_notes_search_results": "🔍 「{query}」を含むノートが見つかりません。",
   "notes_search_results": "🔍 ノート検索結果（{count}件）\n\nキーワード：{query}",
   "archive": "アーカイブ",
-  
   "trash_manager_not_initialized": "❌ ゴミ箱機能が初期化されていません\n\nボットを再起動してください。",
   "trash_empty": "🗑️ ゴミ箱は空です\n\n削除されたアーカイブはありません。",
   "trash_list": "🗑️ ゴミ箱（{count}件）",
@@ -91,14 +85,12 @@
   "trash_invalid_command": "❌ 無効なコマンド\n\n使用方法：\n/trash - ゴミ箱表示\n/trash restore <id> - アーカイブ復元\n/trash delete <id> - 完全削除\n/trash empty [days] - ゴミ箱を空にする",
   "archive_moved_to_trash": "✅ アーカイブ #{archive_id} をゴミ箱に移動しました",
   "archive_delete_failed": "❌ アーカイブ #{archive_id} の削除に失敗しました\n\nアーカイブは既に削除されている可能性があります。",
-  
   "export_manager_not_initialized": "❌ エクスポート機能が初期化されていません\n\nボットを再起動してください。",
   "export_processing": "📦 データをエクスポート中...",
   "export_tag_usage": "使用方法：/export tag <タグ名> [形式]\n\n例：/export tag tech markdown",
   "export_invalid_format": "❌ 無効な形式\n\n対応形式：markdown、json、csv",
   "export_failed": "❌ エクスポートに失敗しました\n\n後でもう一度お試しください。",
   "export_success": "✅ エクスポート成功\n\n📄 ファイル：{filename}\n📊 サイズ：{size} バイト",
-
   "backup_manager_not_initialized": "❌ バックアップ機能が初期化されていません\n\nボットを再起動してください。",
   "backup_none": "🗃️ バックアップが見つかりません。",
   "backup_list_header": "🗃️ バックアップ（{count}件）",
@@ -117,7 +109,6 @@
   "backup_status": "📊 データベースステータス\nサイズ：{size} バイト\nアーカイブ：{archives}\nノート：{notes}\n削除済み：{deleted}\n最終アーカイブ：{last}",
   "backup_status_failed": "❌ データベースステータスの取得に失敗しました",
   "backup_invalid_command": "❌ 無効なサブコマンド\n\n使用方法：/backup [create|restore|delete|cleanup|status]",
-  
   "review_usage": "📊 レビューと統計\n\n期間を選択してアクティビティを表示：\n\n<b>機能：</b>\n• アーカイブトレンド分析\n• アクティブ日数カウント\n• トップタグ統計\n• ランダムアーカイブ発見",
   "review_period_week": "過去7日間",
   "review_period_month": "過去30日間",
@@ -130,9 +121,7 @@
   "review_no_data": "📊 この期間にアクティビティはありません。\n\nアーカイブを開始して統計を表示しましょう！",
   "review_invalid_period": "❌ 無効な期間\n\n使用可能：week、month、year",
   "review_manager_not_initialized": "❌ レビュー機能が初期化されていません\n\nボットを再起動してください。",
-  
   "tags_button_list_header": "🏷️ タグリスト（{count}件）\n\nタグをクリックして関連コンテンツを表示：",
-  
   "ai_status_enabled": "✅ ステータス：有効",
   "ai_status_available": "✅ サービス：利用可能",
   "ai_status_unavailable": "⚠️ サービス：利用不可\nAPIキー設定を確認してください",
@@ -147,23 +136,20 @@
   "ai_status_auto_summarize": "自動要約：{status}",
   "ai_status_auto_tags": "\n自動タグ：{status}",
   "ai_status_enable_guide": "\n\n💡 *有効化方法*\n1. config/config.yamlを編集\n2. ai.enabled: trueに設定\n3. ai.api.providerとai.api.api_keyを設定\n4. ボットを再起動\n\n対応プロバイダー：OpenAI、Claude、Qwen",
-  
   "pagination_page_of": "{total}ページ中{current}ページ",
   "button_previous_page": "⬅️ 前へ",
   "button_next_page": "➡️ 次へ",
   "button_back_to_tags": "🔙 タグリストに戻る",
-  
   "note_mode_enter": "📝 <b>ノートモード起動</b>\n\nノート内容を送信してください：\n• 💬 テキストメッセージ\n• 🖼️ 画像\n• 🎤 音声\n\n💡 アーカイブメッセージに返信してノートをリンクすることもできます\n\n/cancelで終了",
   "note_mode_archive_linked": "📝 <b>ノートモード起動</b>\n\n📎 アーカイブ #{archive_id} にリンク\n\nノート内容を送信してください：\n• 💬 テキストメッセージ\n• 🖼️ 画像\n• 🎤 音声\n\n/cancelで終了",
   "note_mode_saved": "✅ ノートを保存しました\n\n📝 ノートID：#{note_id}",
   "note_mode_saved_with_archive": "✅ ノートを保存しました\n\n📝 ノートID：#{note_id}\n📎 リンクアーカイブ：#{archive_id}",
   "note_mode_cancelled": "❌ ノートモードをキャンセルしました",
   "note_mode_save_failed": "❌ ノートの保存に失敗しました\n\n後でもう一度お試しください。",
-  "notes_list_empty": "📝 ノートがまだありません\n\n/note (/n) コマンドまたはアーカイブリストの📝ボタンでノートを作成してください。",
+  "notes_list_empty": "📝 メモがありません\n\n/note でメモを追加できます",
   "notes_list_header": "📝 ノート（{count}件）",
   "button_add_note": "📝 ノート",
   "nothing_to_cancel": "ℹ️ 進行中の操作はありません。",
-  
   "invalid_command": "⚠️ コマンドのようですが、無効または見つかりません。\n\n/helpで利用可能なコマンドを確認してください。",
   "short_text_prompt": "💬 どうしますか？",
   "button_save_as_note": "📝 ノートとして保存",
@@ -176,7 +162,6 @@
   "short_text_archived": "✅ アーカイブしました（ID：#{archive_id}）\n\n内容：{content}",
   "short_text_archive_failed": "❌ アーカイブに失敗しました",
   "short_text_expired": "⚠️ セッションが期限切れです。再送信してください",
-  
   "ai_chat_exit": "👋 AIチャットモードを終了しました",
   "ai_chat_help": "🤖 AIアシスタント機能：\n\n• スマートチャット：知りたいことを教えてください\n• アーカイブ検索：トピック別にコンテンツを検索\n• 統計表示：アーカイブ統計を確認\n• コンテンツ分析：アーカイブを深く理解\n• 終了：「終了」を送信してセッション終了\n\n注：セッションは10分間無操作で自動終了します",
   "ai_chat_thinking": "🤔 考え中...",
@@ -187,18 +172,14 @@
   "ai_chat_gathering": "📊 データを収集中...",
   "ai_chat_generating": "💬 応答を生成中...",
   "ai_chat_session_expired": "⚠️ セッションが期限切れです",
-  
   "long_text_intent_prompt": "📝 {length}文字のメッセージを送信しました。どうしますか？",
   "long_text_save_note": "📝 ノートとして保存",
   "long_text_continue_chat": "💬 チャットを続ける",
-  
   "continuity_prompt": "💡 {time}前にノート #{note_id} を保存しました\n\nこのメッセージを追加しますか？",
   "continuity_append": "➕ 前のノートに追加",
   "continuity_new_note": "📝 新しいノートを作成",
   "continuity_archive": "📦 通常のアーカイブ",
-  
   "resource_send_failed": "❌ リソースの送信に失敗しました",
-  
   "archive_processing": "⏳ 処理中...",
   "archive_progress": "進捗：{percentage}%",
   "archive_duplicate_file": "⚠️ ファイルが既に存在します",
@@ -208,25 +189,21 @@
   "archive_duplicate_file_tags": "🏷️ タグ：{tags}",
   "archive_duplicate_unknown_title": "不明",
   "archive_duplicate_unknown_time": "不明",
-  
   "batch_processing_start": "📦 一括処理開始\n合計：{total}件\n進捗：0%（0/{total}）",
   "batch_processing_progress": "📦 一括処理中\n段階：{stage}\n進捗：{percentage}%（{current}/{total}）\n残り時間：約{remaining}秒",
   "batch_processing_complete": "✅ 一括アーカイブ完了\n\n成功：{success}件\n失敗：{fail}件\n\n💡 ヒント：/searchでアーカイブを検索できます",
   "batch_processing_complete_no_fail": "✅ 一括アーカイブ完了\n\n成功：{success}件\n\n💡 ヒント：/searchでアーカイブを検索できます",
-  
   "note_modified": "✅ ノートを変更しました\n\n📝 アーカイブ #{archive_id}",
   "note_appended": "✅ ノートを追記しました\n\n📝 アーカイブ #{archive_id}",
   "note_added_to_archive": "✅ アーカイブ #{archive_id} にノートを追加しました\n\n📝 ノートID：#{note_id}",
   "note_add_failed_error": "❌ ノートの追加に失敗しました",
   "note_manager_uninitialized": "❌ ノートマネージャーが初期化されていません",
-  
   "ai_refining_note": "🤖 処理中...",
   "ai_refine_note_success": "✅ **ノートを整理しました**\n\n📝 アーカイブ #{archive_id}\n\n整理後の内容：\n{content}",
   "ai_refine_note_save_failed": "❌ 整理したノートの保存に失敗しました",
   "ai_refine_note_failed": "❌ AI処理に失敗しました",
   "ai_refine_note_error": "❌ 整理に失敗しました：{error}",
   "ai_feature_disabled": "❌ AI機能が有効になっていません",
-  
   "progress_analyzing_content": "📋 コンテンツ分析中",
   "progress_checking_duplicates": "🔍 重複チェック中",
   "progress_ai_analysis": "🤖 AI分析中",
@@ -239,16 +216,13 @@
   "progress_saving_archive": "💾 アーカイブ保存中",
   "progress_complete": "✅ 完了",
   "progress_failed": "❌ 処理失敗",
-  
   "batch_progress_analyzing": "コンテンツ分析中",
   "batch_progress_extracting_tags": "タグ抽出中",
   "batch_progress_ai_generating_tags": "AIタグ生成中",
   "batch_progress_applying_tags": "タグ適用中",
   "batch_progress_storing": "チャンネルに保存中",
   "batch_progress_complete": "完了",
-  
   "unknown_command_message": "⚠️ コマンドのようですが、正しくないか存在しません。\n/helpで利用可能なコマンドを確認してください。",
-  
   "callback_closed": "閉じる",
   "callback_tag_no_content": "タグ #{tag} にコンテンツがありません",
   "callback_tag_header": "🏷️ タグ：#{tag}",
@@ -256,8 +230,17 @@
   "callback_favorite_unmarked": "🤍 お気に入り解除",
   "callback_note_has": "📝 √ ノートあり",
   "callback_note_no": "📝 ノートなし",
-  
   "error_search_engine_not_initialized": "検索エンジンが初期化されていません",
   "error_tag_manager_not_initialized": "タグマネージャーが初期化されていません",
-  "error_database_not_initialized": "データベースストレージが初期化されていません"
+  "error_database_not_initialized": "データベースストレージが初期化されていません",
+  "setting_menu_title": "⚙️ システム設定\n\n設定するカテゴリを選択してください：",
+  "setting_category_basic": "⚙️ 基本設定",
+  "setting_category_features": "🎛️ 機能スイッチ",
+  "setting_category_ai": "🤖 AI設定",
+  "setting_category_storage": "💾 ストレージ設定",
+  "setting_category_logging": "📝 ログ設定",
+  "setting_updated": "✅ 設定が更新されました\n\n<b>{name}</b>\n新しい値：<code>{value}</code>\n\n⚠️ 注意：一部の設定を有効にするには、Botを再起動する必要があります",
+  "setting_update_failed": "❌ 設定の更新に失敗しました\n\n{error}",
+  "setting_invalid_value": "❌ 無効な値\n\n{error}",
+  "setting_restart_required": "⚠️ 注意：一部の設定を有効にするには、Botを再起動する必要があります"
 }

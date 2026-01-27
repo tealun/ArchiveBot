@@ -11,6 +11,7 @@ Response Optimizer - AI响应智能优化器
 import logging
 from typing import Dict, List, Any, Optional
 from collections import Counter
+from ..utils.i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -93,30 +94,7 @@ class ResponseOptimizer:
     @staticmethod
     def _generate_search_suggestions(query: str, language: str) -> str:
         """生成搜索建议（空结果时）"""
-        if language == 'en':
-            return (
-                f"💡 Suggestions:\n"
-                f"• Try simpler keywords\n"
-                f"• Check for typos\n"
-                f"• Use /tags to browse by tags\n"
-                f"• Use /stats to see what's in your archive"
-            )
-        elif language == 'zh-TW':
-            return (
-                f"💡 建議：\n"
-                f"• 試試更簡單的關鍵詞\n"
-                f"• 檢查是否有錯別字\n"
-                f"• 使用 /tags 瀏覽標籤\n"
-                f"• 使用 /stats 查看歸檔概況"
-            )
-        else:
-            return (
-                f"💡 建议：\n"
-                f"• 试试更简单的关键词\n"
-                f"• 检查是否有错别字\n"
-                f"• 使用 /tags 浏览标签\n"
-                f"• 使用 /stats 查看归档概况"
-            )
+        return t('optimizer_search_suggestions', language)
     
     @staticmethod
     def _generate_filter_suggestions(results: List[Dict], language: str) -> str:
@@ -131,30 +109,14 @@ class ResponseOptimizer:
             tag_counts = Counter(all_tags)
             top_tags = [f"#{tag}" for tag, _ in tag_counts.most_common(3)]
             tag_str = '、'.join(top_tags)
-            
-            if language == 'en':
-                return f"💡 {len(results)} results found. Try filtering by tags: {tag_str}"
-            elif language == 'zh-TW':
-                return f"💡 找到 {len(results)} 個結果，可以用標籤篩選：{tag_str}"
-            else:
-                return f"💡 找到 {len(results)} 个结果，可以用标签筛选：{tag_str}"
+            return t('optimizer_filter_suggestions_with_tags', language, count=len(results), tags=tag_str)
         else:
-            if language == 'en':
-                return f"💡 {len(results)} results found. Showing top matches."
-            elif language == 'zh-TW':
-                return f"💡 找到 {len(results)} 個結果，顯示最相關的。"
-            else:
-                return f"💡 找到 {len(results)} 个结果，显示最相关的。"
+            return t('optimizer_filter_suggestions_no_tags', language, count=len(results))
     
     @staticmethod
     def _generate_expand_suggestions(query: str, language: str) -> str:
         """生成扩展建议（少量结果时）"""
-        if language == 'en':
-            return "💡 Want more? Try broader keywords or check /tags"
-        elif language == 'zh-TW':
-            return "💡 想要更多？試試更寬泛的關鍵詞或查看 /tags"
-        else:
-            return "💡 想要更多？试试更宽泛的关键词或查看 /tags"
+        return t('optimizer_expand_suggestions', language)
     
     @staticmethod
     def _optimize_stats_display(data_context: Dict, language: str) -> Dict:
@@ -163,33 +125,11 @@ class ResponseOptimizer:
         
         # 空归档提示
         if stats.get('total', 0) == 0 or stats.get('total_archives', 0) == 0:
-            if language == 'en':
-                data_context['onboarding_hint'] = (
-                    "📝 Your archive is empty. Start by forwarding messages or sending content!"
-                )
-            elif language == 'zh-TW':
-                data_context['onboarding_hint'] = (
-                    "📝 您的歸檔還是空的。開始轉發訊息或發送內容吧！"
-                )
-            else:
-                data_context['onboarding_hint'] = (
-                    "📝 你的归档还是空的。开始转发消息或发送内容吧！"
-                )
+            data_context['onboarding_hint'] = t('optimizer_onboarding_hint', language)
         
         # 标签数量异常提示
         elif stats.get('tags', 0) == 0 or stats.get('total_tags', 0) == 0:
-            if language == 'en':
-                data_context['tagging_hint'] = (
-                    "💡 Tip: Add hashtags when archiving for better organization!"
-                )
-            elif language == 'zh-TW':
-                data_context['tagging_hint'] = (
-                    "💡 提示：歸檔時加上標籤（#hashtag），方便管理！"
-                )
-            else:
-                data_context['tagging_hint'] = (
-                    "💡 提示：归档时加上标签（#hashtag），方便管理！"
-                )
+            data_context['tagging_hint'] = t('optimizer_tagging_hint', language)
         
         return data_context
     
@@ -200,6 +140,7 @@ class ResponseOptimizer:
         
         # 无资源提示
         if not resources:
+            # 使用专门的 no_resource_hint 键（需要添加到 i18n）
             if language == 'en':
                 data_context['no_resource_hint'] = (
                     "📭 No matching resources found.\n"
@@ -218,12 +159,7 @@ class ResponseOptimizer:
         
         # 单个资源 - 添加"再来一个"提示
         elif len(resources) == 1:
-            if language == 'en':
-                data_context['next_hint'] = "💬 Say 'another one' for more"
-            elif language == 'zh-TW':
-                data_context['next_hint'] = "💬 說「再來一個」查看更多"
-            else:
-                data_context['next_hint'] = "💬 说「再来一个」查看更多"
+            data_context['next_hint'] = t('optimizer_resource_suggestions', language)
         
         return data_context
     
