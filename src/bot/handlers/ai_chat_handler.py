@@ -40,6 +40,20 @@ async def handle_ai_chat_mode(update: Update, context: ContextTypes.DEFAULT_TYPE
     message = update.message
     text = message.text.strip() if message.text else ""
     
+    # 批次检测：如果消息属于媒体组或可能是批次消息的一部分，不触发AI Chat
+    # 这些消息应该由批次处理器统一处理
+    if message.media_group_id:
+        logger.debug(f"Message belongs to media_group, skip AI chat")
+        return False
+    
+    # 如果消息有媒体附件（图片、视频等），可能是转发+评论的场景
+    # 应该让批次处理器处理
+    if any([message.photo, message.video, message.document, 
+            message.audio, message.voice, message.animation,
+            message.sticker, message.contact, message.location]):
+        logger.debug(f"Message has media attachment, skip AI chat")
+        return False
+    
     # 获取配置和会话管理器
     config = get_config()
     ai_config = config.ai

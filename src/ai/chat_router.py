@@ -615,7 +615,14 @@ async def generate_response(
         # 构建上下文
         context_parts = []
         
-        if data_context.get('statistics'):
+        # 获取用户意图，判断是否需要显示统计数据
+        user_intent = plan.get('user_intent', 'general_query')
+        # 只在这些意图下显示统计数据
+        show_stats = user_intent in ['specific_search', 'stats_analysis', 'resource_request']
+        
+        logger.info(f"🎯 Response generation: intent={user_intent}, show_stats={show_stats}, has_stats={bool(data_context.get('statistics'))}")
+        
+        if data_context.get('statistics') and show_stats:
             stats = data_context['statistics']
             if language == 'en':
                 context_parts.append(f"Statistics: {stats['total']} archives, {stats['tags']} tags, {stats['recent_week']} in last 7 days")
@@ -762,6 +769,10 @@ def should_trigger_ai_chat(message, context, config) -> tuple[bool, str]:
     # 只处理文本消息且非转发
     if not message.text or message.forward_origin:
         return False, 'not_text_or_forwarded'
+    
+    # 如果消息属于媒体组（批量消息），不触发AI Chat
+    if message.media_group_id:
+        return False, 'belongs_to_media_group'
     
     text = message.text.strip()
     
