@@ -9,7 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
-from ...utils.message_formatters import format_stats_text
+from ...utils.message_builder import MessageBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
             db_size = os.path.getsize(db_path)
         
         # Use unified formatter
-        message = format_stats_text(stats, language=lang_ctx.language, db_size=db_size)
+        message = MessageBuilder.format_stats(stats, language=lang_ctx.language, db_size=db_size)
         
         await update.message.reply_text(message)
         

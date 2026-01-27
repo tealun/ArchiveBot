@@ -1002,7 +1002,7 @@ async def generate_response(
         # 非resource_reply策略，正常生成文本回复
         from ..utils.config import get_config
         from .knowledge_base import get_knowledge_base
-        from ..utils.message_formatters import format_ai_context_summary
+        from ..utils.message_builder import MessageBuilder
         
         config = get_config()
         # 使用 config.get() 方法以支持环境变量（AI_API_KEY）
@@ -1025,7 +1025,7 @@ async def generate_response(
         if data_context.get('search_results') and plan.get('need_data', {}).get('search_keywords'):
             data_context['search_query'] = plan['need_data']['search_keywords']
         
-        data_summary = format_ai_context_summary(data_context, user_intent, language)
+        data_summary = MessageBuilder.format_ai_context_summary(data_context, user_intent, language)
         
         logger.info(f"🎯 Response generation: intent={user_intent}, data_summary_length={len(data_summary)}")
         

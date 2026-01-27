@@ -185,3 +185,46 @@ class MessageBuilder:
     ) -> tuple[str, Any]:
         """格式化配置项输入提示"""
         return SystemFormatter.format_setting_item_prompt(item_info, config_key, current_value, category_key)
+    
+    @staticmethod
+    def format_stats(stats: Dict[str, Any], language: str = 'zh-CN', db_size: int = 0) -> str:
+        """格式化统计信息"""
+        return SystemFormatter.format_stats(stats, language, db_size)
+    
+    @staticmethod
+    def format_search_results_summary(
+        results: List[Dict], 
+        total_count: int, 
+        query: str,
+        language: str = 'zh-CN',
+        max_items: int = 5
+    ) -> str:
+        """格式化搜索结果摘要"""
+        return SystemFormatter.format_search_results_summary(results, total_count, query, language, max_items)
+    
+    @staticmethod
+    def format_tag_analysis(
+        tags: List[Dict], 
+        language: str = 'zh-CN',
+        max_tags: int = 10
+    ) -> str:
+        """格式化标签分析"""
+        return SystemFormatter.format_tag_analysis(tags, language, max_tags)
+    
+    @staticmethod
+    def format_recent_archives(
+        archives: List[Dict],
+        language: str = 'zh-CN',
+        max_items: int = 5
+    ) -> str:
+        """格式化最近归档列表"""
+        return SystemFormatter.format_recent_archives(archives, language, max_items)
+    
+    @staticmethod
+    def format_ai_context_summary(
+        data_context: Dict[str, Any],
+        user_intent: str,
+        language: str = 'zh-CN'
+    ) -> str:
+        """格式化AI上下文数据摘要"""
+        return SystemFormatter.format_ai_context_summary(data_context, user_intent, language)
