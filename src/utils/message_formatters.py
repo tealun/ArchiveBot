@@ -212,7 +212,7 @@ def format_ai_context_summary(
     根据用户意图格式化AI上下文数据摘要
     
     Args:
-        data_context: AI收集的数据上下文
+        data_context: AI收集的数据上下文（可能包含优化建议）
         user_intent: 用户意图类型
         language: 语言代码
         
@@ -227,11 +227,25 @@ def format_ai_context_summary(
     if data_context.get('statistics') and show_stats:
         stats = data_context['statistics']
         parts.append(format_stats_text(stats, language, db_size=0))
+        
+        # 添加统计相关提示
+        if data_context.get('onboarding_hint'):
+            parts.append(data_context['onboarding_hint'])
+        if data_context.get('tagging_hint'):
+            parts.append(data_context['tagging_hint'])
     
     if data_context.get('search_results'):
         results = data_context['search_results']
         query = data_context.get('search_query', '')
         parts.append(format_search_results_summary(results, len(results), query, language))
+        
+        # 添加搜索优化建议
+        if data_context.get('filter_suggestions'):
+            parts.append(data_context['filter_suggestions'])
+        if data_context.get('expand_suggestions'):
+            parts.append(data_context['expand_suggestions'])
+        if data_context.get('empty_result_suggestions'):
+            parts.append(data_context['empty_result_suggestions'])
     
     if data_context.get('tag_analysis'):
         tags = data_context['tag_analysis']
@@ -240,6 +254,12 @@ def format_ai_context_summary(
     if data_context.get('sample_archives'):
         archives = data_context['sample_archives']
         parts.append(format_recent_archives_text(archives, language))
+    
+    # 资源请求相关提示
+    if data_context.get('no_resource_hint'):
+        parts.append(data_context['no_resource_hint'])
+    if data_context.get('next_hint'):
+        parts.append(data_context['next_hint'])
     
     if not parts:
         if language == 'en':

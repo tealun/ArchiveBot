@@ -212,6 +212,11 @@ async def handle_chat_message(
         await progress_callback(i18n.t('ai_chat_gathering'))
     data_context = await gather_data(plan.get('need_data', {}), context, user_intent)
     
+    # Stage 2.5: 智能优化数据上下文（添加建议和提示）
+    from .response_optimizer import ResponseOptimizer
+    data_context = ResponseOptimizer.optimize(user_intent, data_context, user_message, language)
+    logger.info(f"✨ Data context optimized with intelligent suggestions")
+    
     # Stage 3: AI生成最终回复
     logger.info(f"💬 Stage 3: Generating response...")
     if progress_callback:
