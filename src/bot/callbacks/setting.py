@@ -35,38 +35,12 @@ async def handle_setting_category_callback(update: Update, context: ContextTypes
             return
         
         category_info = CONFIG_CATEGORIES[category_key]
-        category_name = category_info['name']
-        category_icon = category_info['icon']
-        items = category_info['items']
         
-        # 构建配置项列表
-        text = f"{category_icon} <b>{category_name}</b>\n\n"
-        text += "选择要配置的项目：\n\n"
-        
-        keyboard = []
-        for config_key, item_info in items.items():
-            item_name = item_info['name']
-            current_value = get_current_value(config_key)
-            
-            # 格式化当前值显示
-            if item_info['type'] == 'bool':
-                value_display = "✅" if current_value else "❌"
-            else:
-                value_display = str(current_value) if current_value is not None else "未设置"
-            
-            keyboard.append([
-                InlineKeyboardButton(
-                    f"{item_name} [{value_display}]",
-                    callback_data=f"setting_item:{config_key}"
-                )
-            ])
-        
-        # 添加返回按钮
-        keyboard.append([
-            InlineKeyboardButton("⬅️ 返回", callback_data="setting_back")
-        ])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # 使用MessageBuilder格式化分类菜单
+        from ...utils.message_builder import MessageBuilder
+        text, reply_markup = MessageBuilder.format_setting_category_menu(
+            category_key, category_info, get_current_value
+        )
         
         await query.edit_message_text(
             text,
@@ -100,127 +74,24 @@ async def handle_setting_item_callback(update: Update, context: ContextTypes.DEF
             await query.edit_message_text("❌ 无效的配置项")
             return
         
-        item_name = item_info['name']
-        item_type = item_info['type']
-        description = item_info.get('description', '')
         current_value = get_current_value(config_key)
+        category_key = _get_category_key(config_key)
         
-        # 构建提示消息
-        text = f"⚙️ <b>{item_name}</b>\n\n"
-        text += f"📝 {description}\n\n"
-        text += f"当前值：<code>{current_value}</code>\n\n"
+        # 使用MessageBuilder格式化配置项提示
+        from ...utils.message_builder import MessageBuilder
+        text, reply_markup = MessageBuilder.format_setting_item_prompt(
+            item_info, config_key, current_value, category_key
+        )
         
-        # 根据类型提供输入提示
-        if item_type == 'bool':
-            text += "请输入新值：\n"
-            text += "• true/false\n"
-            text += "• yes/no\n"
-            text += "• 1/0\n"
-            text += "• 开/关"
-            
-            # 对于布尔值，提供快捷按钮
-            keyboard = [
-                [
-                    InlineKeyboardButton("✅ 启用", callback_data=f"setting_set:{config_key}:true"),
-                    InlineKeyboardButton("❌ 禁用", callback_data=f"setting_set:{config_key}:false")
-                ],
-                [
-                    InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{_get_category_key(config_key)}")
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=reply_markup
-            )
+        await query.edit_message_text(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup
+        )
         
-        elif item_type == 'int':
-            min_val = item_info.get('min')
-            max_val = item_info.get('max')
-            default_val = item_info.get('default')
-            
-            text += "请输入新值（整数）：\n"
-            if min_val is not None:
-                text += f"• 最小值：{min_val}\n"
-            if max_val is not None:
-                text += f"• 最大值：{max_val}\n"
-            if default_val is not None:
-                text += f"• 默认值：{default_val}\n"
-            
-            text += f"\n💡 直接回复数字即可"
-            
-            # 添加返回按钮
-            keyboard = [[
-                InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{_get_category_key(config_key)}")
-            ]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=reply_markup
-            )
-            
-            # 设置等待输入状态
+        # 对于需要文本输入的类型，设置等待状态
+        if item_info['type'] in ('int', 'string'):
             context.user_data['waiting_setting_input'] = config_key
-        
-        elif item_type == 'string':
-            example = item_info.get('example', '')
-            
-            text += "请输入新值（文本）：\n"
-            if example:
-                text += f"• 示例：<code>{example}</code>\n"
-            
-            text += f"\n💡 直接回复文本即可"
-            
-            # 添加返回按钮
-            keyboard = [[
-                InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{_get_category_key(config_key)}")
-            ]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=reply_markup
-            )
-            
-            # 设置等待输入状态
-            context.user_data['waiting_setting_input'] = config_key
-        
-        elif item_type == 'choice':
-            choices = item_info.get('choices', [])
-            default_val = item_info.get('default')
-            
-            text += "请选择新值：\n"
-            for choice in choices:
-                text += f"• {choice}\n"
-            if default_val:
-                text += f"\n默认值：{default_val}\n"
-            
-            # 创建选择按钮
-            keyboard = []
-            for choice in choices:
-                keyboard.append([
-                    InlineKeyboardButton(
-                        choice,
-                        callback_data=f"setting_set:{config_key}:{choice}"
-                    )
-                ])
-            
-            keyboard.append([
-                InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{_get_category_key(config_key)}")
-            ])
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=reply_markup
-            )
         
     except Exception as e:
         logger.error(f"Error in handle_setting_item_callback: {e}", exc_info=True)

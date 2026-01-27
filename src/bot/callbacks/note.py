@@ -50,9 +50,11 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             context.user_data['waiting_note_for_archive'] = archive_id
             
             # 发送提示消息
+            from ...utils.message_builder import MessageBuilder
+            prompt_text = MessageBuilder.format_note_input_prompt(archive_id, 'add')
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"📝 归档 #{archive_id} 还没有笔记\n\n💬 请回复此消息输入笔记内容",
+                text=prompt_text,
                 reply_to_message_id=query.message.message_id
             )
             logger.info(f"User waiting to add note for archive {archive_id}")
@@ -64,28 +66,14 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if db_storage:
             archive = db_storage.get_archive(archive_id)
         
-        # 如果只有一条笔记，使用统一的格式化方法
+        # 使用MessageBuilder格式化笔记显示
+        from ...utils.message_builder import MessageBuilder
+        
         if len(notes) == 1:
-            from ..utils.message_builder import MessageBuilder
             notes_text, reply_markup = MessageBuilder.format_note_detail_reply(notes[0], archive)
         else:
             # 多条笔记，显示列表
-            notes_text = f"📝 归档 #{archive_id} 的笔记 (共{len(notes)}条)\n\n"
-            
-            for idx, note in enumerate(notes, 1):
-                content = note['content']
-                notes_text += f"{idx}. {content}\n"
-                notes_text += f"   📅 {note['created_at']}\n\n"
-            
-            # 添加操作按钮：编辑笔记 | 删除笔记 | 分享笔记
-            keyboard = [[
-                InlineKeyboardButton("✏️ 编辑最新", callback_data=f"note_edit:{archive_id}:{notes[-1]['id']}"),
-                InlineKeyboardButton("🗑️ 删除最新", callback_data=f"note_delete:{notes[-1]['id']}")
-            ]]
-            keyboard.append([InlineKeyboardButton("📤 分享最新", callback_data=f"note_share:{archive_id}:{notes[-1]['id']}")])
-            keyboard.append([InlineKeyboardButton("✖️ 关闭", callback_data=f"note_close")])
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            notes_text, reply_markup = MessageBuilder.format_note_list_multi(notes, archive_id, lang_ctx)
         
         # 先answer，然后发送笔记内容
         await query.answer()
@@ -319,9 +307,11 @@ async def handle_note_edit_callback(update: Update, context: ContextTypes.DEFAUL
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.answer()
+        from ...utils.message_builder import MessageBuilder
+        prompt_text = MessageBuilder.format_note_input_prompt(archive_id, 'edit_menu')
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"📝 编辑归档 #{archive_id} 的笔记\n\n请选择操作：",
+            text=prompt_text,
             reply_markup=reply_markup
         )
         
@@ -372,9 +362,11 @@ async def handle_note_modify_callback(update: Update, context: ContextTypes.DEFA
         await query.answer("📋 笔记内容已发送")
         
         # 发送当前笔记内容供用户复制修改
+        from ...utils.message_builder import MessageBuilder
+        prompt_text = MessageBuilder.format_note_input_prompt(archive_id, 'modify', note_content)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"📝 当前笔记内容：\n\n{note_content}\n\n💡 请复制上方内容，修改后回复此消息发送",
+            text=prompt_text,
             reply_to_message_id=query.message.message_id
         )
         
@@ -406,9 +398,11 @@ async def handle_note_append_callback(update: Update, context: ContextTypes.DEFA
         
         await query.answer("➕ 请输入要追加的内容")
         
+        from ...utils.message_builder import MessageBuilder
+        prompt_text = MessageBuilder.format_note_input_prompt(archive_id, 'append')
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"➕ 追加笔记内容\n\n请回复此消息输入要追加的内容",
+            text=prompt_text,
             reply_to_message_id=query.message.message_id
         )
         
@@ -460,16 +454,11 @@ async def handle_note_share_callback(update: Update, context: ContextTypes.DEFAU
             archive_info = db_storage.get_archive(archive_id)
         
         # 构建分享消息
-        share_text = "📝 笔记分享\n\n"
-        
-        # 如果有存档标题，添加标题
-        if archive_info and archive_info.get('title'):
-            share_text += f"📌 {archive_info['title']}\n\n"
-        
-        share_text += f"{note_content}\n\n"
-        share_text += f"---\n"
-        share_text += f"📅 {note_created_at}\n"
-        share_text += f"🔖 来自归档 #{archive_id}"
+        from ...utils.message_builder import MessageBuilder
+        archive_title = archive_info.get('title') if archive_info else None
+        share_text = MessageBuilder.format_note_share(
+            note_content, note_created_at, archive_id, archive_title
+        )
         
         await query.answer("📤 笔记已发送，可直接转发")
         
@@ -554,9 +543,11 @@ async def handle_note_quick_edit_callback(update: Update, context: ContextTypes.
         await query.answer("✏️ 进入编辑模式")
         
         # 发送纯文本笔记内容
+        from ...utils.message_builder import MessageBuilder
+        prompt_text = MessageBuilder.format_note_input_prompt(0, 'quick_edit', note['content'])
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"📝 当前笔记内容：\n\n{note['content']}\n\n💡 请发送新内容来替换此笔记"
+            text=prompt_text
         )
         
         logger.info(f"User entered edit mode for note {note_id}")

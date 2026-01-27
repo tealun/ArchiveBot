@@ -42,22 +42,10 @@ async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         if not context.args:
             # 查看垃圾箱
             items = trash_manager.list_trash()
-            count = len(items)
             
-            if count == 0:
-                await update.message.reply_text(lang_ctx.t('trash_empty'))
-                return
-            
-            result_text = lang_ctx.t('trash_list', count=count) + "\n\n"
-            
-            for item in items[:20]:  # 只显示前20条
-                result_text += f"🗑️ ID: #{item['id']}\n"
-                result_text += f"📝 {item['title']}\n"
-                result_text += f"🏷️ {', '.join(item['tags'][:3])}{'...' if len(item['tags']) > 3 else ''}\n"
-                result_text += f"🕐 {lang_ctx.t('deleted_at')}: {item['deleted_at']}\n\n"
-            
-            if count > 20:
-                result_text += lang_ctx.t('trash_more', count=count-20)
+            # 使用MessageBuilder格式化垃圾箱列表
+            from ...utils.message_builder import MessageBuilder
+            result_text = MessageBuilder.format_trash_list(items, lang_ctx, max_display=20)
             
             await update.message.reply_text(result_text)
             

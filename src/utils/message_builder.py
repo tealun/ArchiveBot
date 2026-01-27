@@ -748,3 +748,447 @@ class MessageBuilder:
         reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
         
         return text, reply_markup
+    
+    @staticmethod
+    def format_trash_list(
+        items: List[Dict[str, Any]],
+        lang_ctx,
+        max_display: int = 20
+    ) -> str:
+        """
+        格式化垃圾箱列表
+        
+        Args:
+            items: 垃圾箱项目列表
+            lang_ctx: 语言上下文
+            max_display: 最大显示数量
+            
+        Returns:
+            格式化的消息文本
+        """
+        count = len(items)
+        
+        if count == 0:
+            return lang_ctx.t('trash_empty')
+        
+        result_text = lang_ctx.t('trash_list', count=count) + "\n\n"
+        
+        for item in items[:max_display]:
+            result_text += f"🗑️ ID: #{item['id']}\n"
+            result_text += f"📝 {item['title']}\n"
+            result_text += f"🏷️ {', '.join(item['tags'][:3])}{'...' if len(item['tags']) > 3 else ''}\n"
+            result_text += f"🕐 {lang_ctx.t('deleted_at')}: {item['deleted_at']}\n\n"
+        
+        if count > max_display:
+            result_text += lang_ctx.t('trash_more', count=count - max_display)
+        
+        return result_text
+    
+    @staticmethod
+    def format_ai_status(
+        ai_config: Dict[str, Any],
+        context,
+        lang_ctx
+    ) -> str:
+        """
+        格式化AI功能状态显示
+        
+        Args:
+            ai_config: AI配置
+            context: Bot context
+            lang_ctx: 语言上下文
+            
+        Returns:
+            格式化的状态文本（Markdown格式）
+        """
+        from ...ai.summarizer import get_ai_summarizer
+        
+        status_text = "🤖 **AI 功能状态**\n\n"
+        
+        # 检查是否启用
+        if ai_config.get('enabled', False):
+            status_text += "✅ **状态：** 已启用\n\n"
+            
+            # 获取AI总结器
+            summarizer = get_ai_summarizer(ai_config)
+            
+            if summarizer and summarizer.is_available():
+                status_text += "🟢 **服务：** 可用\n\n"
+                
+                # API配置信息
+                api_config = ai_config.get('api', {})
+                provider = api_config.get('provider', 'unknown')
+                model = api_config.get('model', 'unknown')
+                base_url = api_config.get('base_url', 'default')
+                
+                # 脱敏处理API Key
+                api_key = api_config.get('api_key', '')
+                if api_key:
+                    if len(api_key) > 10:
+                        masked_key = api_key[:4] + '****' + api_key[-4:]
+                    else:
+                        masked_key = '****'
+                else:
+                    masked_key = '未设置'
+                
+                status_text += "⚙️ **配置信息：**\n"
+                status_text += f"  • 提供商：`{provider}`\n"
+                status_text += f"  • 模型：`{model}`\n"
+                status_text += f"  • API Key：`{masked_key}`\n"
+                status_text += f"  • Base URL：`{base_url}`\n"
+                status_text += f"  • 最大Token：`{api_config.get('max_tokens', 1000)}`\n"
+                status_text += f"  • 超时时间：`{api_config.get('timeout', 30)}秒`\n"
+                status_text += f"  • 温度参数：`{api_config.get('temperature', 0.7)}`\n\n"
+                
+                # 功能开关
+                status_text += "🔧 **功能开关：**\n"
+                auto_summarize = ai_config.get('auto_summarize', False)
+                auto_tags = ai_config.get('auto_generate_tags', False)
+                auto_category = ai_config.get('auto_category', False)
+                chat_enabled = ai_config.get('chat', {}).get('enabled', False)
+                
+                status_text += f"  • 自动摘要：{'✅ 开启' if auto_summarize else '❌ 关闭'}\n"
+                status_text += f"  • 自动标签：{'✅ 开启' if auto_tags else '❌ 关闭'}\n"
+                status_text += f"  • 自动分类：{'✅ 开启' if auto_category else '❌ 关闭'}\n"
+                status_text += f"  • 智能对话：{'✅ 开启' if chat_enabled else '❌ 关闭'}\n\n"
+                
+                # 使用统计（从数据库获取）
+                db_storage = context.bot_data.get('db_storage')
+                if db_storage:
+                    try:
+                        cursor = db_storage.db.execute("""
+                            SELECT 
+                                COUNT(*) as total,
+                                COUNT(CASE WHEN ai_summary IS NOT NULL THEN 1 END) as with_summary,
+                                COUNT(CASE WHEN ai_tags IS NOT NULL THEN 1 END) as with_tags,
+                                COUNT(CASE WHEN ai_category IS NOT NULL THEN 1 END) as with_category
+                            FROM archives
+                            WHERE deleted = 0
+                        """)
+                        stats = cursor.fetchone()
+                        
+                        total = stats[0]
+                        with_summary = stats[1]
+                        with_tags = stats[2]
+                        with_category = stats[3]
+                        
+                        status_text += "📊 **使用统计：**\n"
+                        status_text += f"  • 总归档数：`{total}`\n"
+                        status_text += f"  • AI摘要：`{with_summary}` ({int(with_summary/total*100) if total > 0 else 0}%)\n"
+                        status_text += f"  • AI标签：`{with_tags}` ({int(with_tags/total*100) if total > 0 else 0}%)\n"
+                        status_text += f"  • AI分类：`{with_category}` ({int(with_category/total*100) if total > 0 else 0}%)\n\n"
+                    except Exception as e:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Failed to get AI usage stats: {e}")
+                        status_text += "📊 **使用统计：** 无法获取\n\n"
+                
+                # 对话会话信息
+                if chat_enabled:
+                    session_manager = context.bot_data.get('session_manager')
+                    if session_manager:
+                        user_id = context._user_id if hasattr(context, '_user_id') else None
+                        if user_id:
+                            session = session_manager.get_session(user_id)
+                            if session:
+                                status_text += "💬 **对话会话：**\n"
+                                status_text += f"  • 状态：活跃\n"
+                                status_text += f"  • 消息数：`{session.get('message_count', 0)}`\n"
+                                last_time = session.get('last_interaction')
+                                if last_time:
+                                    status_text += f"  • 最后交互：`{last_time}`\n"
+                            else:
+                                status_text += "💬 **对话会话：** 无活跃会话\n"
+                            status_text += "\n"
+                
+                # 缓存信息
+                ai_cache = context.bot_data.get('ai_cache')
+                if ai_cache:
+                    try:
+                        cache_stats = ai_cache.get_stats()
+                        status_text += "💾 **缓存统计：**\n"
+                        status_text += f"  • 缓存条目：`{cache_stats.get('total_entries', 0)}`\n"
+                        status_text += f"  • 命中率：`{cache_stats.get('hit_rate', 0):.1f}%`\n"
+                        status_text += f"  • 缓存大小：`{cache_stats.get('size_mb', 0):.2f} MB`\n"
+                    except Exception as e:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Failed to get cache stats: {e}")
+                
+            else:
+                status_text += "🔴 **服务：** 不可用\n\n"
+                status_text += "⚠️ AI服务连接失败，请检查配置\n"
+        else:
+            status_text += "❌ **状态：** 未启用\n\n"
+            status_text += "💡 **启用指南：**\n"
+            status_text += "1. 编辑 `config/config.yaml`\n"
+            status_text += "2. 设置 `ai.enabled: true`\n"
+            status_text += "3. 配置API密钥和提供商\n"
+            status_text += "4. 重启Bot\n"
+        
+        return status_text
+    
+    @staticmethod
+    def format_setting_category_menu(
+        category_key: str,
+        category_info: Dict[str, Any],
+        config_getter
+    ) -> tuple[str, Any]:
+        """
+        格式化配置分类菜单
+        
+        Args:
+            category_key: 分类键
+            category_info: 分类信息
+            config_getter: 获取配置值的函数
+            
+        Returns:
+            (格式化的消息文本, InlineKeyboardMarkup)
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        category_name = category_info['name']
+        category_icon = category_info['icon']
+        items = category_info['items']
+        
+        # 构建配置项列表
+        text = f"{category_icon} <b>{category_name}</b>\n\n"
+        text += "选择要配置的项目：\n\n"
+        
+        keyboard = []
+        for config_key, item_info in items.items():
+            item_name = item_info['name']
+            current_value = config_getter(config_key)
+            
+            # 格式化当前值显示
+            if item_info['type'] == 'bool':
+                value_display = "✅" if current_value else "❌"
+            else:
+                value_display = str(current_value) if current_value is not None else "未设置"
+            
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{item_name} [{value_display}]",
+                    callback_data=f"setting_item:{config_key}"
+                )
+            ])
+        
+        # 添加返回按钮
+        keyboard.append([
+            InlineKeyboardButton("⬅️ 返回", callback_data="setting_back")
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        return text, reply_markup
+    
+    @staticmethod
+    def format_setting_item_prompt(
+        item_info: Dict[str, Any],
+        config_key: str,
+        current_value: Any,
+        category_key: str
+    ) -> tuple[str, Any]:
+        """
+        格式化配置项输入提示
+        
+        Args:
+            item_info: 配置项信息
+            config_key: 配置键
+            current_value: 当前值
+            category_key: 所属分类键
+            
+        Returns:
+            (格式化的消息文本, InlineKeyboardMarkup或None)
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        item_name = item_info['name']
+        item_type = item_info['type']
+        description = item_info.get('description', '')
+        
+        # 构建提示消息
+        text = f"⚙️ <b>{item_name}</b>\n\n"
+        text += f"📝 {description}\n\n"
+        text += f"当前值：<code>{current_value}</code>\n\n"
+        
+        keyboard = []
+        
+        # 根据类型提供输入提示
+        if item_type == 'bool':
+            text += "请输入新值：\n"
+            text += "• true/false\n"
+            text += "• yes/no\n"
+            text += "• 1/0\n"
+            text += "• 开/关"
+            
+            # 对于布尔值，提供快捷按钮
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ 启用", callback_data=f"setting_set:{config_key}:true"),
+                    InlineKeyboardButton("❌ 禁用", callback_data=f"setting_set:{config_key}:false")
+                ],
+                [
+                    InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")
+                ]
+            ]
+        
+        elif item_type == 'int':
+            min_val = item_info.get('min')
+            max_val = item_info.get('max')
+            default_val = item_info.get('default')
+            
+            text += "请输入新值（整数）：\n"
+            if min_val is not None:
+                text += f"• 最小值：{min_val}\n"
+            if max_val is not None:
+                text += f"• 最大值：{max_val}\n"
+            if default_val is not None:
+                text += f"• 默认值：{default_val}\n"
+            
+            text += f"\n💡 直接回复数字即可"
+            
+            keyboard = [[
+                InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")
+            ]]
+        
+        elif item_type == 'string':
+            example = item_info.get('example', '')
+            
+            text += "请输入新值（文本）：\n"
+            if example:
+                text += f"• 示例：<code>{example}</code>\n"
+            
+            text += f"\n💡 直接回复文本即可"
+            
+            keyboard = [[
+                InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")
+            ]]
+        
+        elif item_type == 'choice':
+            choices = item_info.get('choices', [])
+            default_val = item_info.get('default')
+            
+            text += "请选择新值：\n"
+            for choice in choices:
+                text += f"• {choice}\n"
+            if default_val:
+                text += f"\n默认值：{default_val}\n"
+            
+            # 创建选择按钮
+            keyboard = []
+            for choice in choices:
+                keyboard.append([
+                    InlineKeyboardButton(
+                        choice,
+                        callback_data=f"setting_set:{config_key}:{choice}"
+                    )
+                ])
+            
+            keyboard.append([
+                InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")
+            ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+        
+        return text, reply_markup
+    
+    @staticmethod
+    def format_note_list_multi(
+        notes: List[Dict[str, Any]],
+        archive_id: int,
+        lang_ctx
+    ) -> tuple[str, Any]:
+        """
+        格式化多条笔记的简单列表（用于回调场景）
+        
+        Args:
+            notes: 笔记列表
+            archive_id: 归档ID
+            lang_ctx: 语言上下文
+            
+        Returns:
+            (格式化的消息文本, InlineKeyboardMarkup)
+        """
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        notes_text = f"📝 归档 #{archive_id} 的笔记 (共{len(notes)}条)\n\n"
+        
+        for idx, note in enumerate(notes, 1):
+            content = note['content']
+            notes_text += f"{idx}. {content}\n"
+            notes_text += f"   📅 {note['created_at']}\n\n"
+        
+        # 添加操作按钮：编辑笔记 | 删除笔记 | 分享笔记
+        keyboard = [[
+            InlineKeyboardButton("✏️ 编辑最新", callback_data=f"note_edit:{archive_id}:{notes[-1]['id']}"),
+            InlineKeyboardButton("🗑️ 删除最新", callback_data=f"note_delete:{notes[-1]['id']}")
+        ]]
+        keyboard.append([InlineKeyboardButton("📤 分享最新", callback_data=f"note_share:{archive_id}:{notes[-1]['id']}")])
+        keyboard.append([InlineKeyboardButton("✖️ 关闭", callback_data=f"note_close")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        return notes_text, reply_markup
+    
+    @staticmethod
+    def format_note_input_prompt(
+        archive_id: int,
+        prompt_type: str = 'add',
+        note_content: str = None
+    ) -> str:
+        """
+        格式化笔记输入提示
+        
+        Args:
+            archive_id: 归档ID
+            prompt_type: 提示类型 ('add', 'modify', 'append', 'edit_menu', 'quick_edit')
+            note_content: 笔记内容（用于modify和quick_edit类型）
+            
+        Returns:
+            格式化的提示文本
+        """
+        if prompt_type == 'add':
+            return f"📝 归档 #{archive_id} 还没有笔记\n\n💬 请回复此消息输入笔记内容"
+        elif prompt_type == 'modify':
+            return f"📝 当前笔记内容：\n\n{note_content}\n\n💡 请复制上方内容，修改后回复此消息发送"
+        elif prompt_type == 'append':
+            return "➕ 追加笔记内容\n\n请回复此消息输入要追加的内容"
+        elif prompt_type == 'edit_menu':
+            return f"📝 编辑归档 #{archive_id} 的笔记\n\n请选择操作："
+        elif prompt_type == 'quick_edit':
+            return f"📝 当前笔记内容：\n\n{note_content}\n\n💡 请发送新内容来替换此笔记"
+        else:
+            return f"📝 归档 #{archive_id}\n\n💬 请输入笔记内容"
+    
+    @staticmethod
+    def format_note_share(
+        note_content: str,
+        note_created_at: str,
+        archive_id: int,
+        archive_title: str = None
+    ) -> str:
+        """
+        格式化笔记分享文本
+        
+        Args:
+            note_content: 笔记内容
+            note_created_at: 笔记创建时间
+            archive_id: 归档ID
+            archive_title: 归档标题（可选）
+            
+        Returns:
+            格式化的分享文本
+        """
+        share_text = "📝 笔记分享\n\n"
+        
+        # 如果有存档标题，添加标题
+        if archive_title:
+            share_text += f"📌 {archive_title}\n\n"
+        
+        share_text += f"{note_content}\n\n"
+        share_text += f"---\n"
+        share_text += f"📅 {note_created_at}\n"
+        share_text += f"🔖 来自归档 #{archive_id}"
+        
+        return share_text
