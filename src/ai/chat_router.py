@@ -598,6 +598,7 @@ async def generate_response(
         # 非resource_reply策略，正常生成文本回复
         from ..utils.config import get_config
         from .knowledge_base import get_knowledge_base
+        from ..utils.message_formatters import format_ai_context_summary
         
         config = get_config()
         # 使用 config.get() 方法以支持环境变量（AI_API_KEY）
@@ -612,58 +613,17 @@ async def generate_response(
             knowledge_content = kb.get_knowledge()
             logger.info("System-related query detected, knowledge base included")
         
-        # 构建上下文
-        context_parts = []
-        
-        # 获取用户意图，判断是否需要显示统计数据
+        # 获取用户意图
         user_intent = plan.get('user_intent', 'general_query')
-        # 只在这些意图下显示统计数据
-        show_stats = user_intent in ['specific_search', 'stats_analysis', 'resource_request']
         
-        logger.info(f"🎯 Response generation: intent={user_intent}, show_stats={show_stats}, has_stats={bool(data_context.get('statistics'))}")
+        # 使用统一的格式化工具构建数据摘要
+        # 添加search_query到data_context（如果有搜索结果）
+        if data_context.get('search_results') and plan.get('need_data', {}).get('search_keywords'):
+            data_context['search_query'] = plan['need_data']['search_keywords']
         
-        if data_context.get('statistics') and show_stats:
-            stats = data_context['statistics']
-            if language == 'en':
-                context_parts.append(f"Statistics: {stats['total']} archives, {stats['tags']} tags, {stats['recent_week']} in last 7 days")
-            elif language == 'zh-TW':
-                context_parts.append(f"統計：共{stats['total']}條歸檔，{stats['tags']}個標籤，最近7天{stats['recent_week']}條")
-            else:
-                context_parts.append(f"统计：共{stats['total']}条归档，{stats['tags']}个标签，最近7天{stats['recent_week']}条")
+        data_summary = format_ai_context_summary(data_context, user_intent, language)
         
-        if data_context.get('search_results'):
-            results = data_context['search_results']
-            header = "Search results" if language == 'en' else ("搜尋結果" if language == 'zh-TW' else "搜索结果")
-            context_parts.append(f"\n{header}（{len(results)}）：")
-            for i, item in enumerate(results[:3], 1):
-                title = item.get('title', 'No title' if language == 'en' else '無標題' if language == 'zh-TW' else '无标题')[:40]
-                context_parts.append(f"{i}. {title}")
-        
-        if data_context.get('tag_analysis'):
-            tags = data_context['tag_analysis'][:10]
-            top_tags = ', '.join([f"#{t['tag']}({t['count']})" for t in tags[:5]])
-            header = "Popular tags" if language == 'en' else ("熱門標籤" if language == 'zh-TW' else "热门标签")
-            context_parts.append(f"\n{header}：{top_tags}")
-        
-        if data_context.get('sample_archives'):
-            samples = data_context['sample_archives'][:5]
-            header = "Recent archives" if language == 'en' else ("最近歸檔" if language == 'zh-TW' else "最近归档")
-            context_parts.append(f"\n{header}：")
-            for s in samples:
-                context_parts.append(f"• {s['title']}")
-        
-        # 最近24小时记录上下文（限制数量避免token消耗）
-        if data_context.get('recent_context'):
-            recent = data_context['recent_context'][:5]  # 最多5条，避免prompt过大
-            header = "Archives in last 24 hours" if language == 'en' else ("過去24小時歸檔" if language == 'zh-TW' else "过去24小时归档")
-            context_parts.append(f"\n{header}（{len(recent)}）：")
-            for r in recent:
-                title = r.get('title', '')[:40]  # 缩短标题长度
-                tags = ', '.join([f"#{t}" for t in r.get('tags', [])[:2]])  # 最多2个标签
-                context_parts.append(f"• {title} {tags}")
-        
-        no_data_text = "No relevant data" if language == 'en' else ("暫無相關數據" if language == 'zh-TW' else "暂无相关数据")
-        data_summary = '\n'.join(context_parts) if context_parts else no_data_text
+        logger.info(f"🎯 Response generation: intent={user_intent}, data_summary_length={len(data_summary)}")
         
         # 获取对话历史
         conversation_history = session_data.get('context', {}).get('history', [])

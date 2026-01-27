@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.message_formatters import format_stats_text
 
 logger = logging.getLogger(__name__)
 
@@ -42,21 +43,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         if os.path.exists(db_path):
             db_size = os.path.getsize(db_path)
         
-        # Format stats
-        total_archives = stats.get('total_archives', 0)
-        total_tags = stats.get('total_tags', 0)
-        total_size = format_file_size(stats.get('total_size', 0))
-        db_size_formatted = format_file_size(db_size)
-        last_archive = stats.get('last_archive', 'N/A')
-        
-        message = lang_ctx.t(
-            'stats',
-            total_archives=total_archives,
-            total_tags=total_tags,
-            storage_used=total_size,
-            db_size=db_size_formatted,
-            last_archive=last_archive
-        )
+        # Use unified formatter
+        message = format_stats_text(stats, language=lang_ctx.language, db_size=db_size)
         
         await update.message.reply_text(message)
         
