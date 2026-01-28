@@ -117,32 +117,28 @@ class ArchiveFormatter:
         content_type = archive_data.get('content_type', '')
         emoji = get_content_type_emoji(content_type)
         
-        success_msg = f"{emoji} {i18n.t('archive_success')}"
+        # ========== 顶部：成功状态 ==========
+        success_msg = f"✅ <b>{i18n.t('archive_success')}</b>"
         
         # ========== 标题：带存储位置跳转链接 ==========
-        # 优先级：AI生成标题 > 内容截断(32字符，第一段) > 原标题 > 类型名
+        # 优先级：AI生成标题 > 内容截断(45字符，第一段) > 原标题 > 类型名
         title_text = None
-        ai_title = archive_data.get('ai_title')  # 优先使用AI标题
+        ai_title = archive_data.get('ai_title')
         content = archive_data.get('content', '')
         caption = archive_data.get('caption', '')
         original_title = archive_data.get('title', '')
         
-        # 判断是否有任何可用内容
-        has_content = bool(ai_title or content or caption)
-        
         if ai_title:
             title_text = ai_title
         elif content or caption:
-            # 使用内容或caption的第一段落，截断32字符
+            # 使用内容或caption的第一段落，截断45字符
             text_source = content or caption
-            # 提取第一自然段（以换行符分割）
             first_para = text_source.split('\n')[0].strip()
-            if len(first_para) > 32:
-                title_text = first_para[:32] + '...'
+            if len(first_para) > 45:
+                title_text = first_para[:45] + '...'
             else:
-                title_text = first_para if first_para else text_source[:32]
+                title_text = first_para if first_para else text_source[:45]
         elif original_title:
-            # 如果没有AI/content/caption，使用原标题
             title_text = original_title
         else:
             # 最后才使用类型名
@@ -154,59 +150,67 @@ class ArchiveFormatter:
         # 构建存储位置链接
         storage_path = archive_data.get('storage_path')
         if storage_path and isinstance(storage_path, str) and ':' in storage_path:
-            # 解析 storage_path: "channel_id:message_id" 或 "channel_id:message_id:file_id"
             parts = storage_path.split(':')
             if len(parts) >= 2:
                 channel_id_str = parts[0].replace('-100', '')
                 message_id = parts[1]
                 storage_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                title_display = f'<a href="{storage_link}">{title_text}</a>'
+                title_display = f'📄 <a href="{storage_link}">{title_text}</a>'
             else:
-                title_display = title_text
+                title_display = f'{emoji} {title_text}'
         else:
-            title_display = title_text
+            title_display = f'{emoji} {title_text}'
         
-        success_msg += f"\n\n<b>{i18n.t('title')}</b>: {title_display}"
+        success_msg += f"\n\n{title_display}"
         
-        # ========== 内容类型 ==========
+        # ========== 基本信息区（紧凑显示） ==========
+        info_parts = []
+        
+        # 内容类型 + 文件大小（同一行）
         if content_type:
             content_type_key = f'content_type_{content_type}'
             content_type_display = i18n.t(content_type_key)
             if content_type_display == content_type_key:
                 content_type_display = content_type
-            success_msg += f"\n<b>{i18n.t('content_type')}</b>: {content_type_display}"
+            info_parts.append(f"📋 {content_type_display}")
         
-        # ========== 文件大小 ==========
         file_size = archive_data.get('file_size')
         if file_size and file_size > 0:
-            success_msg += f"\n<b>{i18n.t('file_size')}</b>: {format_file_size(file_size)}"
+            info_parts.append(f"💾 {format_file_size(file_size)}")
         
-        # ========== 标签 ==========
+        if info_parts:
+            success_msg += f"\n<code>{' · '.join(info_parts)}</code>"
+        
+        # ========== 标签（换行独立显示） ==========
         tags = archive_data.get('tags', [])
         if tags:
-            tags_str = ' '.join(f"#{tag}" for tag in tags[:5])
-            if len(tags) > 5:
-                tags_str += f" +{len(tags) - 5}"
-            success_msg += f"\n<b>{i18n.t('tags')}</b>: {tags_str}"
+            tags_str = ' '.join(f"#{tag}" for tag in tags[:6])
+            if len(tags) > 6:
+                tags_str += f" <i>+{len(tags) - 6}</i>"
+            success_msg += f"\n🏷 {tags_str}"
         
-        # ========== 存储：显示频道名称 ==========
-        storage_path = archive_data.get('storage_path')
+        # ========== 存储位置（简化显示） ==========
         if storage_path:
-            # 获取频道名称（优先从Bot API，其次从config查找）
             channel_name = await _get_channel_name_from_path(storage_path, bot)
             if channel_name:
-                success_msg += f"\n<b>{i18n.t('storage')}</b>: {channel_name}"
-            else:
-                # 如果获取失败，显示存储类型
-                storage_type = archive_data.get('storage_type', 'telegram')
-                success_msg += f"\n<b>{i18n.t('storage')}</b>: {storage_type}"
+                success_msg += f"\n📁 {channel_name}"
         
-        # ========== 来源 ==========
+        # ========== 来源信息（简化显示） ==========
         source = archive_data.get('source')
         if source:
-            success_msg += f"\n<b>{i18n.t('source')}</b>: {source}"
+            # 简化来源信息显示（只显示主要部分）
+            if '转发自:' in source or 'Forwarded from:' in source:
+                # 提取频道名称（去掉多余信息）
+                source_parts = source.split('|')
+                if len(source_parts) > 0:
+                    main_source = source_parts[0].strip()
+                    # 去掉"转发自:"前缀
+                    main_source = main_source.replace('转发自:', '').replace('Forwarded from:', '').strip()
+                    success_msg += f"\n🔗 <i>{main_source}</i>"
+            else:
+                success_msg += f"\n🔗 <i>{source}</i>"
         
-        # ========== AI分析信息 ==========
+        # ========== AI分析信息（分隔显示） ==========
         if include_ai_info:
             ai_summary = archive_data.get('ai_summary')
             ai_category = archive_data.get('ai_category')
@@ -214,20 +218,21 @@ class ArchiveFormatter:
             
             logger.debug(f"AI info check: include={include_ai_info}, summary={bool(ai_summary)}, category={bool(ai_category)}, points={len(ai_key_points)}")
             
-            if ai_summary or ai_category:
-                success_msg += f"\n\n{i18n.t('ai_analysis')}"
+            if ai_summary or ai_category or ai_key_points:
+                success_msg += f"\n\n{'─' * 25}"
+                success_msg += f"\n🤖 <b>{i18n.t('ai_analysis')}</b>"
                 
                 if ai_category:
-                    success_msg += f"\n{i18n.t('ai_category')}：{ai_category}"
+                    success_msg += f"\n📚 {ai_category}"
                 
                 if ai_summary:
-                    summary_text = truncate_text(ai_summary, 200)
-                    success_msg += f"\n{i18n.t('ai_summary')} {summary_text}"
+                    summary_text = truncate_text(ai_summary, 180)
+                    success_msg += f"\n\n💭 {summary_text}"
                 
                 if ai_key_points:
-                    success_msg += f"\n{i18n.t('ai_key_points')}："
+                    success_msg += f"\n\n⭐️ <b>{i18n.t('ai_key_points')}</b>"
                     for i, point in enumerate(ai_key_points[:3], 1):
-                        success_msg += f"\n  {i}. {point}"
+                        success_msg += f"\n  • {point}"
         
         return success_msg
     
