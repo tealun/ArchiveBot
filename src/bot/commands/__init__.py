@@ -14,6 +14,7 @@ from .export import export_command
 from .backup import backup_command
 from .review import review_command
 from .setting import setting_command
+from .rand import rand_command
 
 __all__ = [
     'start_command',
@@ -31,4 +32,5 @@ __all__ = [
     'backup_command',
     'review_command',
     'setting_command',
+    'rand_command',
 ]

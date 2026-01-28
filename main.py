@@ -262,6 +262,7 @@ def main():
         application.add_handler(CommandHandler("export", owner_only(commands.export_command)))
         application.add_handler(CommandHandler("backup", owner_only(commands.backup_command)))
         application.add_handler(CommandHandler("review", owner_only(commands.review_command)))
+        application.add_handler(CommandHandler(["rand", "r"], owner_only(commands.rand_command)))
         
         # Register callback handlers (统一处理)
         application.add_handler(CallbackQueryHandler(

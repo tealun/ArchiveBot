@@ -138,6 +138,20 @@ CONFIG_CATEGORIES = {
                 'default': 'INFO'
             }
         }
+    },
+    'review': {
+        'name': '回顾设置',
+        'icon': '🎲',
+        'items': {
+            'review.random_count': {
+                'name': '随机回顾数量',
+                'type': 'int',
+                'description': '随机回顾命令默认返回的存档数量',
+                'min': 1,
+                'max': 10,
+                'default': 3
+            }
+        }
     }
 }
 
