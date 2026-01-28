@@ -86,12 +86,27 @@ async def rand_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
             await update.message.reply_text(header)
             
             for archive in archives:
-                # 发送资源或详情
-                await MessageBuilder.send_archive_resource(
+                # 尝试发送资源
+                result = await MessageBuilder.send_archive_resource(
                     context.bot,
                     update.effective_chat.id,
                     archive
                 )
+                
+                # 如果无法发送资源（database/reference类型或发送失败），发送文本详情
+                if not result:
+                    notes = db_storage.get_notes_by_archive(archive['id'])
+                    text, reply_markup = MessageBuilder.format_text_archive_reply(
+                        archive,
+                        notes,
+                        db_instance=db_storage.db
+                    )
+                    await update.message.reply_text(
+                        text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=reply_markup,
+                        disable_web_page_preview=True
+                    )
         else:
             # 3条以上：发送列表
             header = f"🎲 随机回顾（{len(archives)}/{len(all_ids)} 条）\n\n"
