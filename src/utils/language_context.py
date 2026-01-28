@@ -48,27 +48,58 @@ class LanguageContext:
             self._language = config.language
     
     def _load_user_language(self, context: ContextTypes.DEFAULT_TYPE) -> Optional[str]:
-        """Load user's language preference from storage"""
+        """Load user's language preference from storage (database first, then user_data)"""
         try:
+            # Priority 1: Load from database for persistence
             db_storage = context.bot_data.get('db_storage')
             if db_storage and db_storage.db:
-                # Check if user language is stored in database
-                # For now, use user_data as fallback
-                return context.user_data.get('language')
+                try:
+                    cursor = db_storage.db.conn.cursor()
+                    cursor.execute("""
+                        SELECT value FROM config WHERE key = 'user_language'
+                    """)
+                    row = cursor.fetchone()
+                    if row:
+                        lang = row[0]
+                        # Cache in user_data for quick access
+                        context.user_data['language'] = lang
+                        logger.debug(f"Loaded user language from database: {lang}")
+                        return lang
+                except Exception as e:
+                    logger.debug(f"Failed to load from database: {e}")
+            
+            # Priority 2: Fallback to user_data (for current session)
+            lang = context.user_data.get('language')
+            if lang:
+                logger.debug(f"Loaded user language from user_data: {lang}")
+                return lang
+                
         except Exception as e:
             logger.debug(f"Failed to load user language: {e}")
         return None
     
     def _save_user_language(self, context: ContextTypes.DEFAULT_TYPE):
-        """Save user's language preference to storage"""
+        """Save user's language preference to storage (both database and user_data)"""
         try:
-            # Store in user_data for quick access
+            # Save to user_data for quick access (session cache)
             context.user_data['language'] = self._language
             
-            # TODO: Optionally save to database for persistence
-            # db_storage = context.bot_data.get('db_storage')
-            # if db_storage and db_storage.db:
-            #     db_storage.db.set_user_language(self.user_id, self._language)
+            # Save to database for persistence across bot restarts
+            db_storage = context.bot_data.get('db_storage')
+            if db_storage and db_storage.db:
+                try:
+                    cursor = db_storage.db.conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO config (key, value, description, updated_at)
+                        VALUES ('user_language', ?, 'User language preference', datetime('now'))
+                        ON CONFLICT(key) DO UPDATE SET
+                            value = excluded.value,
+                            updated_at = excluded.updated_at
+                    """, (self._language,))
+                    db_storage.db.conn.commit()
+                    logger.info(f"Saved user language to database: {self._language}")
+                except Exception as e:
+                    logger.warning(f"Failed to save language to database: {e}")
         except Exception as e:
             logger.warning(f"Failed to save user language: {e}")
     
@@ -84,7 +115,7 @@ class LanguageContext:
         from .i18n import I18n
         mapped_lang = I18n.LANGUAGE_CODE_MAPPING.get(lang, lang)
         
-        if mapped_lang in ['zh-CN', 'en', 'zh-TW']:
+        if mapped_lang in ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es']:
             self._language = mapped_lang
             self._i18n = None  # Reset i18n instance
             if self._context:
@@ -123,7 +154,10 @@ class LanguageContext:
         language_hints = {
             'zh-CN': '请用简体中文回复',
             'zh-TW': '請用繁體中文回覆',
-            'en': 'Please reply in English'
+            'en': 'Please reply in English',
+            'ja': '日本語で返信してください',
+            'ko': '한국어로 답변해 주세요',
+            'es': 'Por favor responde en español'
         }
         return language_hints.get(self._language, language_hints['zh-CN'])
     

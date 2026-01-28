@@ -443,6 +443,12 @@ class Database:
             except sqlite3.OperationalError:
                 pass
             
+            # Initialize default user language preference if not exists
+            cursor.execute("""
+                INSERT OR IGNORE INTO config (key, value, description, updated_at)
+                VALUES ('user_language', 'zh-CN', 'User language preference', datetime('now'))
+            """)
+            
             self.conn.commit()
             logger.info("Database tables initialized successfully")
             
