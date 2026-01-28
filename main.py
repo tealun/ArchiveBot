@@ -205,7 +205,7 @@ def main():
         storage_manager = StorageManager(db_storage, tag_manager, telegram_storage)
         search_engine = SearchEngine(db_storage)
         trash_manager = TrashManager(db)
-        export_manager = ExportManager(db, note_manager)
+        export_manager = ExportManager(db, note_manager, tag_manager)
         review_manager = ReviewManager(db_storage, tag_manager)
         
         # Initialize AI data cache for efficient data gathering (传入config以支持排除过滤)

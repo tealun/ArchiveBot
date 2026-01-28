@@ -63,6 +63,7 @@ from .favorite import (
 
 # Backup callbacks
 from .backup import (
+    handle_backup_create_now_callback,
     handle_backup_keep_callback,
     handle_backup_delete_all_callback
 )
@@ -118,6 +119,7 @@ __all__ = [
     'handle_favorite_callback',
     'handle_forward_callback',
     # Backup
+    'handle_backup_create_now_callback',
     'handle_backup_keep_callback',
     'handle_backup_delete_all_callback',
     # Setting

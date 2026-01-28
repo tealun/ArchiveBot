@@ -22,16 +22,18 @@ class ExportManager:
     Supports Markdown, JSON, and CSV formats
     """
     
-    def __init__(self, db, note_manager):
+    def __init__(self, db, note_manager, tag_manager=None):
         """
         Initialize export manager
         
         Args:
             db: Database instance
             note_manager: NoteManager instance
+            tag_manager: TagManager instance (optional)
         """
         self.db = db
         self.note_manager = note_manager
+        self.tag_manager = tag_manager
         logger.info("ExportManager initialized")
     
     def export_to_json(self, include_deleted: bool = False) -> str:

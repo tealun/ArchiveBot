@@ -300,7 +300,7 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
             if ai_summarizer and ai_summarizer.is_available():
                 try:
                     # 获取用户语言设置
-                    from ..utils.config import get_config
+                    from ...utils.config import get_config
                     config = get_config()
                     user_language = user_data.get('language', config.get('bot.language', 'zh-CN'))
                     
@@ -344,7 +344,7 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
             telegram_storage = context.bot_data.get('telegram_storage')
             if telegram_storage:
                 try:
-                    from ..utils.config import get_config
+                    from ...utils.config import get_config
                     config = get_config()
                     
                     # 获取笔记频道ID：NOTE -> TEXT -> default
@@ -432,14 +432,15 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
             
             result_parts.append(f"🔚 {reason_text}")
             
-            # 构建编辑/追加/删除按钮
+            # 构建编辑/追加/转发/删除按钮
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [
-                    InlineKeyboardButton("✏️ 编辑", callback_data=f"note_quick_edit:{note_id}"),
                     InlineKeyboardButton("➕ 追加", callback_data=f"note_quick_append:{note_id}"),
+                    InlineKeyboardButton("✏️ 编辑", callback_data=f"note_quick_edit:{note_id}"),
                 ],
                 [
+                    InlineKeyboardButton("📤 转发", callback_data=f"note_share:{note_id}"),
                     InlineKeyboardButton("🗑️ 删除", callback_data=f"note_quick_delete:{note_id}")
                 ]
             ]

@@ -46,7 +46,7 @@ class NoteFormatter:
             archive_id = note.get('archive_id')
             title = note.get('title', '')
             
-            result_text += "\n━━━━━━━━━━━━━━━━━━━━\n\n"
+            result_text += "\n" + "="*40 + "\n\n"
             
             if title:
                 result_text += f"📝 <b>笔记 #{note_id}</b> - {title}\n"
@@ -80,12 +80,12 @@ class NoteFormatter:
             
             keyboard.append([
                 InlineKeyboardButton(
-                    f"{idx}. 查看完整内容",
+                    f"{idx}. 查看笔记 #{note_id} 详情",
                     callback_data=f"note_view:{note_id}"
                 )
             ])
         
-        result_text += "\n━━━━━━━━━━━━━━━━━━━━\n"
+        result_text += "\n" + "="*40 + "\n"
         result_text += f"\n📊 共 {len(notes)} 条笔记"
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -112,51 +112,37 @@ class NoteFormatter:
         created_at = note.get('created_at', '')
         archive_id = note.get('archive_id')
         
-        storage_path = note.get('storage_path', '')
-        note_link = ''
-        
-        if storage_path:
-            parts = storage_path.split(':')
-            if len(parts) >= 2:
-                channel_id_str = parts[0].replace('-100', '')
-                message_id = parts[1]
-                link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                note_link = f"<a href='{link}'>#{note_id}</a>"
-            else:
-                note_link = f"#{note_id}"
-        else:
-            note_link = f"#{note_id}"
-        
+        # 构建标题
         if note_title:
-            text = f"📝 [笔记 {note_link}] {note_title}\n"
-            text += "----------------------------------\n"
-            text += f"{note_content}\n"
-            text += "----------------------------------\n"
-            text += f"📅 {created_at}"
+            title_line = f"📝 [{note_title}]"
         else:
-            text = f"📝 [笔记 {note_link}]\n"
-            text += "----------------------------------\n"
-            text += f"{note_content}\n"
-            text += "----------------------------------\n"
-            text += f"📅 {created_at}"
+            title_line = f"📝 [笔记 #{note_id} 详情]"
         
+        # 构建消息
+        text = f"{title_line}\n"
+        text += "-" * 51 + "\n"
+        text += f"📎 id：#{note_id} 📅 创建时间：{created_at}\n\n"
+        text += f"{note_content}\n"
+        text += "-" * 51
+        
+        # 构建按钮
         keyboard = []
         if archive_id:
             keyboard.append([
                 InlineKeyboardButton("✏️ 编辑", callback_data=f"note_edit:{archive_id}:{note_id}"),
-                InlineKeyboardButton("➕ 追加", callback_data=f"note_append:{archive_id}:{note_id}")
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_delete:{note_id}")
             ])
             keyboard.append([
                 InlineKeyboardButton("📤 分享", callback_data=f"note_share:{archive_id}:{note_id}"),
-                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_delete:{note_id}")
+                InlineKeyboardButton("❌ 关闭", callback_data=f"note_close")
             ])
         else:
             keyboard.append([
                 InlineKeyboardButton("✏️ 编辑", callback_data=f"note_quick_edit:{note_id}"),
-                InlineKeyboardButton("➕ 追加", callback_data=f"note_quick_append:{note_id}")
+                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_quick_delete:{note_id}")
             ])
             keyboard.append([
-                InlineKeyboardButton("🗑️ 删除", callback_data=f"note_quick_delete:{note_id}")
+                InlineKeyboardButton("❌ 关闭", callback_data=f"note_close")
             ])
         
         reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None

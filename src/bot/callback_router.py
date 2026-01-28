@@ -52,6 +52,7 @@ from .callbacks import (
     handle_favorite_callback,
     handle_forward_callback,
     # Backup
+    handle_backup_create_now_callback,
     handle_backup_keep_callback,
     handle_backup_delete_all_callback,
     # Setting
@@ -153,6 +154,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_favorite_callback(update, context)
         elif callback_data.startswith('forward:'):
             await handle_forward_callback(update, context)
+        elif callback_data == 'backup_create_now':
+            await handle_backup_create_now_callback(update, context)
         elif callback_data.startswith('backup_keep:'):
             await handle_backup_keep_callback(update, context)
         elif callback_data == 'backup_delete_all':

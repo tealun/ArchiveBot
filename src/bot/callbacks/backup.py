@@ -14,6 +14,90 @@ logger = logging.getLogger(__name__)
 
 
 @with_language_context
+async def handle_backup_create_now_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle backup create now button click - 立即创建备份
+    
+    Callback data format: backup_create_now
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        lang_ctx: Language context
+    """
+    query = update.callback_query
+    
+    try:
+        backup_manager = context.bot_data.get('backup_manager')
+        
+        if not backup_manager:
+            await query.answer(lang_ctx.t('backup_manager_not_initialized'), show_alert=True)
+            return
+        
+        await query.answer("⏳ 正在创建备份...")
+        
+        # 创建备份
+        result = backup_manager.create_backup(description="手动备份")
+        
+        if result:
+            await query.answer(f"✅ 备份创建成功：{result}", show_alert=True)
+            
+            # 刷新备份列表
+            backups = backup_manager.list_backups()
+            lines = [lang_ctx.t('backup_list_header', count=len(backups))]
+            for b in backups[:10]:
+                lines.append(lang_ctx.t(
+                    'backup_list_item',
+                    filename=b.get('filename'),
+                    created_at=b.get('created_at'),
+                    size=b.get('size'),
+                    description=b.get('description', '')
+                ))
+            if len(backups) > 10:
+                lines.append(lang_ctx.t('backup_list_more', count=len(backups) - 10))
+            
+            # 重建按钮
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "🆕 立即备份",
+                        callback_data="backup_create_now"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "💾 保留1份",
+                        callback_data="backup_keep:1"
+                    ),
+                    InlineKeyboardButton(
+                        "💾 保留3份",
+                        callback_data="backup_keep:3"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "🗑️ 全部删除",
+                        callback_data="backup_delete_all"
+                    )
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                '\n'.join(lines),
+                reply_markup=reply_markup
+            )
+            
+            logger.info(f"Manual backup created: {result}")
+        else:
+            await query.answer(lang_ctx.t('backup_create_failed'), show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"Error creating backup: {e}", exc_info=True)
+        await query.answer(f"错误: {str(e)}", show_alert=True)
+
+
+@with_language_context
 async def handle_backup_keep_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle backup keep button click - 保留指定数量的备份
@@ -62,6 +146,12 @@ async def handle_backup_keep_callback(update: Update, context: ContextTypes.DEFA
         # 重建按钮
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         keyboard = [
+            [
+                InlineKeyboardButton(
+                    "🆕 立即备份",
+                    callback_data="backup_create_now"
+                )
+            ],
             [
                 InlineKeyboardButton(
                     "💾 保留1份",

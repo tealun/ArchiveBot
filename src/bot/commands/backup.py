@@ -64,6 +64,12 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
             keyboard = [
                 [
                     InlineKeyboardButton(
+                        "🆕 立即备份",
+                        callback_data="backup_create_now"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
                         "💾 保留1份",
                         callback_data="backup_keep:1"
                     ),

@@ -189,23 +189,31 @@ class Config:
         
         return value
     
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any) -> bool:
         """
         Set configuration value by dot-separated key path
         
         Args:
             key: Dot-separated key path
             value: Value to set
+            
+        Returns:
+            True if successful, False otherwise
         """
-        keys = key.split('.')
-        config = self._config
-        
-        for k in keys[:-1]:
-            if k not in config:
-                config[k] = {}
-            config = config[k]
-        
-        config[keys[-1]] = value
+        try:
+            keys = key.split('.')
+            config = self._config
+            
+            for k in keys[:-1]:
+                if k not in config:
+                    config[k] = {}
+                config = config[k]
+            
+            config[keys[-1]] = value
+            return True
+        except Exception as e:
+            logger.error(f"Error setting config key {key}: {e}")
+            return False
     
     def save(self) -> None:
         """Save configuration to YAML file"""

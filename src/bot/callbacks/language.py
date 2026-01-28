@@ -32,9 +32,14 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
         if callback_data.startswith('lang_'):
             language = callback_data[5:]  # Remove 'lang_' prefix
             
-            # Set language via config and update context
-            config = get_config()
-            if config.set('bot.language', language):
+            # Set language via i18n first (validate language)
+            from ...utils.i18n import get_i18n
+            i18n = get_i18n()
+            
+            if i18n.set_language(language):
+                # Update config
+                config = get_config()
+                config.set('bot.language', language)
                 config.save()
                 # Update current language context
                 lang_ctx.set_language(language)
