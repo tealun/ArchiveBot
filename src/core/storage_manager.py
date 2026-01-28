@@ -198,7 +198,10 @@ class StorageManager:
                 # Success message (使用MessageBuilder统一构建)
                 from ..utils.message_builder import MessageBuilder
                 
-                success_msg = MessageBuilder.build_archive_success_message(
+                # 获取bot实例（从 telegram_storage 中获取）
+                bot = self.telegram_storage.bot if self.telegram_storage else None
+                
+                success_msg = await MessageBuilder.build_archive_success_message(
                     archive_data={
                         'title': analysis.get('title'),
                         'content': analysis.get('content'),
@@ -216,7 +219,8 @@ class StorageManager:
                         'ai_key_points': analysis.get('ai_key_points', [])
                     },
                     i18n=self.i18n,
-                    include_ai_info=True
+                    include_ai_info=True,
+                    bot=bot
                 )
                 
                 results.append((True, success_msg, archive_id))
@@ -343,7 +347,10 @@ class StorageManager:
             # Format success message (使用MessageBuilder统一构建)
             from ..utils.message_builder import MessageBuilder
             
-            success_msg = MessageBuilder.build_archive_success_message(
+            # 获取bot实例（从 telegram_storage 中获取）
+            bot = self.telegram_storage.bot if self.telegram_storage else None
+            
+            success_msg = await MessageBuilder.build_archive_success_message(
                 archive_data={
                     'title': analysis.get('title'),
                     'content': analysis.get('content'),
@@ -361,7 +368,8 @@ class StorageManager:
                     'ai_key_points': analysis.get('ai_key_points', [])
                 },
                 i18n=self.i18n,
-                include_ai_info=True
+                include_ai_info=True,
+                bot=bot
             )
             
             logger.info(f"Successfully archived content: archive_id={archive_id}")

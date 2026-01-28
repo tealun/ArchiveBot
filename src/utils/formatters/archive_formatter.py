@@ -15,12 +15,13 @@ from ..config import get_config
 logger = logging.getLogger(__name__)
 
 
-def _get_channel_name_from_path(storage_path: str) -> Optional[str]:
+async def _get_channel_name_from_path(storage_path: str, bot: Optional[Any] = None) -> Optional[str]:
     """
     从storage_path提取频道ID并查找频道名称
     
     Args:
         storage_path: 格式如 "channel_id:message_id" 或 "channel_id:message_id:file_id"
+        bot: Telegram Bot实例（可选）
         
     Returns:
         频道名称或None
@@ -29,15 +30,23 @@ def _get_channel_name_from_path(storage_path: str) -> Optional[str]:
         return None
     
     try:
-        from ..config import get_config
-        config = get_config()
-        
         # 解析channel_id
         parts = storage_path.split(':')
         channel_id = int(parts[0])
         
-        # 定义频道ID到名称的映射（从config读取）
-        # 优先级：type_mapping > channels配置
+        # 尝试从Telegram Bot API获取频道信息
+        if bot:
+            try:
+                chat = await bot.get_chat(channel_id)
+                if chat.title:
+                    return chat.title
+            except Exception as e:
+                logger.debug(f"Failed to get chat info from Bot API: {e}")
+        
+        # 如果Bot API获取失败，从config读取映射
+        from ..config import get_config
+        config = get_config()
+        
         channels_config = config.get('storage.telegram.channels', {})
         type_mapping = config.get('storage.telegram.type_mapping', {})
         source_mapping = config.get('storage.telegram.source_mapping', [])
@@ -75,8 +84,8 @@ def _get_channel_name_from_path(storage_path: str) -> Optional[str]:
         if channel_name:
             return channel_name
         
-        # 如果没找到，返回ID
-        return f"频道 {channel_id}"
+        # 如果没找到，返回None让调用方处理
+        return None
         
     except Exception as e:
         logger.debug(f"Error getting channel name: {e}")
@@ -87,10 +96,11 @@ class ArchiveFormatter:
     """归档格式化器 - 处理归档相关的消息格式化"""
     
     @staticmethod
-    def build_success_message(
+    async def build_success_message(
         archive_data: Dict[str, Any],
         i18n,
-        include_ai_info: bool = True
+        include_ai_info: bool = True,
+        bot: Optional[Any] = None
     ) -> str:
         """
         构建归档成功消息
@@ -99,6 +109,7 @@ class ArchiveFormatter:
             archive_data: 归档数据
             i18n: 国际化对象
             include_ai_info: 是否包含AI分析信息
+            bot: Telegram Bot实例（用于获取频道名称）
             
         Returns:
             格式化的HTML消息文本
@@ -181,10 +192,14 @@ class ArchiveFormatter:
         # ========== 存储：显示频道名称 ==========
         storage_path = archive_data.get('storage_path')
         if storage_path:
-            # 获取频道名称（从config中查找）
-            channel_name = _get_channel_name_from_path(storage_path)
+            # 获取频道名称（优先从Bot API，其次从config查找）
+            channel_name = await _get_channel_name_from_path(storage_path, bot)
             if channel_name:
                 success_msg += f"\n<b>{i18n.t('storage')}</b>: {channel_name}"
+            else:
+                # 如果获取失败，显示存储类型
+                storage_type = archive_data.get('storage_type', 'telegram')
+                success_msg += f"\n<b>{i18n.t('storage')}</b>: {storage_type}"
         
         # ========== 来源 ==========
         source = archive_data.get('source')

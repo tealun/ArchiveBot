@@ -16,9 +16,9 @@ features:
   enable_ocr: false  # Habilitar reconocimiento OCR de imágenes
 
 ai:
-  enabled: false  # Habilitar funcionalidad de IA
-  auto_summarize: false  # Resumir automáticamente nuevo contenido archivado
-  auto_generate_tags: false  # Generar automáticamente etiquetas de IA
+  enabled: true  # Habilitar funcionalidad de IA
+  auto_summarize: true  # Resumir automáticamente nuevo contenido archivado
+  auto_generate_tags: true  # Generar automáticamente etiquetas de IA
   auto_generate_title: true  # Generar automáticamente título de IA para notas (15-20 caracteres)
   max_generated_tags: 8  # Número máximo de etiquetas generadas automáticamente por IA (5-10 es óptimo, por defecto 8)
 
@@ -39,7 +39,7 @@ ai:
   cache_path: "data/ai_cache.db" # Ruta de la base de datos de caché (sqlite)
   cache_ttl_seconds: 604800      # Período de validez de caché (segundos), por defecto 7 días
   rate_limit_per_minute: 60      # Límite global de llamadas a la API por minuto
-  log_calls: false               # Registrar detalles de llamadas de IA (evitar registrar respuestas completas en producción)
+  log_calls: true                # Registrar detalles de llamadas de IA (útil para depuración, puede establecerse en false en producción)
   retry_on_failure: 1            # Número de reintentos en errores temporales
   auto_summary_on_forward: true  # Activar resumen automáticamente al reenviar mensaje (nivel de procesador)
   auto_tagging: true             # Aplicar etiquetas generadas por IA (establecer en false para generar solo sugerencias)
@@ -107,15 +107,34 @@ storage:
       contact: default     # Contacto → Canal por defecto
       location: default    # Ubicación → Canal por defecto
     
-    # Configuración de mapeo de fuente a canal (prioridad más alta que mapeo de tipo)
-    # Especificar canal de almacenamiento según la fuente de reenvío (nombre o ID de canal/grupo)
-    # Múltiples fuentes pueden mapearse al mismo canal, pero una fuente no puede mapearse a múltiples canales
+    # Configuración de mapeo de fuente a canal (prioridad más alta que el mapeo de tipo)
+    # Enrutar mensajes según la fuente de reenvío (canal/grupo/usuario)
+    # 
+    # Tipos de fuente soportados:
+    # 1. Canal: Coincidir por nombre o ID, ej: 'Canal Técnico' o -1001234567890 o 1234567890
+    # 2. Grupo/Supergrupo: Coincidir por nombre o ID, ej: 'Grupo Dev' o -1009876543210 o 9876543210
+    # 3. Usuario Personal: Coincidir solo por nombre (@username o nombre visible), ej: 'JohnDoe' o '@JohnDoe'
+    # 4. Bot: Coincidir solo por nombre (@username), ej: 'MyBot' o '@MyBot'
+    # 5. Usuario Oculto: Coincidir por nombre visible, ej: 'Deleted Account'
+    #
+    # Notas sobre formato de ID:
+    # - Puede usar ID completo (-1001234567890) o ID simplificado sin prefijo -100 (1234567890)
+    # - El sistema maneja automáticamente el prefijo -100, no necesita preocuparse por el formato
+    # - Los IDs copiados del cliente de Telegram usualmente no tienen el prefijo -100, puede usarlos directamente
+    #
+    # Notas:
+    # - Múltiples fuentes pueden mapear al mismo canal
+    # - Una fuente no puede mapear a múltiples canales (gana la primera coincidencia)
+    # - Los IDs de usuario no son soportados para coincidencia (IDs de usuario normales son números positivos)
+    # - La coincidencia de nombres distingue mayúsculas; se recomienda usar IDs para evitar cambios de nombre
     source_mapping:
-      # Ejemplo:
-      # - sources: ['Canal Técnico', 'Grupo Desarrollo', -1001234567890]  # Soporta nombre o ID
-      #   channel_id: -1001111111111  # Canal de almacenamiento de destino
-      # - sources: ['Vida Cotidiana']
+      # Ejemplos:
+      # - sources: ['Canal Técnico', 'Grupo Dev', 1234567890]  # Nombre o ID (sin -100 está bien)
+      #   channel_id: -1001111111111  # Canal de almacenamiento destino (ID completo recomendado)
+      # - sources: ['Vida Diaria', -1009876543210, 'JohnDoe']  # Mixto: nombre + ID completo + nombre de usuario
       #   channel_id: -1002222222222
+      # - sources: ['MyBot', '@NewsBot']  # Bot: con o sin prefijo @
+      #   channel_id: -1003333333333
     
     # Configuración de mapeo de etiqueta a canal (prioridad más alta)
     # Especificar canal de almacenamiento según etiquetas del mensaje

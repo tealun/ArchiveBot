@@ -28,13 +28,14 @@ class MessageBuilder:
     # ========== 归档相关方法（委托给 ArchiveFormatter）==========
     
     @staticmethod
-    def build_archive_success_message(
+    async def build_archive_success_message(
         archive_data: Dict[str, Any],
         i18n,
-        include_ai_info: bool = True
+        include_ai_info: bool = True,
+        bot: Optional[Any] = None
     ) -> str:
         """构建归档成功消息"""
-        return ArchiveFormatter.build_success_message(archive_data, i18n, include_ai_info)
+        return await ArchiveFormatter.build_success_message(archive_data, i18n, include_ai_info, bot)
     
     @staticmethod
     def format_archive_list(

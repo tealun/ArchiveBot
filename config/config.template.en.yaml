@@ -36,7 +36,7 @@ ai:
   cache_path: "data/ai_cache.db" # Path to cache DB (sqlite)
   cache_ttl_seconds: 604800      # Cache TTL in seconds (default 7 days)
   rate_limit_per_minute: 60      # Global approximate API calls per minute
-  log_calls: false               # Whether to log AI call details (avoid logging full responses in production)
+  log_calls: true                # Whether to log AI call details (useful for debugging, can set to false in production)
   retry_on_failure: 1            # Number of retries for transient errors
   auto_summary_on_forward: true  # Auto-trigger summary when forwarding messages (handler-level)
   auto_tagging: true             # Apply AI-generated tags (can be set to false to only generate suggestions)
@@ -106,11 +106,16 @@ storage:
     # Route messages based on forward source (channel/group/user)
     # 
     # Supported source types:
-    # 1. Channel: Match by name or ID, e.g.: 'Tech Channel' or -1001234567890
-    # 2. Group/Supergroup: Match by name or ID, e.g.: 'Dev Group' or -1009876543210
-    # 3. Personal User: Match by name only (username or first_name), e.g.: 'JohnDoe' or 'John'
-    # 4. Bot: Match by name only (username), e.g.: 'MyBot'
+    # 1. Channel: Match by name or ID, e.g.: 'Tech Channel' or -1001234567890 or 1234567890
+    # 2. Group/Supergroup: Match by name or ID, e.g.: 'Dev Group' or -1009876543210 or 9876543210
+    # 3. Personal User: Match by name only (@username or display name), e.g.: 'JohnDoe' or '@JohnDoe'
+    # 4. Bot: Match by name only (@username), e.g.: 'MyBot' or '@MyBot'
     # 5. Hidden User: Match by display name, e.g.: 'Deleted Account'
+    #
+    # ID Format Notes:
+    # - You can use full ID (-1001234567890) or simplified ID without -100 prefix (1234567890)
+    # - System automatically handles -100 prefix, no need to worry about format
+    # - IDs copied from Telegram client usually don't have -100 prefix, you can use them directly
     #
     # Notes:
     # - Multiple sources can map to the same channel
@@ -119,11 +124,11 @@ storage:
     # - Name matching is case-sensitive; using IDs is recommended to avoid name changes
     source_mapping:
       # Examples:
-      # - sources: ['Tech Channel', 'Dev Group', -1001234567890]  # Channel/Group: name or ID
-      #   channel_id: -1001111111111  # Target storage channel
-      # - sources: ['Daily Life', 'JohnDoe']  # Channel name + username
+      # - sources: ['Tech Channel', 'Dev Group', 1234567890]  # Name or ID (without -100 prefix is OK)
+      #   channel_id: -1001111111111  # Target storage channel (full ID recommended)
+      # - sources: ['Daily Life', -1009876543210, 'JohnDoe']  # Mixed: name + full ID + username
       #   channel_id: -1002222222222
-      # - sources: ['MyBot', 'NewsBot']  # Bot usernames
+      # - sources: ['MyBot', '@NewsBot']  # Bot: with or without @ prefix
       #   channel_id: -1003333333333
     
     # Tag to channel mapping configuration (highest priority)

@@ -16,9 +16,9 @@ features:
   enable_ocr: false  # 启用图片OCR识别
 
 ai:
-  enabled: false  # 启用AI功能
-  auto_summarize: false  # 自动总结新归档内容
-  auto_generate_tags: false  # 自动生成AI标签
+  enabled: true  # 启用AI功能
+  auto_summarize: true  # 自动总结新归档内容
+  auto_generate_tags: true  # 自动生成AI标签
   auto_generate_title: true  # 自动为笔记生成AI标题（15-20字）
   max_generated_tags: 8  # AI自动生成标签的最大数量（5-10为佳，默认8）
 
@@ -39,7 +39,7 @@ ai:
   cache_path: "data/ai_cache.db" # 缓存数据库路径（sqlite）
   cache_ttl_seconds: 604800      # 缓存有效期（秒），默认7天
   rate_limit_per_minute: 60      # 全局每分钟API调用次数限制
-  log_calls: false               # 是否记录AI调用详情（生产环境避免记录完整响应）
+  log_calls: true                # 是否记录AI调用详情（便于调试，生产环境可设为false）
   retry_on_failure: 1            # 临时错误重试次数
   auto_summary_on_forward: true  # 转发消息时自动触发摘要（处理器层级）
   auto_tagging: true             # 应用AI生成的标签（可设为false仅生成建议）
@@ -111,11 +111,16 @@ storage:
     # 根据转发来源（频道/群组/用户）指定存储频道
     # 
     # 支持的来源类型：
-    # 1. 频道 (Channel): 可用名称或ID匹配，如: '技术频道' 或 -1001234567890
-    # 2. 群组 (Group/Supergroup): 可用名称或ID匹配，如: '开发群组' 或 -1009876543210
-    # 3. 个人用户 (User): 仅用名称匹配（username或first_name），如: 'JohnDoe' 或 '张三'
-    # 4. 机器人 (Bot): 仅用名称匹配（username），如: 'MyBot'
+    # 1. 频道 (Channel): 可用名称或ID匹配，如: '技术频道' 或 -1001234567890 或 1234567890
+    # 2. 群组 (Group/Supergroup): 可用名称或ID匹配，如: '开发群组' 或 -1009876543210 或 9876543210
+    # 3. 个人用户 (User): 仅用名称匹配（@username或显示名），如: 'JohnDoe' 或 '张三' 或 '@JohnDoe'
+    # 4. 机器人 (Bot): 仅用名称匹配（@username），如: 'MyBot' 或 '@MyBot'
     # 5. 隐藏用户 (Hidden User): 用显示名称匹配，如: 'Deleted Account'
+    #
+    # ID格式说明：
+    # - 可以使用完整ID（-1001234567890）或去掉-100前缀的简化ID（1234567890）
+    # - 系统会自动处理-100前缀，无需担心格式问题
+    # - 从Telegram客户端复制的ID通常不带-100前缀，可以直接使用
     #
     # 注意：
     # - 多个来源可以映射到同一个频道
@@ -124,11 +129,11 @@ storage:
     # - 名称匹配区分大小写，建议使用ID以避免名称变更问题
     source_mapping:
       # 示例：
-      # - sources: ['技术频道', '开发群组', -1001234567890]  # 频道/群组：支持名称或ID
-      #   channel_id: -1001111111111  # 目标存储频道
-      # - sources: ['生活日常', 'JohnDoe']  # 频道名称 + 用户名
+      # - sources: ['技术频道', '开发群组', 1234567890]  # 频道/群组：支持名称或ID（可不带-100前缀）
+      #   channel_id: -1001111111111  # 目标存储频道（建议使用完整ID）
+      # - sources: ['生活日常', -1009876543210, 'JohnDoe']  # 混合：名称 + 完整ID + 用户名
       #   channel_id: -1002222222222
-      # - sources: ['MyBot', 'NewsBot']  # 机器人username
+      # - sources: ['MyBot', '@NewsBot']  # 机器人：支持带@或不带@
       #   channel_id: -1003333333333
     
     # 标签到频道的映射配置（优先级最高）

@@ -98,7 +98,6 @@ async def summarize_operation(
                 await asyncio.sleep(1)
             continue
     
-    # 所有重试失败
-    if log_calls:
-        logger.error(f"AI summarize failed after {retry_on_failure + 1} attempts: {last_error}")
+    # 所有重试失败 - 始终记录最终失败（不管log_calls设置）
+    logger.error(f"AI summarize failed after {retry_on_failure + 1} attempts: {last_error}")
     return {'success': False, 'error': str(last_error)}

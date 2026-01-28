@@ -270,6 +270,12 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                             duration = time.time() - start
                             provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'unknown')
                             logger.info(f"AI summarize_content provider={provider}, duration={duration:.2f}s")
+                            
+                            # 记录失败详情
+                            if summary_result and not summary_result.get('success'):
+                                error_msg = summary_result.get('error', 'Unknown error')
+                                logger.error(f"AI summarize failed: {error_msg}")
+                            
                             if summary_result and summary_result.get('success'):
                                 # 将AI分析结果添加到analysis
                                 analysis['ai_summary'] = summary_result.get('summary', '')
