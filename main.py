@@ -506,11 +506,11 @@ def main():
                 logger.error(f"Failed to set bot commands: {e}")
         
         # 使用 post_init 在 bot 初始化后设置命令菜单
-        async def post_init_callback(application: Application) -> None:
+        async def post_init_callback(app: Application) -> None:
             """在 bot 初始化后执行的回调"""
             logger.info("Bot initialized, setting up commands menu...")
-            if job_queue:
-                job_queue.run_once(set_bot_commands_job, when=5)
+            if app.job_queue:
+                app.job_queue.run_once(set_bot_commands_job, when=5)
                 logger.info("✓ Bot commands setup scheduled (will execute in 5 seconds)")
         
         application.post_init = post_init_callback
