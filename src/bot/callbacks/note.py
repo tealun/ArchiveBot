@@ -803,7 +803,7 @@ async def handle_refine_note_callback(update: Update, context: ContextTypes.DEFA
             await query.answer("笔记管理器未初始化", show_alert=True)
             return
         
-        notes = note_manager.get_notes_by_archive(archive_id)
+        notes = note_manager.get_notes(archive_id)
         if not notes:
             await query.answer("❌ 该归档没有笔记", show_alert=True)
             return

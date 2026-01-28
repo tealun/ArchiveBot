@@ -45,7 +45,10 @@ class ArchiveFormatter:
             success_msg += f"\n\n<b>{i18n.t('title')}</b>: {truncate_text(title, 100)}"
         
         if content_type:
-            content_type_display = i18n.t(f'content_type_{content_type}', default=content_type)
+            content_type_key = f'content_type_{content_type}'
+            content_type_display = i18n.t(content_type_key)
+            if content_type_display == content_type_key:
+                content_type_display = content_type
             success_msg += f"\n<b>{i18n.t('content_type')}</b>: {content_type_display}"
         
         file_size = archive_data.get('file_size')
@@ -74,20 +77,22 @@ class ArchiveFormatter:
         if include_ai_info:
             ai_summary = archive_data.get('ai_summary')
             ai_category = archive_data.get('ai_category')
+            ai_key_points = archive_data.get('ai_key_points', [])
+            
+            logger.debug(f"AI info check: include={include_ai_info}, summary={bool(ai_summary)}, category={bool(ai_category)}, points={len(ai_key_points)}")
             
             if ai_summary or ai_category:
-                success_msg += "\n\n🤖 AI分析"
+                success_msg += f"\n\n{i18n.t('ai_analysis')}"
                 
                 if ai_category:
-                    success_msg += f"\n📁 分类：{ai_category}"
+                    success_msg += f"\n{i18n.t('ai_category')}：{ai_category}"
                 
                 if ai_summary:
                     summary_text = truncate_text(ai_summary, 200)
-                    success_msg += f"\n💭 {summary_text}"
+                    success_msg += f"\n{i18n.t('ai_summary')} {summary_text}"
                 
-                ai_key_points = archive_data.get('ai_key_points', [])
                 if ai_key_points:
-                    success_msg += "\n🔑 关键点："
+                    success_msg += f"\n{i18n.t('ai_key_points')}："
                     for i, point in enumerate(ai_key_points[:3], 1):
                         success_msg += f"\n  {i}. {point}"
         

@@ -187,7 +187,7 @@ async def _execute_notes(
         
         if archive_id:
             # Get notes for specific archive
-            notes = note_manager.get_notes_by_archive(archive_id)
+            notes = note_manager.get_notes(archive_id)
             if not notes:
                 return True, _get_success_message('no_notes_for_archive', language, archive_id), {'count': 0, 'notes': []}
             
