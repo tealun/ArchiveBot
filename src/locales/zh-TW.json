@@ -217,6 +217,8 @@
   "batch_progress_storing": "存儲到頻道",
   "batch_progress_complete": "完成",
   "unknown_command_message": "⚠️ 這似乎是一個命令，但格式不正確或命令不存在。\n發送 /help 查看所有可用命令。",
+  "unknown_command_hint": "❌ 未知命令：{command}\n\n發送 /help 查看所有可用命令。",
+  "command_execution_failed": "❌ 命令執行失敗，請重新發送：{command}",
   "callback_closed": "已關閉",
   "callback_tag_no_content": "標籤 #{tag} 下暫無內容",
   "callback_tag_header": "🏷️ 標籤: #{tag}",
@@ -236,5 +238,11 @@
   "setting_updated": "✅ 配置已更新\n\n<b>{name}</b>\n新值：<code>{value}</code>\n\n⚠️ 注意：部分配置需要重啟Bot才能生效",
   "setting_update_failed": "❌ 配置更新失敗\n\n{error}",
   "setting_invalid_value": "❌ 無效的值\n\n{error}",
-  "setting_restart_required": "⚠️ 注意：部分配置需要重啟Bot才能生效"
+  "setting_restart_required": "⚠️ 注意：部分配置需要重啟Bot才能生效",
+  "title": "標題",
+  "content_type": "類型",
+  "storage": "儲存",
+  "source": "來源",
+  "file_size": "大小",
+  "tags": "標籤"
 }

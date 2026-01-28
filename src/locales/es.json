@@ -223,6 +223,8 @@
   "batch_progress_storing": "Guardando en canal",
   "batch_progress_complete": "Completado",
   "unknown_command_message": "⚠️ Esto parece un comando, pero es incorrecto o no existe.\nEnvía /help para ver todos los comandos disponibles.",
+  "unknown_command_hint": "❌ Comando desconocido: {command}\n\nEnvía /help para ver todos los comandos disponibles.",
+  "command_execution_failed": "❌ Ejecución de comando falló, por favor reenvía: {command}",
   "callback_closed": "Cerrado",
   "callback_tag_no_content": "No hay contenido bajo la etiqueta #{tag}",
   "callback_tag_header": "🏷️ Etiqueta: #{tag}",
@@ -242,5 +244,11 @@
   "setting_updated": "✅ Configuración Actualizada\n\n<b>{name}</b>\nNuevo valor: <code>{value}</code>\n\n⚠️ Nota: Algunas configuraciones requieren reiniciar el bot para surtir efecto",
   "setting_update_failed": "❌ Error al Actualizar Configuración\n\n{error}",
   "setting_invalid_value": "❌ Valor Inválido\n\n{error}",
-  "setting_restart_required": "⚠️ Nota: Algunas configuraciones requieren reiniciar el bot para surtir efecto"
+  "setting_restart_required": "⚠️ Nota: Algunas configuraciones requieren reiniciar el bot para surtir efecto",
+  "title": "Título",
+  "content_type": "Tipo",
+  "storage": "Almacenamiento",
+  "source": "Origen",
+  "file_size": "Tamaño",
+  "tags": "Etiquetas"
 }

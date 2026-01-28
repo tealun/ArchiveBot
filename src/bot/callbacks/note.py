@@ -178,16 +178,21 @@ async def handle_note_exit_save_callback(update: Update, context: ContextTypes.D
         
         # 执行命令（如果有）
         if command:
-            # 需要重新解析和分发命令
-            await query.message.reply_text(f"正在执行命令：{command}")
             logger.info(f"Executing pending command after note mode: {command}")
-            # TODO: 这里应该调用相应的命令处理器
-            # 由于我们无法直接调用命令处理器，建议用户重新输入命令
-            await query.message.reply_text(
-                f"请重新发送命令：{command}"
-            )
+            
+            # 导入命令分发器
+            from ..commands import dispatch_command_after_note
+            
+            # 执行命令
+            success = await dispatch_command_after_note(command, update, context)
+            
+            if not success:
+                # 如果执行失败，提示用户重新输入
+                await query.message.reply_text(
+                    lang_ctx.t('command_execution_failed', command=command)
+                )
         
-        logger.info("Note mode exited with save")
+        logger.info("Note mode exited with save and command executed")
         
     except Exception as e:
         logger.error(f"Error handling note exit save callback: {e}", exc_info=True)

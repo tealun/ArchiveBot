@@ -223,6 +223,8 @@
   "batch_progress_storing": "チャンネルに保存中",
   "batch_progress_complete": "完了",
   "unknown_command_message": "⚠️ コマンドのようですが、正しくないか存在しません。\n/helpで利用可能なコマンドを確認してください。",
+  "unknown_command_hint": "❌ 不明なコマンド：{command}\n\n/helpで利用可能なコマンドを確認してください。",
+  "command_execution_failed": "❌ コマンド実行失敗、再送信してください：{command}",
   "callback_closed": "閉じる",
   "callback_tag_no_content": "タグ #{tag} にコンテンツがありません",
   "callback_tag_header": "🏷️ タグ：#{tag}",
@@ -242,5 +244,11 @@
   "setting_updated": "✅ 設定が更新されました\n\n<b>{name}</b>\n新しい値：<code>{value}</code>\n\n⚠️ 注意：一部の設定を有効にするには、Botを再起動する必要があります",
   "setting_update_failed": "❌ 設定の更新に失敗しました\n\n{error}",
   "setting_invalid_value": "❌ 無効な値\n\n{error}",
-  "setting_restart_required": "⚠️ 注意：一部の設定を有効にするには、Botを再起動する必要があります"
+  "setting_restart_required": "⚠️ 注意：一部の設定を有効にするには、Botを再起動する必要があります",
+  "title": "タイトル",
+  "content_type": "タイプ",
+  "storage": "ストレージ",
+  "source": "ソース",
+  "file_size": "サイズ",
+  "tags": "タグ"
 }
