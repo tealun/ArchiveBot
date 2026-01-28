@@ -16,18 +16,6 @@ logger = logging.getLogger(__name__)
 
 # 配置项定义：分类 -> 配置项列表
 CONFIG_CATEGORIES = {
-    'basic': {
-        'name': '基础设置',
-        'icon': '⚙️',
-        'items': {
-            'bot.feedback_url': {
-                'name': '反馈链接',
-                'type': 'string',
-                'description': '用户反馈地址（GitHub Issues链接）',
-                'example': 'https://github.com/username/repo/issues'
-            }
-        }
-    },
     'features': {
         'name': '功能开关',
         'icon': '🎛️',
