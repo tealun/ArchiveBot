@@ -33,25 +33,38 @@ async def execute_safe_operation(
     try:
         logger.info(f"🔍 AI executing safe operation: {operation_type} with params: {operation_params}")
         
+        # Log audit event
+        from ...ai.chat_router import _log_audit_event
+        
         # Search operation
         if operation_type == 'search':
-            return await _execute_search(operation_params, context, language)
+            result = await _execute_search(operation_params, context, language)
+            _log_audit_event('safe_executed', operation_type, operation_params, context, language, result[1])
+            return result
         
         # Stats operation
         elif operation_type == 'stats':
-            return await _execute_stats(context, language)
+            result = await _execute_stats(context, language)
+            _log_audit_event('safe_executed', operation_type, operation_params, context, language, result[1])
+            return result
         
         # Tags operation
         elif operation_type == 'tags':
-            return await _execute_tags(operation_params, context, language)
+            result = await _execute_tags(operation_params, context, language)
+            _log_audit_event('safe_executed', operation_type, operation_params, context, language, result[1])
+            return result
         
         # Notes operation
         elif operation_type == 'notes':
-            return await _execute_notes(operation_params, context, language)
+            result = await _execute_notes(operation_params, context, language)
+            _log_audit_event('safe_executed', operation_type, operation_params, context, language, result[1])
+            return result
         
         # Review operation
         elif operation_type == 'review':
-            return await _execute_review(operation_params, context, language)
+            result = await _execute_review(operation_params, context, language)
+            _log_audit_event('safe_executed', operation_type, operation_params, context, language, result[1])
+            return result
         
         # Unknown operation type
         else:

@@ -33,29 +33,44 @@ async def execute_confirmed_action(
     try:
         logger.info(f"Executing confirmed action: {action_type} with params: {action_params}")
         
+        # Log audit event
+        from ...ai.chat_router import _log_audit_event
+        
         # Delete archive (move to trash)
         if action_type == 'delete_archive':
-            return await _execute_delete_archive(action_params, context, language)
+            result = await _execute_delete_archive(action_params, context, language)
+            _log_audit_event('write_confirmed', action_type, action_params, context, language, result[1])
+            return result
         
         # Clear trash (permanently delete all)
         elif action_type == 'clear_trash':
-            return await _execute_clear_trash(context, language)
+            result = await _execute_clear_trash(context, language)
+            _log_audit_event('write_confirmed', action_type, action_params, context, language, result[1])
+            return result
         
         # Create note
         elif action_type == 'create_note':
-            return await _execute_create_note(action_params, context, language)
+            result = await _execute_create_note(action_params, context, language)
+            _log_audit_event('write_confirmed', action_type, action_params, context, language, result[1])
+            return result
         
         # Add tag to archive
         elif action_type == 'add_tag':
-            return await _execute_add_tag(action_params, context, language)
+            result = await _execute_add_tag(action_params, context, language)
+            _log_audit_event('write_confirmed', action_type, action_params, context, language, result[1])
+            return result
         
         # Remove tag from archive
         elif action_type == 'remove_tag':
-            return await _execute_remove_tag(action_params, context, language)
+            result = await _execute_remove_tag(action_params, context, language)
+            _log_audit_event('write_confirmed', action_type, action_params, context, language, result[1])
+            return result
         
         # Toggle favorite
         elif action_type == 'toggle_favorite':
-            return await _execute_toggle_favorite(action_params, context, language)
+            result = await _execute_toggle_favorite(action_params, context, language)
+            _log_audit_event('write_confirmed', action_type, action_params, context, language, result[1])
+            return result
         
         # Unknown action type
         else:

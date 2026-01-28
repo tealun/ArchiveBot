@@ -164,6 +164,17 @@ async def handle_ai_cancel_callback(update: Update, context: ContextTypes.DEFAUL
         # Clear pending action
         del pending_actions[confirmation_id]
         
+        # Log audit event
+        from ...ai.chat_router import _log_audit_event
+        _log_audit_event(
+            'write_cancelled',
+            action_data.get('action_type'),
+            action_data.get('params', {}),
+            context,
+            lang_ctx.language,
+            'User cancelled operation'
+        )
+        
         # Update message
         cancel_msg = "✅ 操作已取消" if lang_ctx.language.startswith('zh') else "✅ Operation cancelled"
         await query.answer(cancel_msg)

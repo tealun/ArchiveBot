@@ -387,7 +387,40 @@ async def handle_command_request(plan: Dict[str, Any], context: Any, language: s
         
         return message_text
     
-    # Phase 3: Not yet implemented - guide user to use commands
+    # Phase 3: Forbidden operations - reject with explanation
+    FORBIDDEN_OPERATIONS = ['delete', 'clear_trash', 'backup', 'restore_backup', 'export']
+    
+    if command_type in FORBIDDEN_OPERATIONS:
+        logger.warning(f"🚫 AI attempted forbidden operation: {command_type}")
+        
+        # Log to audit trail
+        _log_audit_event(
+            event_type='forbidden_operation_attempt',
+            operation=command_type,
+            params=command_params,
+            context=context,
+            language=language
+        )
+        
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            return (
+                f"🚫 出于安全考虑，此操作需要您手动执行\n\n"
+                f"🔒 被拒绝的操作：{command_type}\n\n"
+                f"💡 请使用对应的命令手动操作"
+            ) if not is_traditional else (
+                f"🚫 出於安全考慮，此操作需要您手動執行\n\n"
+                f"🔒 被拒絕的操作：{command_type}\n\n"
+                f"💡 請使用對應的命令手動操作"
+            )
+        else:
+            return (
+                f"🚫 For security reasons, this operation requires manual execution\n\n"
+                f"🔒 Rejected operation: {command_type}\n\n"
+                f"💡 Please use the corresponding command"
+            )
+    
+    # Unknown operations - guide user to use commands
     
     command_guides = {
         'note': i18n.t('command_guide_note', language) if hasattr(i18n, 't') else "💡 使用 /note <归档ID> 添加笔记",
@@ -1505,3 +1538,41 @@ async def process_ai_chat(
     except Exception as e:
         logger.error(f"AI chat processing error: {e}", exc_info=True)
         return False, None
+
+
+def _log_audit_event(
+    event_type: str,
+    operation: str,
+    params: dict,
+    context: Any,
+    language: str,
+    result: str = None
+) -> None:
+    """
+    Log AI operation audit trail (Phase 3)
+    
+    Args:
+        event_type: Event type (forbidden_attempt, write_confirmed, write_cancelled, safe_executed)
+        operation: Operation name
+        params: Operation parameters
+        context: Bot context
+        language: Language code
+        result: Operation result (success/failure message)
+    """
+    from datetime import datetime
+    import json
+    
+    audit_log = {
+        'timestamp': datetime.now().isoformat(),
+        'event_type': event_type,
+        'operation': operation,
+        'params': params,
+        'language': language,
+        'result': result
+    }
+    
+    # Log to application logger with special prefix for audit trail
+    logger.info(f"[AUDIT] {json.dumps(audit_log, ensure_ascii=False)}")
+    
+    # Optional: Store to database for persistent audit trail
+    # TODO: Implement database audit table if needed
