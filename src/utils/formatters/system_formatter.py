@@ -79,11 +79,15 @@ class SystemFormatter:
                 status_text += "🟢 **服务：** 可用\n\n"
                 
                 api_config = ai_config.get('api', {})
-                provider = api_config.get('provider', 'unknown')
-                model = api_config.get('model', 'unknown')
-                base_url = api_config.get('base_url', 'default')
                 
-                api_key = api_config.get('api_key', '')
+                # 优先从环境变量读取，否则从配置文件读取
+                import os
+                provider = os.getenv('AI_API_PROVIDER') or api_config.get('provider', '') or 'unknown'
+                model = os.getenv('AI_MODEL') or api_config.get('model', '') or 'unknown'
+                base_url = os.getenv('AI_API_URL') or api_config.get('api_url', '') or api_config.get('base_url', 'default')
+                
+                # API Key处理
+                api_key = os.getenv('AI_API_KEY') or api_config.get('api_key', '')
                 if api_key:
                     if len(api_key) > 10:
                         masked_key = api_key[:4] + '****' + api_key[-4:]
@@ -105,7 +109,7 @@ class SystemFormatter:
                 auto_summarize = ai_config.get('auto_summarize', False)
                 auto_tags = ai_config.get('auto_generate_tags', False)
                 auto_category = ai_config.get('auto_category', False)
-                chat_enabled = ai_config.get('chat', {}).get('enabled', False)
+                chat_enabled = ai_config.get('chat_enabled', False)  # 修正：直接从ai_config读取
                 
                 status_text += f"  • 自动摘要：{'✅ 开启' if auto_summarize else '❌ 关闭'}\n"
                 status_text += f"  • 自动标签：{'✅ 开启' if auto_tags else '❌ 关闭'}\n"
@@ -359,6 +363,9 @@ class SystemFormatter:
         db_size_formatted = format_file_size(db_size) if db_size > 0 else None
         last_archive = stats.get('last_archive', 'N/A')
         
+        # 获取类型统计
+        type_stats = stats.get('type_stats', {})
+        
         if db_size_formatted:
             # 完整版本（命令使用）
             message = i18n.t(
@@ -369,6 +376,31 @@ class SystemFormatter:
                 db_size=db_size_formatted,
                 last_archive=last_archive
             )
+            
+            # 添加类型统计
+            if type_stats:
+                message += "\n\n📂 **类型统计：**\n"
+                type_emoji = {
+                    'text': '📝',
+                    'link': '🔗',
+                    'image': '🖼️',
+                    'video': '🎬',
+                    'audio': '🎵',
+                    'voice': '🎤',
+                    'document': '📄',
+                    'ebook': '📚',
+                    'animation': '🎞️',
+                    'sticker': '🎭',
+                    'contact': '👤',
+                    'location': '📍'
+                }
+                
+                # 按数量排序
+                sorted_types = sorted(type_stats.items(), key=lambda x: x[1], reverse=True)
+                for content_type, count in sorted_types:
+                    emoji = type_emoji.get(content_type, '📦')
+                    percentage = int(count / total_archives * 100) if total_archives > 0 else 0
+                    message += f"  {emoji} {content_type}: `{count}` ({percentage}%)\n"
         else:
             # 简化版本（AI对话使用）
             if language == 'en':

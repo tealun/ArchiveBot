@@ -515,7 +515,7 @@ class Database:
             cursor = self.conn.cursor()
             
             # Total archives
-            cursor.execute("SELECT COUNT(*) FROM archives")
+            cursor.execute("SELECT COUNT(*) FROM archives WHERE deleted = 0")
             total_archives = cursor.fetchone()[0]
             
             # Total tags
@@ -523,18 +523,29 @@ class Database:
             total_tags = cursor.fetchone()[0]
             
             # Total storage used
-            cursor.execute("SELECT SUM(file_size) FROM archives WHERE file_size IS NOT NULL")
+            cursor.execute("SELECT SUM(file_size) FROM archives WHERE file_size IS NOT NULL AND deleted = 0")
             total_size = cursor.fetchone()[0] or 0
             
             # Last archive time
-            cursor.execute("SELECT MAX(archived_at) FROM archives")
+            cursor.execute("SELECT MAX(archived_at) FROM archives WHERE deleted = 0")
             last_archive = cursor.fetchone()[0]
+            
+            # Type statistics
+            cursor.execute("""
+                SELECT content_type, COUNT(*) as count
+                FROM archives
+                WHERE deleted = 0
+                GROUP BY content_type
+                ORDER BY count DESC
+            """)
+            type_stats = {row[0]: row[1] for row in cursor.fetchall()}
             
             return {
                 'total_archives': total_archives,
                 'total_tags': total_tags,
                 'total_size': total_size,
-                'last_archive': last_archive
+                'last_archive': last_archive,
+                'type_stats': type_stats
             }
             
         except sqlite3.Error as e:
@@ -543,7 +554,8 @@ class Database:
                 'total_archives': 0,
                 'total_tags': 0,
                 'total_size': 0,
-                'last_archive': None
+                'last_archive': None,
+                'type_stats': {}
             }
 
     def get_activity_summary(self, days: int = 7) -> Dict[str, Any]:
