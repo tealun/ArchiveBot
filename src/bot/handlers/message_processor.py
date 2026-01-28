@@ -406,7 +406,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         
         # 检查是否为转发消息
         if message.forward_origin:
-            from telegram import MessageOriginChannel, MessageOriginUser, MessageOriginChat
+            from telegram import MessageOriginChannel, MessageOriginUser, MessageOriginChat, MessageOriginHiddenUser
             
             is_direct_send = False
             if isinstance(message.forward_origin, MessageOriginChannel):
@@ -426,14 +426,22 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                 }
                 logger.info(f"Message forwarded from chat: {source_info['name']} (ID: {source_info['id']})")
             elif isinstance(message.forward_origin, MessageOriginUser):
-                # 来自用户的转发
+                # 来自用户的转发（包括个人用户和机器人）
                 user = message.forward_origin.sender_user
                 source_info = {
                     'name': user.username or user.first_name,
                     'id': user.id,
-                    'type': 'private'
+                    'type': 'bot' if user.is_bot else 'user'
                 }
-                logger.info(f"Message forwarded from user: {source_info['name']} (ID: {source_info['id']})")
+                logger.info(f"Message forwarded from {'bot' if user.is_bot else 'user'}: {source_info['name']} (ID: {source_info['id']})")
+            elif isinstance(message.forward_origin, MessageOriginHiddenUser):
+                # 来自隐藏用户的转发（用户设置了"转发消息时隐藏我的账号"）
+                source_info = {
+                    'name': message.forward_origin.sender_user_name,  # 显示名称（如"Deleted Account"）
+                    'id': None,  # 无法获取用户ID
+                    'type': 'hidden_user'
+                }
+                logger.info(f"Message forwarded from hidden user: {source_info['name']}")
         else:
             # 个人直接发送
             logger.info("Message sent directly by user (not forwarded)")

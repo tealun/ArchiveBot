@@ -103,14 +103,28 @@ storage:
       location: default    # Locations → default channel
     
     # Source to channel mapping configuration (higher priority than type mapping)
-    # Route messages based on forward source (channel/group name or ID)
-    # Multiple sources can map to the same channel, but one source cannot map to multiple channels
+    # Route messages based on forward source (channel/group/user)
+    # 
+    # Supported source types:
+    # 1. Channel: Match by name or ID, e.g.: 'Tech Channel' or -1001234567890
+    # 2. Group/Supergroup: Match by name or ID, e.g.: 'Dev Group' or -1009876543210
+    # 3. Personal User: Match by name only (username or first_name), e.g.: 'JohnDoe' or 'John'
+    # 4. Bot: Match by name only (username), e.g.: 'MyBot'
+    # 5. Hidden User: Match by display name, e.g.: 'Deleted Account'
+    #
+    # Notes:
+    # - Multiple sources can map to the same channel
+    # - One source cannot map to multiple channels (first match wins)
+    # - User IDs are not supported for matching (normal user IDs are positive numbers)
+    # - Name matching is case-sensitive; using IDs is recommended to avoid name changes
     source_mapping:
       # Examples:
-      # - sources: ['Tech Channel', 'Dev Group', -1001234567890]  # Supports names or IDs
+      # - sources: ['Tech Channel', 'Dev Group', -1001234567890]  # Channel/Group: name or ID
       #   channel_id: -1001111111111  # Target storage channel
-      # - sources: ['Daily Life']
+      # - sources: ['Daily Life', 'JohnDoe']  # Channel name + username
       #   channel_id: -1002222222222
+      # - sources: ['MyBot', 'NewsBot']  # Bot usernames
+      #   channel_id: -1003333333333
     
     # Tag to channel mapping configuration (highest priority)
     # Route messages based on message tags
