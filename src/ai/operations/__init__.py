@@ -9,6 +9,7 @@ from .notes import (
 )
 from .titles import generate_title_from_text_operation
 from .ebook import is_ebook_operation
+from .executor import execute_confirmed_action
 
 __all__ = [
     'summarize_operation',
@@ -18,4 +19,5 @@ __all__ = [
     'generate_note_from_ai_analysis_operation',
     'generate_title_from_text_operation',
     'is_ebook_operation',
+    'execute_confirmed_action',
 ]

@@ -277,7 +277,17 @@ async def handle_command_request(plan: Dict[str, Any], context: Any, language: s
     command_params = plan.get('command_params', {})
     
     # 当前版本：引导用户使用对应命令
-    # TODO: 未来版本直接执行命令（需要权限验证和错误处理）
+    # TODO [Priority: Low] [AI Enhancement]
+    # Feature: AI directly executes commands instead of just guiding users
+    # Current: AI only provides command usage hints
+    # Proposed: AI parses intent and executes actual operations (e.g., create note, delete archive)
+    # Implementation requirements:
+    #   1. Permission validation: Verify user has permission to execute action
+    #   2. Parameter validation: Sanitize and validate all parameters
+    #   3. Error handling: Graceful fallback if execution fails
+    #   4. Audit logging: Log all AI-triggered operations for security
+    # Security concerns: Prevent AI from executing destructive operations without confirmation
+    # Estimated effort: 16-24 hours (requires security review)
     
     command_guides = {
         'note': i18n.t('command_guide_note', language) if hasattr(i18n, 't') else "💡 使用 /note <归档ID> 添加笔记",
@@ -454,26 +464,22 @@ async def handle_clarification(
             return f"✅ Okay, I won't proceed with this operation.\n\nLet me know if you need anything else."
     
     else:  # confirm
-        # 用户确认操作 - 当前版本仅返回提示，实际操作执行需要根据 action_type 调用相应的系统模块
+        # 用户确认操作 - 执行实际操作
+        from .operations.executor import execute_confirmed_action
+        
+        # 执行操作
+        success, result_message = await execute_confirmed_action(
+            action_type=action_type,
+            action_params=action_params,
+            context=context,
+            language=language
+        )
+        
+        # 清除pending action
         session_manager.clear_pending_action(session_id)
         
-        # TODO: 根据 action_type 执行实际操作
-        # 例如：
-        # if action_type == 'delete_archive':
-        #     archive_id = action_params.get('archive_id')
-        #     await execute_delete_archive(archive_id, context)
-        # elif action_type == 'clear_trash':
-        #     await execute_clear_trash(context)
-        # ...
-        
-        if language.startswith('zh'):
-            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
-            if is_traditional:
-                return f"✅ 收到確認。\n\n💡 當前版本的確認執行功能正在完善中（操作類型：{action_type}）。\n\n如需立即執行，請使用相應的命令。"
-            else:
-                return f"✅ 收到确认。\n\n💡 当前版本的确认执行功能正在完善中（操作类型：{action_type}）。\n\n如需立即执行，请使用相应的命令。"
-        else:
-            return f"✅ Confirmation received.\n\n💡 Confirmation execution feature is being enhanced (action type: {action_type}).\n\nFor immediate execution, please use the corresponding command."
+        # 返回执行结果
+        return result_message
 
 
 async def handle_guided_inquiry(
