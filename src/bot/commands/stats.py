@@ -11,11 +11,13 @@ from ...utils.language_context import with_language_context
 from ...utils.config import get_config
 from ...utils.message_builder import MessageBuilder
 from ...utils.helpers import format_file_size, send_or_update_reply
+from .note_mode_interceptor import intercept_in_note_mode
 
 logger = logging.getLogger(__name__)
 
 from ...storage.database import DatabaseStorage
 
+@intercept_in_note_mode
 @with_language_context
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """

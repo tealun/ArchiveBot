@@ -8,12 +8,14 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
+from .note_mode_interceptor import intercept_in_note_mode
 from ...utils.config import get_config
 from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
 
+@intercept_in_note_mode
 @with_language_context
 async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """

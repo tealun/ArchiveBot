@@ -29,41 +29,8 @@ async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAUL
     try:
         message = update.message
         
-        # 检查是否是命令
-        if message.text and message.text.startswith('/'):
-            # 排除/cancel命令（已经在命令处理中）
-            if message.text.startswith('/cancel'):
-                return
-            
-            # 其他命令：提示用户选择
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "🚪 立即退出并保存笔记",
-                        callback_data=f"note_exit_save:{message.text}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "✍️ 继续记录笔记",
-                        callback_data="note_continue"
-                    )
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await message.reply_text(
-                f"⚠️ 您正在笔记模式中\n\n"
-                f"检测到命令：{message.text}\n\n"
-                f"请选择操作：",
-                reply_markup=reply_markup
-            )
-            
-            # 暂存命令，等待用户选择后执行
-            context.user_data['pending_command'] = message.text
-            return
+        # 注意：命令拦截已由 note_mode_interceptor 装饰器处理
+        # 这里只处理非命令的普通消息
         
         # 重置超时计时器
         if 'note_timeout_job' in context.user_data:
