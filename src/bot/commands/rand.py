@@ -95,7 +95,8 @@ async def rand_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
                 
                 # 如果无法发送资源（database/reference类型或发送失败），发送文本详情
                 if not result:
-                    notes = db_storage.get_notes_by_archive(archive['id'])
+                    note_manager = context.bot_data.get('note_manager')
+                    notes = note_manager.get_notes(archive['id']) if note_manager else []
                     text, reply_markup = MessageBuilder.format_text_archive_reply(
                         archive,
                         notes,
