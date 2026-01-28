@@ -2,7 +2,9 @@
 Single message processor
 """
 
-import loggingimport timefrom typing import List, Optional, Dict
+import logging
+import time
+from typing import List, Optional, Dict
 from telegram import Update, Message
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
