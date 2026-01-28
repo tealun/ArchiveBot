@@ -540,12 +540,25 @@ class Database:
             """)
             type_stats = {row[0]: row[1] for row in cursor.fetchall()}
             
+            # Notes statistics
+            cursor.execute("SELECT COUNT(*) FROM notes WHERE deleted = 0")
+            total_notes = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM notes WHERE archive_id IS NOT NULL AND deleted = 0")
+            linked_notes = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM notes WHERE archive_id IS NULL AND deleted = 0")
+            standalone_notes = cursor.fetchone()[0]
+            
             return {
                 'total_archives': total_archives,
                 'total_tags': total_tags,
                 'total_size': total_size,
                 'last_archive': last_archive,
-                'type_stats': type_stats
+                'type_stats': type_stats,
+                'total_notes': total_notes,
+                'linked_notes': linked_notes,
+                'standalone_notes': standalone_notes
             }
             
         except sqlite3.Error as e:
@@ -555,7 +568,10 @@ class Database:
                 'total_tags': 0,
                 'total_size': 0,
                 'last_archive': None,
-                'type_stats': {}
+                'type_stats': {},
+                'total_notes': 0,
+                'linked_notes': 0,
+                'standalone_notes': 0
             }
 
     def get_activity_summary(self, days: int = 7) -> Dict[str, Any]:

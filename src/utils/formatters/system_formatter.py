@@ -413,6 +413,17 @@ class SystemFormatter:
                     emoji = type_emoji.get(content_type, '📦')
                     percentage = int(count / total_archives * 100) if total_archives > 0 else 0
                     message += f"  {emoji} {content_type}: `{count}` ({percentage}%)\n"
+            
+            # 添加笔记统计
+            total_notes = stats.get('total_notes', 0)
+            linked_notes = stats.get('linked_notes', 0)
+            standalone_notes = stats.get('standalone_notes', 0)
+            
+            if total_notes > 0:
+                message += "\n\n📝 **笔记统计：**\n"
+                message += f"  • 总笔记数：`{total_notes}`\n"
+                message += f"  • 关联笔记：`{linked_notes}` ({int(linked_notes/total_notes*100) if total_notes > 0 else 0}%)\n"
+                message += f"  • 独立笔记：`{standalone_notes}` ({int(standalone_notes/total_notes*100) if total_notes > 0 else 0}%)\n"
         else:
             # 简化版本（AI对话使用）
             if language == 'en':
