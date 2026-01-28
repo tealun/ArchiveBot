@@ -597,28 +597,14 @@ URL：{analysis.get('url', '')}
                 # 只有前面有内容时才添加分隔线
                 if final_note_parts:
                     final_note_parts.append("----------------------------------")
-                # 获取用户名
-                from telegram import Update as TelegramUpdate
-                temp_update = TelegramUpdate(update_id=0, message=message)
-                user = temp_update.effective_user if hasattr(temp_update, 'effective_user') else message.from_user
-                username = user.first_name if user else "用户"
-                final_note_parts.append(f"[{username}]: {user_comment}")
+                final_note_parts.append(f"[用户]: {user_comment}")
             
-            # 第三部分：原始caption（如果有来源信息）
+            # 第三部分：原始caption（转发消息的原文）
             if original_caption:
                 # 只有前面有内容时才添加分隔线
                 if final_note_parts:
                     final_note_parts.append("----------------------------------")
-                
-                # 获取来源名称
-                source_name = None
-                if source_info:
-                    source_name = source_info.get('name', '')
-                
-                if source_name:
-                    final_note_parts.append(f"[{source_name}]: {original_caption}")
-                else:
-                    final_note_parts.append(f"[来源]: {original_caption}")
+                final_note_parts.append(f"[原文]: {original_caption}")
             
             # 合并所有部分
             final_note_content = "\n".join(final_note_parts)
