@@ -6,6 +6,7 @@ Main entry point
 import sys
 import signal
 import logging
+from functools import wraps
 from pathlib import Path
 from dotenv import load_dotenv
 
