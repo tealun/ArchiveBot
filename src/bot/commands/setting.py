@@ -114,19 +114,6 @@ CONFIG_CATEGORIES = {
             }
         }
     },
-    'logging': {
-        'name': '日志设置',
-        'icon': '📝',
-        'items': {
-            'logging.level': {
-                'name': '日志级别',
-                'type': 'choice',
-                'description': '日志记录级别',
-                'choices': ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                'default': 'INFO'
-            }
-        }
-    },
     'review': {
         'name': '回顾设置',
         'icon': '🎲',
