@@ -168,7 +168,7 @@ async def handle_note_exit_save_callback(update: Update, context: ContextTypes.D
         command = parts[1] if len(parts) > 1 else None
         
         # 导入handlers中的_finalize_note_internal
-        from ..bot.handlers import _finalize_note_internal
+        from ..handlers.note_mode import _finalize_note_internal
         
         # 保存笔记
         await _finalize_note_internal(context, update.effective_chat.id, update.effective_user.id, reason="command")
@@ -205,7 +205,7 @@ async def handle_note_finish_callback(update: Update, context: ContextTypes.DEFA
     
     try:
         # 导入handlers中的_finalize_note_internal
-        from ..bot.handlers import _finalize_note_internal
+        from ..handlers.note_mode import _finalize_note_internal
         
         # 保存笔记
         await _finalize_note_internal(context, update.effective_chat.id, update.effective_user.id, reason="manual")
