@@ -133,7 +133,7 @@ async def handle_note_view_callback(update: Update, context: ContextTypes.DEFAUL
                 archive = db_storage.get_archive(archive_id)
         
         # 使用MessageBuilder构建详情
-        from ..utils.message_builder import MessageBuilder
+        from ...utils.message_builder import MessageBuilder
         detail_text, reply_markup = MessageBuilder.format_note_detail_reply(note, archive)
         
         # Answer并发送详情
