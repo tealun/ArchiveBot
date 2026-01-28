@@ -10,6 +10,7 @@ from .notes import (
 from .titles import generate_title_from_text_operation
 from .ebook import is_ebook_operation
 from .executor import execute_confirmed_action
+from .safe_executor import execute_safe_operation
 
 __all__ = [
     'summarize_operation',
@@ -20,4 +21,5 @@ __all__ = [
     'generate_title_from_text_operation',
     'is_ebook_operation',
     'execute_confirmed_action',
+    'execute_safe_operation',
 ]

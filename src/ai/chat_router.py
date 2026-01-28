@@ -262,6 +262,10 @@ async def handle_command_request(plan: Dict[str, Any], context: Any, language: s
     """
     处理操作指令意图（command_request）
     
+    Phase 1: Safe read-only operations (search, stats, tags, notes, review) - execute directly
+    Phase 2: Write operations (create_note, add_tag, etc.) - require confirmation
+    Phase 3: Dangerous operations (delete, trash, export, backup) - forbidden
+    
     Args:
         plan: AI 理解规划结果
         context: Bot context
@@ -271,23 +275,56 @@ async def handle_command_request(plan: Dict[str, Any], context: Any, language: s
         执行结果消息
     """
     from ..utils.i18n import I18n
+    from .operations.safe_executor import execute_safe_operation
+    
     i18n = I18n(language)
     
     command_type = plan.get('command_type', 'unknown')
     command_params = plan.get('command_params', {})
     
-    # 当前版本：引导用户使用对应命令
-    # TODO [Priority: Low] [AI Enhancement]
-    # Feature: AI directly executes commands instead of just guiding users
-    # Current: AI only provides command usage hints
-    # Proposed: AI parses intent and executes actual operations (e.g., create note, delete archive)
-    # Implementation requirements:
-    #   1. Permission validation: Verify user has permission to execute action
-    #   2. Parameter validation: Sanitize and validate all parameters
-    #   3. Error handling: Graceful fallback if execution fails
-    #   4. Audit logging: Log all AI-triggered operations for security
-    # Security concerns: Prevent AI from executing destructive operations without confirmation
-    # Estimated effort: 16-24 hours (requires security review)
+    # Phase 1: Safe operations - execute directly
+    SAFE_OPERATIONS = ['search', 'stats', 'tags', 'notes', 'review']
+    
+    if command_type in SAFE_OPERATIONS:
+        logger.info(f"🤖 AI executing safe operation: {command_type}")
+        success, message, data = await execute_safe_operation(
+            operation_type=command_type,
+            operation_params=command_params,
+            context=context,
+            language=language
+        )
+        
+        if success and data:
+            # Format data for user-friendly display
+            if command_type == 'search' and data.get('results'):
+                # Format search results
+                results_text = _format_search_results(data['results'], language)
+                return f"{message}\n\n{results_text}"
+            
+            elif command_type == 'stats':
+                # Format statistics
+                stats_text = _format_stats(data, language)
+                return f"{message}\n\n{stats_text}"
+            
+            elif command_type == 'tags' and data.get('tags'):
+                # Format tags list
+                tags_text = _format_tags(data['tags'], language)
+                return f"{message}\n\n{tags_text}"
+            
+            elif command_type == 'notes' and data.get('notes'):
+                # Format notes list
+                notes_text = _format_notes(data['notes'], language)
+                return f"{message}\n\n{notes_text}"
+            
+            elif command_type == 'review' and data.get('archive'):
+                # Format review archive
+                review_text = _format_review(data, language)
+                return f"{message}\n\n{review_text}"
+        
+        return message
+    
+    # Phase 2 & 3: Not yet implemented - guide user to use commands
+    # TODO: Implement Phase 2 (write operations with confirmation) and Phase 3 (forbidden operations)
     
     command_guides = {
         'note': i18n.t('command_guide_note', language) if hasattr(i18n, 't') else "💡 使用 /note <归档ID> 添加笔记",
@@ -303,11 +340,109 @@ async def handle_command_request(plan: Dict[str, Any], context: Any, language: s
     if language.startswith('zh'):
         is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
         if is_traditional:
-            return f"⚙️ 收到您的操作請求！\n\n{guide_message}\n\n💬 我會在未來版本中支援直接執行命令。"
+            return f"⚙️ 收到您的操作請求！\n\n{guide_message}\n\n💬 寫入操作需要您確認後執行。"
         else:
-            return f"⚙️ 收到您的操作请求！\n\n{guide_message}\n\n💬 我会在未来版本中支持直接执行命令。"
+            return f"⚙️ 收到您的操作请求！\n\n{guide_message}\n\n💬 写入操作需要您确认后执行。"
     else:
-        return f"⚙️ Command request received!\n\n{guide_message}\n\n💬 Direct command execution will be supported in future versions."
+        return f"⚙️ Command request received!\n\n{guide_message}\n\n💬 Write operations require your confirmation."
+
+
+def _format_search_results(results: list, language: str) -> str:
+    """Format search results for display"""
+    is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+    
+    if not results:
+        return ""
+    
+    formatted = []
+    for i, result in enumerate(results[:5], 1):  # Show top 5
+        title = result.get('title', '无标题' if not is_traditional else '無標題')
+        archive_id = result.get('id', '?')
+        content_type = result.get('content_type', '未知')
+        formatted.append(f"{i}. #{archive_id} - {title} ({content_type})")
+    
+    if len(results) > 5:
+        more = len(results) - 5
+        if language.startswith('zh'):
+            formatted.append(f"\n...还有 {more} 个结果" if not is_traditional else f"\n...還有 {more} 個結果")
+        else:
+            formatted.append(f"\n...{more} more results")
+    
+    return "\n".join(formatted)
+
+
+def _format_stats(data: dict, language: str) -> str:
+    """Format statistics for display"""
+    is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+    
+    if language.startswith('zh'):
+        return f"📦 总归档：{data.get('total_archives', 0)}\n🏷️ 总标签：{data.get('total_tags', 0)}" if not is_traditional else f"📦 總歸檔：{data.get('total_archives', 0)}\n🏷️ 總標籤：{data.get('total_tags', 0)}"
+    else:
+        return f"📦 Total Archives: {data.get('total_archives', 0)}\n🏷️ Total Tags: {data.get('total_tags', 0)}"
+
+
+def _format_tags(tags: list, language: str) -> str:
+    """Format tags list for display"""
+    if not tags:
+        return ""
+    
+    formatted = []
+    for tag in tags[:10]:  # Show top 10
+        tag_name = tag.get('tag_name', '?')
+        count = tag.get('count', 0)
+        formatted.append(f"#{tag_name} ({count})")
+    
+    if len(tags) > 10:
+        more = len(tags) - 10
+        is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+        if language.startswith('zh'):
+            formatted.append(f"...还有 {more} 个标签" if not is_traditional else f"...還有 {more} 個標籤")
+        else:
+            formatted.append(f"...{more} more tags")
+    
+    return "\n".join(formatted)
+
+
+def _format_notes(notes: list, language: str) -> str:
+    """Format notes list for display"""
+    if not notes:
+        return ""
+    
+    formatted = []
+    for i, note in enumerate(notes[:5], 1):  # Show top 5
+        content = note.get('content', '')
+        note_id = note.get('id', '?')
+        # Truncate long content
+        if len(content) > 50:
+            content = content[:50] + "..."
+        formatted.append(f"{i}. #{note_id} - {content}")
+    
+    if len(notes) > 5:
+        more = len(notes) - 5
+        is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+        if language.startswith('zh'):
+            formatted.append(f"\n...还有 {more} 条笔记" if not is_traditional else f"\n...還有 {more} 條筆記")
+        else:
+            formatted.append(f"\n...{more} more notes")
+    
+    return "\n".join(formatted)
+
+
+def _format_review(data: dict, language: str) -> str:
+    """Format review archive for display"""
+    archive = data.get('archive', {})
+    if not archive:
+        return ""
+    
+    is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+    title = archive.get('title', '无标题' if not is_traditional else '無標題')
+    archive_id = archive.get('id', '?')
+    content_type = archive.get('content_type', '未知')
+    
+    if language.startswith('zh'):
+        return f"📌 随机回顾\n#{archive_id} - {title}\n类型：{content_type}" if not is_traditional else f"📌 隨機回顧\n#{archive_id} - {title}\n類型：{content_type}"
+    else:
+        return f"📌 Random Review\n#{archive_id} - {title}\nType: {content_type}"
 
 
 async def handle_contextual_reference(
