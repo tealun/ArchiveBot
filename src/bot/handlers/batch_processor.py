@@ -3,6 +3,7 @@ Batch message processor
 """
 
 import logging
+import time
 from typing import List, Optional, Dict
 from telegram import Update, Message
 from telegram.ext import ContextTypes
@@ -10,6 +11,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import get_language_context
 from ...utils.helpers import format_file_size, truncate_text
+from .message_processor import _process_single_message, _auto_generate_note
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     # 提取共享的hashtags（从merged_caption）- 这是用户主动输入的标签
     shared_hashtags = []
     if merged_caption:
-        from ..utils.helpers import extract_hashtags
+        from ...utils.helpers import extract_hashtags
         shared_hashtags = extract_hashtags(merged_caption)
         logger.info(f"Extracted shared hashtags from caption: {shared_hashtags}")
     
@@ -69,7 +71,7 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
     shared_ai_result = {'tags': [], 'title': None, 'summary': None}
     ai_summarizer = context.bot_data.get('ai_summarizer')
     if ai_summarizer and ai_summarizer.is_available():
-        from ..utils.config import get_config
+        from ...utils.config import get_config
         config = get_config()
         
         # 只分析一次：使用merged_caption（包含用户评论）
@@ -213,7 +215,7 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                     storage_type = duplicate_info.get('storage_type')
                     
                     if storage_path and storage_type == 'telegram':
-                        from ..utils.config import get_config
+                        from ...utils.config import get_config
                         config = get_config()
                         channel_id = config.telegram_channel_id
                         if channel_id:

@@ -3,6 +3,8 @@ Setting command - 配置管理命令
 允许用户通过交互界面修改非敏感配置项
 """
 
+from __future__ import annotations
+
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -10,6 +12,7 @@ from telegram.constants import ParseMode
 
 from ...utils.config import get_config
 from ...utils.language_context import with_language_context
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -156,9 +159,12 @@ async def setting_command(update: Update, context: ContextTypes.DEFAULT_TYPE, la
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await update.message.reply_text(
+        await send_or_update_reply(
+            update,
+            context,
             "⚙️ <b>系统配置</b>\n\n"
             "请选择要配置的分类：",
+            'setting',
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup
         )
@@ -167,7 +173,7 @@ async def setting_command(update: Update, context: ContextTypes.DEFAULT_TYPE, la
         
     except Exception as e:
         logger.error(f"Error in setting_command: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ 发生错误：{str(e)}")
+        await send_or_update_reply(update, context, f"❌ 发生错误：{str(e)}", 'setting')
 
 
 def get_config_item_info(config_key: str) -> dict:

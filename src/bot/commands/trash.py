@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         # 获取trash_manager
         trash_manager = context.bot_data.get('trash_manager')
         if not trash_manager:
-            await update.message.reply_text(lang_ctx.t('trash_manager_not_initialized'))
+            await send_or_update_reply(update, context, lang_ctx.t('trash_manager_not_initialized'), 'trash')
             return
         
         # 解析子命令
@@ -47,41 +48,41 @@ async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
             from ...utils.message_builder import MessageBuilder
             result_text = MessageBuilder.format_trash_list(items, lang_ctx, max_display=20)
             
-            await update.message.reply_text(result_text)
+            await send_or_update_reply(update, context, result_text, 'trash')
             
         elif context.args[0] == 'restore':
             # 恢复归档
             if len(context.args) < 2:
-                await update.message.reply_text(lang_ctx.t('trash_restore_usage'))
+                await send_or_update_reply(update, context, lang_ctx.t('trash_restore_usage'), 'trash')
                 return
             
             try:
                 archive_id = int(context.args[1])
             except ValueError:
-                await update.message.reply_text(lang_ctx.t('invalid_archive_id'))
+                await send_or_update_reply(update, context, lang_ctx.t('invalid_archive_id'), 'trash')
                 return
             
             if trash_manager.restore_archive(archive_id):
-                await update.message.reply_text(lang_ctx.t('trash_restore_success', archive_id=archive_id))
+                await send_or_update_reply(update, context, lang_ctx.t('trash_restore_success', archive_id=archive_id), 'trash')
             else:
-                await update.message.reply_text(lang_ctx.t('trash_restore_failed', archive_id=archive_id))
+                await send_or_update_reply(update, context, lang_ctx.t('trash_restore_failed', archive_id=archive_id), 'trash')
         
         elif context.args[0] == 'delete':
             # 永久删除
             if len(context.args) < 2:
-                await update.message.reply_text(lang_ctx.t('trash_delete_usage'))
+                await send_or_update_reply(update, context, lang_ctx.t('trash_delete_usage'), 'trash')
                 return
             
             try:
                 archive_id = int(context.args[1])
             except ValueError:
-                await update.message.reply_text(lang_ctx.t('invalid_archive_id'))
+                await send_or_update_reply(update, context, lang_ctx.t('invalid_archive_id'), 'trash')
                 return
             
             if trash_manager.delete_permanently(archive_id):
-                await update.message.reply_text(lang_ctx.t('trash_delete_success', archive_id=archive_id))
+                await send_or_update_reply(update, context, lang_ctx.t('trash_delete_success', archive_id=archive_id), 'trash')
             else:
-                await update.message.reply_text(lang_ctx.t('trash_delete_failed', archive_id=archive_id))
+                await send_or_update_reply(update, context, lang_ctx.t('trash_delete_failed', archive_id=archive_id), 'trash')
         
         elif context.args[0] == 'empty':
             # 清空垃圾箱
@@ -90,21 +91,21 @@ async def trash_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
                 try:
                     days_old = int(context.args[1])
                 except ValueError:
-                    await update.message.reply_text(lang_ctx.t('invalid_days'))
+                    await send_or_update_reply(update, context, lang_ctx.t('invalid_days'), 'trash')
                     return
             
             count = trash_manager.empty_trash(days_old)
             
             if days_old:
-                await update.message.reply_text(lang_ctx.t('trash_empty_success_days', count=count, days=days_old))
+                await send_or_update_reply(update, context, lang_ctx.t('trash_empty_success_days', count=count, days=days_old), 'trash')
             else:
-                await update.message.reply_text(lang_ctx.t('trash_empty_success', count=count))
+                await send_or_update_reply(update, context, lang_ctx.t('trash_empty_success', count=count), 'trash')
         
         else:
-            await update.message.reply_text(lang_ctx.t('trash_invalid_command'))
+            await send_or_update_reply(update, context, lang_ctx.t('trash_invalid_command'), 'trash')
         
         logger.info(f"Trash command executed: {' '.join(context.args) if context.args else 'list'}")
         
     except Exception as e:
         logger.error(f"Error in trash_command: {e}", exc_info=True)
-        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+        await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'trash')

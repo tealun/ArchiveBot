@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,8 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
     Handle /export command - 导出数据
     
     Usage:
-        /export - 导出为Markdown
-        /export json - 导出为JSON
-        /export csv - 导出为CSV
-        /export tag <tag_name> [format] - 按标签导出
+        /export - 显示格式选择菜单
+        /export tag <tag_name> - 按标签导出（显示格式选择）
     
     Args:
         update: Telegram update
@@ -35,86 +34,61 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         # 获取export_manager
         export_manager = context.bot_data.get('export_manager')
         if not export_manager:
-            await update.message.reply_text(lang_ctx.t('export_manager_not_initialized'))
+            await send_or_update_reply(update, context, lang_ctx.t('export_manager_not_initialized'), 'export')
             return
         
-        # 发送处理中提示
-        processing_msg = await update.message.reply_text(lang_ctx.t('export_processing'))
-        
         # 解析命令参数
-        format_type = 'markdown'  # 默认格式
         tag_name = None
         
         if context.args:
             if context.args[0] == 'tag':
                 # 按标签导出
                 if len(context.args) < 2:
-                    await processing_msg.edit_text(lang_ctx.t('export_tag_usage'))
+                    await send_or_update_reply(update, context, lang_ctx.t('export_tag_usage'), 'export')
                     return
                 tag_name = context.args[1]
-                format_type = context.args[2] if len(context.args) > 2 else 'markdown'
-            else:
-                # 指定格式
-                format_type = context.args[0].lower()
         
-        # 验证格式
-        if format_type not in ['markdown', 'json', 'csv', 'md']:
-            await processing_msg.edit_text(lang_ctx.t('export_invalid_format'))
-            return
+        # 显示格式选择按钮
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "📄 Markdown",
+                    callback_data=f"export_format:markdown:{tag_name or 'all'}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "📊 JSON",
+                    callback_data=f"export_format:json:{tag_name or 'all'}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "📋 CSV",
+                    callback_data=f"export_format:csv:{tag_name or 'all'}"
+                )
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # 导出数据
         if tag_name:
-            # 按标签导出
-            data = export_manager.export_archives_by_tag(tag_name, format_type)
-            filename = f"archives_tag_{tag_name}"
+            message = f"📦 导出标签 #{tag_name} 的归档\n\n请选择导出格式："
         else:
-            # 全量导出
-            if format_type in ['markdown', 'md']:
-                data = export_manager.export_to_markdown()
-                format_type = 'markdown'
-            elif format_type == 'json':
-                data = export_manager.export_to_json()
-            else:  # csv
-                data = export_manager.export_to_csv()
-            
-            filename = "archives_export"
+            message = "📦 导出所有归档\n\n请选择导出格式："
         
-        if not data:
-            await processing_msg.edit_text(lang_ctx.t('export_failed'))
-            return
-        
-        # 确定文件扩展名
-        if format_type in ['markdown', 'md']:
-            ext = 'md'
-        elif format_type == 'json':
-            ext = 'json'
-        else:
-            ext = 'csv'
-        
-        # 生成文件名（带时间戳）
-        from datetime import datetime
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        full_filename = f"{filename}_{timestamp}.{ext}"
-        
-        # 发送文件
-        from io import BytesIO
-        file_data = BytesIO(data.encode('utf-8'))
-        file_data.name = full_filename
-        
-        await update.message.reply_document(
-            document=file_data,
-            filename=full_filename,
-            caption=lang_ctx.t('export_success', filename=full_filename, size=len(data))
+        await send_or_update_reply(
+            update, 
+            context, 
+            message, 
+            'export',
+            reply_markup=reply_markup
         )
         
-        # 删除处理中提示
-        await processing_msg.delete()
-        
-        logger.info(f"Export command executed: format={format_type}, tag={tag_name}, size={len(data)}")
+        logger.info(f"Export command: showing format selection, tag={tag_name}")
         
     except Exception as e:
         logger.error(f"Error in export_command: {e}", exc_info=True)
         try:
-            await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+            await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'export')
         except:
             pass

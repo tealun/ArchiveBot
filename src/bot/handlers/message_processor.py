@@ -36,7 +36,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
     """
     # 从 message 创建临时 update 对象以获取语言上下文
     from telegram import Update as TelegramUpdate
-    from ..utils.config import get_config
+    from ...utils.config import get_config
     
     temp_update = TelegramUpdate(update_id=0, message=message)
     lang_ctx = get_language_context(temp_update, context)
@@ -52,7 +52,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         # 如果有合并的caption，添加到分析结果
         if merged_caption:
             # 提取hashtags
-            from ..utils.helpers import extract_hashtags
+            from ...utils.helpers import extract_hashtags
             caption_hashtags = extract_hashtags(merged_caption)
             if caption_hashtags:
                 existing_hashtags = analysis.get('hashtags', [])
@@ -67,7 +67,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         # 如果是链接，尝试提取元数据
         if analysis.get('_needs_metadata_extraction'):
             try:
-                from ..utils.link_extractor import extract_link_metadata
+                from ...utils.link_extractor import extract_link_metadata
                 url = analysis.get('url')
                 metadata = await extract_link_metadata(url)
                 
@@ -481,7 +481,7 @@ async def _auto_generate_note(
         if content_type in ['text', 'article']:
             content = analysis.get('content', '')
             if content:
-                from ..utils.helpers import should_create_note
+                from ...utils.helpers import should_create_note
                 is_short, note_type = should_create_note(content)
                 
                 if not is_short and ai_summarizer and ai_summarizer.is_available():

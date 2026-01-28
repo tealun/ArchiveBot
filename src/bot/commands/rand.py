@@ -11,6 +11,7 @@ from telegram.constants import ParseMode
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
 from ...utils.message_builder import MessageBuilder
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ async def rand_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         db_storage = context.bot_data.get('db_storage')
         
         if not db_storage:
-            await update.message.reply_text(lang_ctx.t('error_database_not_initialized'))
+            await send_or_update_reply(update, context, lang_ctx.t('error_database_not_initialized'), 'rand')
             return
         
         # 获取配置的随机回顾数量
@@ -48,8 +49,11 @@ async def rand_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
                 # 限制范围1-10
                 count = max(1, min(10, count))
             except ValueError:
-                await update.message.reply_text(
-                    f"❌ 无效的数量参数\n\n使用方法：/rand [1-10]\n默认数量：{default_count}"
+                await send_or_update_reply(
+                    update,
+                    context,
+                    f"❌ 无效的数量参数\n\n使用方法：/rand [1-10]\n默认数量：{default_count}",
+                    'rand'
                 )
                 return
         
@@ -61,7 +65,7 @@ async def rand_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
             all_ids = [row[0] for row in cursor.fetchall()]
         
         if not all_ids:
-            await update.message.reply_text("📭 暂无存档可供回顾")
+            await send_or_update_reply(update, context, "📭 暂无存档可供回顾", 'rand')
             return
         
         # 随机选择
@@ -76,14 +80,14 @@ async def rand_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
                 archives.append(archive)
         
         if not archives:
-            await update.message.reply_text("❌ 获取存档失败")
+            await send_or_update_reply(update, context, "❌ 获取存档失败", 'rand')
             return
         
         # 根据数量决定回复方式
         if len(archives) <= 3:
             # 3条以内：直接发送详细信息
             header = f"🎲 随机回顾（{len(archives)}/{len(all_ids)} 条）\n\n"
-            await update.message.reply_text(header)
+            await send_or_update_reply(update, context, header, 'rand')
             
             for archive in archives:
                 # 尝试发送资源
@@ -120,8 +124,11 @@ async def rand_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
             
             full_text = header + list_text
             
-            await update.message.reply_text(
+            await send_or_update_reply(
+                update,
+                context,
                 full_text,
+                'rand',
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
@@ -130,4 +137,4 @@ async def rand_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         
     except Exception as e:
         logger.error(f"Error in rand_command: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ 随机回顾失败：{str(e)}")
+        await send_or_update_reply(update, context, f"❌ 随机回顾失败：{str(e)}", 'rand')

@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         review_manager = context.bot_data.get('review_manager')
 
         if not review_manager:
-            await update.message.reply_text(lang_ctx.t('review_manager_not_initialized'))
+            await send_or_update_reply(update, context, lang_ctx.t('review_manager_not_initialized'), 'review')
             return
 
         # 显示期间选择按钮
@@ -57,12 +58,15 @@ async def review_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await update.message.reply_text(
+        await send_or_update_reply(
+            update,
+            context,
             lang_ctx.t('review_usage'),
+            'review',
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
 
     except Exception as e:
         logger.error(f"Error in review_command: {e}", exc_info=True)
-        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+        await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'review')

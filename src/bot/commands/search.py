@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +31,14 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         query = ' '.join(context.args) if context.args else None
         
         if not query:
-            await update.message.reply_text(lang_ctx.t('search_no_keyword'))
+            await send_or_update_reply(update, context, lang_ctx.t('search_no_keyword'), 'search')
             return
         
         # Get search engine from context
         search_engine: SearchEngine = context.bot_data.get('search_engine')
         
         if not search_engine:
-            await update.message.reply_text(lang_ctx.t('error_search_engine_not_initialized'))
+            await send_or_update_reply(update, context, lang_ctx.t('error_search_engine_not_initialized'), 'search')
             return
         
         # Send processing message
@@ -111,4 +112,4 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         
     except Exception as e:
         logger.error(f"Error in search_command: {e}", exc_info=True)
-        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+        await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'search')

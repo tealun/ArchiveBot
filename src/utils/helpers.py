@@ -317,3 +317,69 @@ def get_content_type_emoji(content_type: str) -> str:
     }
     
     return emoji_map.get(content_type, '📦')
+
+
+async def send_or_update_reply(update, context, text, command_name, **kwargs):
+    """
+    Send a reply message or update existing one if found
+    Delete old command reply and send new one to keep chat clean
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        text: Message text
+        command_name: Command name (e.g., 'backup', 'stats')
+        **kwargs: Additional arguments for send_message/reply_text
+        
+    Returns:
+        Sent message object
+    """
+    from telegram.error import BadRequest
+    
+    # Get user_id and chat_id
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # Use bot_data for persistence across sessions, keyed by user_id and command
+    reply_key = f'last_reply_{user_id}_{command_name}'
+    
+    # Try to delete old reply if exists
+    old_data = context.bot_data.get(reply_key)
+    if old_data and isinstance(old_data, dict):
+        old_message_id = old_data.get('message_id')
+        old_chat_id = old_data.get('chat_id')
+        
+        if old_message_id and old_chat_id:
+            try:
+                await context.bot.delete_message(
+                    chat_id=old_chat_id,
+                    message_id=old_message_id
+                )
+                logger.info(f"🗑️ Deleted old reply for /{command_name} (msg_id: {old_message_id})")
+            except BadRequest as e:
+                # Message might be already deleted or too old
+                logger.debug(f"Could not delete old reply for /{command_name}: {e}")
+            except Exception as e:
+                logger.warning(f"Error deleting old reply for /{command_name}: {e}")
+    
+    # Send new reply
+    if hasattr(update, 'message') and update.message:
+        sent_message = await update.message.reply_text(text, **kwargs)
+    else:
+        sent_message = await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            **kwargs
+        )
+    
+    # Store new message_id and chat_id in bot_data for persistence
+    context.bot_data[reply_key] = {
+        'message_id': sent_message.message_id,
+        'chat_id': chat_id,
+        'command': command_name,
+        'timestamp': sent_message.date.timestamp() if sent_message.date else None
+    }
+    
+    logger.info(f"📝 Stored reply for /{command_name} (msg_id: {sent_message.message_id})")
+    
+    return sent_message

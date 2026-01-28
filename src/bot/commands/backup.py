@@ -13,7 +13,7 @@ from ...utils.config import get_config
 logger = logging.getLogger(__name__)
 
 from ...core.backup_manager import BackupManager
-from ...utils.helpers import format_file_size
+from ...utils.helpers import format_file_size, send_or_update_reply
 
 @with_language_context
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
@@ -44,23 +44,47 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         if not context.args:
             backups = backup_manager.list_backups()
             if not backups:
-                await update.message.reply_text(lang_ctx.t('backup_none'))
+                # 没有备份时，显示提示信息和立即备份按钮
+                keyboard = [[
+                    InlineKeyboardButton(
+                        "🆕 立即备份",
+                        callback_data="backup_create_now"
+                    )
+                ]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await send_or_update_reply(
+                    update, context,
+                    lang_ctx.t('backup_none'),
+                    'backup',
+                    reply_markup=reply_markup
+                )
                 return
 
             lines = [lang_ctx.t('backup_list_header', count=len(backups))]
-            for b in backups[:10]:
-                lines.append(lang_ctx.t(
-                    'backup_list_item',
-                    filename=b.get('filename'),
-                    created_at=b.get('created_at'),
-                    size=b.get('size'),
-                    description=b.get('description', '')
-                ))
+            lines.append("")
+            
+            for idx, b in enumerate(backups[:10], 1):
+                filename = b.get('filename', 'unknown')
+                created_at = b.get('created_at', '')
+                size = b.get('size', 0)
+                description = b.get('description', '')
+                
+                # 格式化文件大小
+                size_str = format_file_size(size)
+                
+                # 构建单个备份条目
+                lines.append(f"📦 <b>{idx}. {filename}</b>")
+                lines.append(f"   📅 {created_at}")
+                lines.append(f"   📊 {size_str}")
+                if description:
+                    lines.append(f"   💬 {description}")
+                lines.append("")
+            
             if len(backups) > 10:
                 lines.append(lang_ctx.t('backup_list_more', count=len(backups) - 10))
 
             # 添加操作按钮
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [
                     InlineKeyboardButton(
@@ -87,8 +111,11 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await update.message.reply_text(
+            await send_or_update_reply(
+                update, context,
                 '\n'.join(lines),
+                'backup',
+                parse_mode=ParseMode.HTML,
                 reply_markup=reply_markup
             )
             return

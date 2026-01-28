@@ -41,8 +41,8 @@ async def handle_language_callback(update: Update, context: ContextTypes.DEFAULT
                 config = get_config()
                 config.set('bot.language', language)
                 config.save()
-                # Update current language context
-                lang_ctx.set_language(language)
+                # Update current language context using property setter
+                lang_ctx.language = language
                 
                 # 同步更新用户的命令菜单语言
                 try:

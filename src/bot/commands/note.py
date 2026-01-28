@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,12 @@ async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
     try:
         # 检查是否已经在笔记模式中
         if context.user_data.get('note_mode'):
-            await update.message.reply_text(
+            await send_or_update_reply(
+                update,
+                context,
                 "⚠️ 您已经在笔记模式中\n"
-                "发送 /cancel 可以退出并保存当前笔记"
+                "发送 /cancel 可以退出并保存当前笔记",
+                'note'
             )
             return
         
@@ -92,13 +96,13 @@ async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
             "🚫 发送 /cancel 可立即退出并保存笔记"
         ])
         
-        await update.message.reply_text('\n'.join(reply_parts))
+        await send_or_update_reply(update, context, '\n'.join(reply_parts), 'note')
         
         logger.info(f"User {update.effective_user.id} entered note mode")
         
     except Exception as e:
         logger.error(f"Error in note_command: {e}", exc_info=True)
-        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+        await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'note')
 
 
 @with_language_context
@@ -114,14 +118,17 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
     try:
         # 检查是否在笔记模式中
         if not context.user_data.get('note_mode'):
-            await update.message.reply_text(
+            await send_or_update_reply(
+                update,
+                context,
                 "⚠️ 您当前不在笔记模式中\n"
-                "发送 /note 可以进入笔记模式"
+                "发送 /note 可以进入笔记模式",
+                'cancel'
             )
             return
         
         # 导入handlers中的_finalize_note_internal
-        from ..bot.handlers import _finalize_note_internal
+        from ..handlers import _finalize_note_internal
         
         # 立即生成并保存笔记
         await _finalize_note_internal(context, update.effective_chat.id, update.effective_user.id, reason="manual")
@@ -130,7 +137,7 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         
     except Exception as e:
         logger.error(f"Error in cancel_command: {e}", exc_info=True)
-        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+        await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'cancel')
 
 
 @with_language_context
@@ -147,7 +154,7 @@ async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         # 获取note_manager和config
         note_manager = context.bot_data.get('note_manager')
         if not note_manager:
-            await update.message.reply_text(lang_ctx.t('note_manager_not_initialized'))
+            await send_or_update_reply(update, context, lang_ctx.t('note_manager_not_initialized'), 'notes')
             return
         
         # 获取所有笔记（分页显示）
@@ -166,8 +173,11 @@ async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
             lang_ctx=lang_ctx
         )
         
-        await update.message.reply_text(
-            result_text, 
+        await send_or_update_reply(
+            update,
+            context,
+            result_text,
+            'notes',
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup,
             disable_web_page_preview=True
@@ -177,4 +187,4 @@ async def notes_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         
     except Exception as e:
         logger.error(f"Error in notes_command: {e}", exc_info=True)
-        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+        await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'notes')

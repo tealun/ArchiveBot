@@ -2,6 +2,8 @@
 Setting callbacks - 配置管理回调处理
 """
 
+from __future__ import annotations
+
 import logging
 import yaml
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup

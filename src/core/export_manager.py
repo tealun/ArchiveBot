@@ -59,11 +59,9 @@ class ExportManager:
                 deleted_filter = "" if include_deleted else "WHERE deleted = 0"
                 cursor = self.db.execute(f"""
                     SELECT 
-                        id, title, content, content_type, tags,
+                        id, title, content, content_type,
                         file_size, file_id,
-                        storage_type, source_chat, source_message_id,
-                        telegram_message_id, telegram_file_id,
-                        ai_summary, ai_category, ai_tags, ai_key_points,
+                        storage_type, source, metadata,
                         created_at, deleted, deleted_at
                     FROM archives
                     {deleted_filter}
@@ -72,26 +70,24 @@ class ExportManager:
                 
                 for row in cursor.fetchall():
                     archive_id = row[0]
+                    
+                    # 通过 tag_manager 获取标签
+                    tags = self.tag_manager.get_archive_tags(archive_id) if self.tag_manager else []
+                    
                     archive = {
                         'id': archive_id,
                         'title': row[1],
                         'content': row[2],
                         'content_type': row[3],
-                        'tags': row[4].split(',') if row[4] else [],
-                        'file_size': row[5],
-                        'file_id': row[6],
-                        'storage_type': row[7],
-                        'source_chat': row[8],
-                        'source_message_id': row[9],
-                        'telegram_message_id': row[10],
-                        'telegram_file_id': row[11],
-                        'ai_summary': row[12],
-                        'ai_category': row[13],
-                        'ai_tags': row[14],
-                        'ai_key_points': row[15],
-                        'created_at': row[16],
-                        'deleted': bool(row[17]),
-                        'deleted_at': row[18]
+                        'tags': tags,
+                        'file_size': row[4],
+                        'file_id': row[5],
+                        'storage_type': row[6],
+                        'source': row[7],
+                        'metadata': row[8],
+                        'created_at': row[9],
+                        'deleted': bool(row[10]),
+                        'deleted_at': row[11]
                     }
                     
                     # Add notes
@@ -252,7 +248,7 @@ class ExportManager:
                 deleted_filter = "" if include_deleted else "WHERE deleted = 0"
                 cursor = self.db.execute(f"""
                     SELECT 
-                        id, title, content, content_type, tags,
+                        id, title, content, content_type,
                         file_size, created_at,
                         deleted, deleted_at
                     FROM archives
@@ -265,16 +261,20 @@ class ExportManager:
                     notes = self.note_manager.get_notes(archive_id)
                     note_count = len(notes)
                     
+                    # 通过 tag_manager 获取标签
+                    tags = self.tag_manager.get_archive_tags(archive_id) if self.tag_manager else []
+                    tags_str = ', '.join(tags)
+                    
                     writer.writerow([
                         row[0],  # id
                         row[1] or '',  # title
                         (row[2] or '')[:100],  # content (truncated)
                         row[3],  # content_type
-                        row[4] or '',  # tags
-                        row[5] or 0,  # file_size
-                        row[6],  # created_at
-                        '是' if row[7] else '否',  # deleted
-                        row[8] or '',  # deleted_at
+                        tags_str,  # tags
+                        row[4] or 0,  # file_size
+                        row[5],  # created_at
+                        '是' if row[6] else '否',  # deleted
+                        row[7] or '',  # deleted_at
                         note_count
                     ])
             
@@ -297,14 +297,17 @@ class ExportManager:
         """
         try:
             with self.db._lock:
+                # 使用 JOIN 查询有指定标签的归档
                 cursor = self.db.execute("""
-                    SELECT 
-                        id, title, content, content_type, tags,
-                        file_name, file_size, created_at
-                    FROM archives
-                    WHERE deleted = 0 AND tags LIKE ?
-                    ORDER BY created_at DESC
-                """, (f'%{tag}%',))
+                    SELECT DISTINCT
+                        a.id, a.title, a.content, a.content_type,
+                        a.file_size, a.created_at
+                    FROM archives a
+                    INNER JOIN archive_tags at ON a.id = at.archive_id
+                    INNER JOIN tags t ON at.tag_id = t.id
+                    WHERE a.deleted = 0 AND t.tag_name = ?
+                    ORDER BY a.created_at DESC
+                """, (tag,))
                 
                 archives = cursor.fetchall()
                 
@@ -319,15 +322,17 @@ class ExportManager:
                         archive_id = row[0]
                         notes = self.note_manager.get_notes(archive_id)
                         
+                        # 获取该归档的所有标签
+                        archive_tags = self.tag_manager.get_archive_tags(archive_id) if self.tag_manager else []
+                        
                         data['archives'].append({
                             'id': archive_id,
                             'title': row[1],
                             'content': row[2],
                             'content_type': row[3],
-                            'tags': row[4].split(',') if row[4] else [],
-                            'file_name': row[5],
-                            'file_size': row[6],
-                            'created_at': row[7],
+                            'tags': archive_tags,
+                            'file_size': row[4],
+                            'created_at': row[5],
                             'notes': notes
                         })
                     
@@ -336,15 +341,20 @@ class ExportManager:
                 elif format == 'csv':
                     csv_buffer = StringIO()
                     writer = csv.writer(csv_buffer)
-                    writer.writerow(['ID', '标题', '内容', '类型', '标签', '文件名', '创建时间', '笔记数量'])
+                    writer.writerow(['ID', '标题', '内容', '类型', '标签', '文件大小', '创建时间', '笔记数量'])
                     
                     for row in archives:
                         archive_id = row[0]
                         notes = self.note_manager.get_notes(archive_id)
+                        
+                        # 获取该归档的所有标签
+                        archive_tags = self.tag_manager.get_archive_tags(archive_id) if self.tag_manager else []
+                        tags_str = ', '.join(archive_tags)
+                        
                         writer.writerow([
                             row[0], row[1] or '', (row[2] or '')[:100],
-                            row[3], row[4] or '', row[5] or '',
-                            row[7], len(notes)
+                            row[3], tags_str, row[4] or 0,
+                            row[5], len(notes)
                         ])
                     
                     return csv_buffer.getvalue()
@@ -360,10 +370,14 @@ class ExportManager:
                         archive_id = row[0]
                         notes = self.note_manager.get_notes(archive_id)
                         
+                        # 获取该归档的所有标签
+                        archive_tags = self.tag_manager.get_archive_tags(archive_id) if self.tag_manager else []
+                        
                         md.write(f"### {row[1] or '无标题'}\n\n")
                         md.write(f"**ID:** #{archive_id}  \n")
                         md.write(f"**类型:** {row[3]}  \n")
-                        md.write(f"**创建时间:** {row[7]}  \n\n")
+                        md.write(f"**标签:** {', '.join(f'`{t}`' for t in archive_tags)}  \n")
+                        md.write(f"**创建时间:** {row[5]}  \n\n")
                         
                         if row[2]:
                             md.write(f"{row[2]}\n\n")

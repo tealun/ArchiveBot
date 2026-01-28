@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,11 @@ async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         context._user_id = update.effective_user.id
         status_text = MessageBuilder.format_ai_status(ai_config, context, lang_ctx)
         
-        await update.message.reply_text(
+        await send_or_update_reply(
+            update,
+            context,
             status_text,
+            'ai',
             parse_mode=ParseMode.MARKDOWN
         )
         
@@ -43,4 +47,4 @@ async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         
     except Exception as e:
         logger.error(f"Error in ai_status_command: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ 获取AI状态失败: {str(e)}")
+        await send_or_update_reply(update, context, f"❌ 获取AI状态失败: {str(e)}", 'ai')

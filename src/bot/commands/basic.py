@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +28,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         config = get_config()
         
         welcome_msg = lang_ctx.t('welcome')
-        await update.message.reply_text(welcome_msg, parse_mode=ParseMode.HTML)
+        await send_or_update_reply(update, context, welcome_msg, 'start', parse_mode=ParseMode.HTML)
         
         logger.info(f"Start command executed by user {update.effective_user.id}")
         
     except Exception as e:
         logger.error(f"Error in start_command: {e}", exc_info=True)
-        await update.message.reply_text(f"Error: {e}")
+        await send_or_update_reply(update, context, f"Error: {e}", 'start')
 
 
 @with_language_context
@@ -49,8 +50,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
     try:
         help_msg = lang_ctx.t('help')
         
-        await update.message.reply_text(
+        await send_or_update_reply(
+            update,
+            context,
             help_msg,
+            'help',
             parse_mode=ParseMode.HTML
         )
         
@@ -58,4 +62,4 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         
     except Exception as e:
         logger.error(f"Error in help_command: {e}", exc_info=True)
-        await update.message.reply_text(f"Error: {e}")
+        await send_or_update_reply(update, context, f"Error: {e}", 'help')

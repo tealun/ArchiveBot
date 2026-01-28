@@ -9,6 +9,7 @@ from telegram.constants import ParseMode
 
 from ...utils.language_context import with_language_context
 from ...utils.config import get_config
+from ...utils.helpers import send_or_update_reply
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +29,14 @@ async def tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         tag_manager: TagManager = context.bot_data.get('tag_manager')
         
         if not tag_manager:
-            await update.message.reply_text(lang_ctx.t('error_tag_manager_not_initialized'))
+            await send_or_update_reply(update, context, lang_ctx.t('error_tag_manager_not_initialized'), 'tags')
             return
         
         # Get all tags (sorted by count descending)
         tags = tag_manager.get_all_tags(limit=100)
         
         if not tags:
-            await update.message.reply_text(lang_ctx.t('tags_empty'))
+            await send_or_update_reply(update, context, lang_ctx.t('tags_empty'), 'tags')
             return
         
         # 构建按钮矩阵（3列，分页显示）
@@ -89,10 +90,10 @@ async def tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         
         message = lang_ctx.t('tags_button_list_header', count=len(tags))
         
-        await update.message.reply_text(message, reply_markup=reply_markup)
+        await send_or_update_reply(update, context, message, 'tags', reply_markup=reply_markup)
         
         logger.info(f"Tags command executed: {len(tags)} tags, page {page}")
         
     except Exception as e:
         logger.error(f"Error in tags_command: {e}", exc_info=True)
-        await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
+        await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'tags')

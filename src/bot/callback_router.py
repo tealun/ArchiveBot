@@ -55,6 +55,8 @@ from .callbacks import (
     handle_backup_create_now_callback,
     handle_backup_keep_callback,
     handle_backup_delete_all_callback,
+    # Export
+    handle_export_format_callback,
     # Setting
     handle_setting_category_callback,
     handle_setting_item_callback,
@@ -76,7 +78,14 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     """
     try:
         query = update.callback_query
-        await query.answer()
+        
+        # 尝试立即回应查询，但如果超时不影响后续处理
+        try:
+            await query.answer()
+        except Exception as e:
+            # 忽略超时错误，继续处理
+            if 'too old' not in str(e).lower():
+                logger.warning(f"Failed to answer callback query: {e}")
         
         lang_ctx = get_language_context(update, context)
         callback_data = query.data
@@ -160,6 +169,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_backup_keep_callback(update, context)
         elif callback_data == 'backup_delete_all':
             await handle_backup_delete_all_callback(update, context)
+        elif callback_data.startswith('export_format:'):
+            await handle_export_format_callback(update, context)
         elif callback_data.startswith('setting_cat:'):
             await handle_setting_category_callback(update, context)
         elif callback_data.startswith('setting_item:'):
