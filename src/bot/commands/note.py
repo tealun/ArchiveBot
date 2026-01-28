@@ -66,7 +66,7 @@ async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         # 创建新的超时任务
         from datetime import timedelta
         # 导入handlers中的note_timeout_callback
-        from ..bot.handlers import note_timeout_callback
+        from ..handlers.note_mode import note_timeout_callback
         
         job = context.job_queue.run_once(
             note_timeout_callback,

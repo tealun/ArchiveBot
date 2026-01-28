@@ -420,7 +420,7 @@ class SystemFormatter:
             standalone_notes = stats.get('standalone_notes', 0)
             
             if total_notes > 0:
-                message += "\n\n📝 **笔记统计：**\n"
+                message += "\n📝 **笔记统计：**\n"
                 message += f"  • 总笔记数：`{total_notes}`\n"
                 message += f"  • 关联笔记：`{linked_notes}` ({int(linked_notes/total_notes*100) if total_notes > 0 else 0}%)\n"
                 message += f"  • 独立笔记：`{standalone_notes}` ({int(standalone_notes/total_notes*100) if total_notes > 0 else 0}%)\n"

@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from ...utils.config import get_config
-from ...utils.language_context import get_language_context
+from ...utils.language_context import with_language_context
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +156,7 @@ CONFIG_CATEGORIES = {
 }
 
 
+@with_language_context
 async def setting_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
     """
     Handle /setting or /set command - 显示配置分类菜单
