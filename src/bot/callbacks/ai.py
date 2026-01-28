@@ -83,3 +83,97 @@ async def handle_ai_view_callback(update: Update, context: ContextTypes.DEFAULT_
     except Exception as e:
         logger.error(f"Error in AI view callback: {e}", exc_info=True)
         await query.answer("Error showing AI analysis", show_alert=True)
+
+
+@with_language_context
+async def handle_ai_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle AI write operation confirmation callback (Phase 2)
+    
+    Callback data format: ai_confirm:confirmation_id
+    """
+    query = update.callback_query
+    
+    try:
+        # Parse callback data
+        confirmation_id = query.data.split(':', 1)[1]
+        
+        # Get pending action
+        pending_actions = context.user_data.get('pending_actions', {})
+        action_data = pending_actions.get(confirmation_id)
+        
+        if not action_data:
+            await query.answer(lang_ctx.t('confirmation_expired'), show_alert=True)
+            await query.message.delete()
+            return
+        
+        # Extract action info
+        action_type = action_data.get('action_type')
+        params = action_data.get('params', {})
+        language = action_data.get('language', lang_ctx.language)
+        
+        # Execute action using executor
+        from ...ai.operations.executor import execute_confirmed_action
+        
+        success, result_message = await execute_confirmed_action(
+            action_type=action_type,
+            action_params=params,
+            context=context,
+            language=language
+        )
+        
+        # Clear pending action
+        del pending_actions[confirmation_id]
+        
+        # Update message
+        await query.answer(lang_ctx.t('action_executed') if success else lang_ctx.t('action_failed'))
+        await query.message.edit_text(
+            f"{result_message}",
+            reply_markup=None
+        )
+        
+        logger.info(f"✓ AI write operation confirmed and executed: {action_type}")
+        
+    except Exception as e:
+        logger.error(f"Error handling AI confirm callback: {e}", exc_info=True)
+        await query.answer(f"{lang_ctx.t('error_occurred')}", show_alert=True)
+
+
+@with_language_context
+async def handle_ai_cancel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_ctx) -> None:
+    """
+    Handle AI write operation cancellation callback (Phase 2)
+    
+    Callback data format: ai_cancel:confirmation_id
+    """
+    query = update.callback_query
+    
+    try:
+        # Parse callback data
+        confirmation_id = query.data.split(':', 1)[1]
+        
+        # Get pending action
+        pending_actions = context.user_data.get('pending_actions', {})
+        action_data = pending_actions.get(confirmation_id)
+        
+        if not action_data:
+            await query.answer(lang_ctx.t('confirmation_expired'), show_alert=True)
+            await query.message.delete()
+            return
+        
+        # Clear pending action
+        del pending_actions[confirmation_id]
+        
+        # Update message
+        cancel_msg = "✅ 操作已取消" if lang_ctx.language.startswith('zh') else "✅ Operation cancelled"
+        await query.answer(cancel_msg)
+        await query.message.edit_text(
+            f"{cancel_msg}",
+            reply_markup=None
+        )
+        
+        logger.info(f"✓ AI write operation cancelled: {action_data.get('action_type')}")
+        
+    except Exception as e:
+        logger.error(f"Error handling AI cancel callback: {e}", exc_info=True)
+        await query.answer(f"{lang_ctx.t('error_occurred')}", show_alert=True)

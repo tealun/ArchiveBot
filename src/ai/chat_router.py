@@ -323,8 +323,71 @@ async def handle_command_request(plan: Dict[str, Any], context: Any, language: s
         
         return message
     
-    # Phase 2 & 3: Not yet implemented - guide user to use commands
-    # TODO: Implement Phase 2 (write operations with confirmation) and Phase 3 (forbidden operations)
+    # Phase 2: Write operations - require confirmation
+    WRITE_OPERATIONS = ['create_note', 'add_tag', 'remove_tag', 'toggle_favorite']
+    
+    if command_type in WRITE_OPERATIONS:
+        logger.info(f"🤖 AI requesting write operation with confirmation: {command_type}")
+        
+        # Generate confirmation using existing pending_action mechanism
+        import uuid
+        from datetime import datetime
+        
+        confirmation_id = str(uuid.uuid4())[:8]
+        
+        # Store pending action in context
+        if 'pending_actions' not in context.user_data:
+            context.user_data['pending_actions'] = {}
+        
+        context.user_data['pending_actions'][confirmation_id] = {
+            'action_type': command_type,
+            'params': command_params,
+            'created_at': datetime.now().isoformat(),
+            'language': language
+        }
+        
+        # Generate confirmation message
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        action_descriptions = {
+            'create_note': '创建笔记' if not language.startswith('zh-T') else '創建筆記',
+            'add_tag': '添加标签' if not language.startswith('zh-T') else '添加標籤',
+            'remove_tag': '移除标签' if not language.startswith('zh-T') else '移除標籤',
+            'toggle_favorite': '切换收藏' if not language.startswith('zh-T') else '切換收藏'
+        }
+        
+        action_desc = action_descriptions.get(command_type, command_type)
+        params_str = ', '.join([f"{k}={v}" for k, v in command_params.items()])
+        
+        if language.startswith('zh'):
+            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            message_text = (
+                f"⚠️ 确认执行操作\n\n"
+                f"🔧 操作：{action_desc}\n"
+                f"📝 参数：{params_str}\n\n"
+                f"请确认是否执行此操作？"
+            ) if not is_traditional else (
+                f"⚠️ 確認執行操作\n\n"
+                f"🔧 操作：{action_desc}\n"
+                f"📝 參數：{params_str}\n\n"
+                f"請確認是否執行此操作？"
+            )
+        else:
+            message_text = (
+                f"⚠️ Confirm Action\n\n"
+                f"🔧 Action: {action_desc}\n"
+                f"📝 Parameters: {params_str}\n\n"
+                f"Do you want to proceed?"
+            )
+        
+        # Return message with confirmation callback data
+        # The confirmation will be handled by executor via callback
+        context.user_data['pending_confirmation_message'] = message_text
+        context.user_data['pending_confirmation_id'] = confirmation_id
+        
+        return message_text
+    
+    # Phase 3: Not yet implemented - guide user to use commands
     
     command_guides = {
         'note': i18n.t('command_guide_note', language) if hasattr(i18n, 't') else "💡 使用 /note <归档ID> 添加笔记",

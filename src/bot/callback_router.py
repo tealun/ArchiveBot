@@ -21,6 +21,8 @@ from .callbacks import (
     handle_search_page_callback,
     # AI
     handle_ai_view_callback,
+    handle_ai_confirm_callback,
+    handle_ai_cancel_callback,
     # Trash
     handle_delete_callback,
     handle_trash_restore_callback,
@@ -179,6 +181,10 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_setting_set_callback(update, context)
         elif callback_data == 'setting_back':
             await handle_setting_back_callback(update, context)
+        elif callback_data.startswith('ai_confirm:'):
+            await handle_ai_confirm_callback(update, context)
+        elif callback_data.startswith('ai_cancel:'):
+            await handle_ai_cancel_callback(update, context)
         elif callback_data == 'noop':
             # 不做任何操作（日期显示按钮）
             pass

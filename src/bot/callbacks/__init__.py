@@ -16,7 +16,11 @@ from .tag import (
 from .search import handle_search_page_callback
 
 # AI callbacks
-from .ai import handle_ai_view_callback
+from .ai import (
+    handle_ai_view_callback,
+    handle_ai_confirm_callback,
+    handle_ai_cancel_callback
+)
 
 # Trash callbacks
 from .trash import (

@@ -172,6 +172,39 @@ async def _process_ai_message(
         ):
             return True
         
+        # 检测是否有待确认的写操作（Phase 2）
+        if 'pending_confirmation_message' in context.user_data and 'pending_confirmation_id' in context.user_data:
+            confirmation_msg = context.user_data.pop('pending_confirmation_message')
+            confirmation_id = context.user_data.pop('pending_confirmation_id')
+            
+            # 显示确认对话框
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "✅ 确认执行" if lang_ctx.language.startswith('zh') else "✅ Confirm",
+                        callback_data=f"ai_confirm:{confirmation_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "❌ 取消" if lang_ctx.language.startswith('zh') else "❌ Cancel",
+                        callback_data=f"ai_cancel:{confirmation_id}"
+                    )
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # 删除进度消息，发送确认消息
+            try:
+                await progress_msg.delete()
+            except:
+                pass
+            
+            await message.reply_text(confirmation_msg, reply_markup=reply_markup)
+            logger.info(f"Write operation confirmation sent for {confirmation_id}")
+            return True
+        
         # 编辑消息为最终回复（正常文本）
         await progress_msg.edit_text(f"🤖 {ai_response}")
         
