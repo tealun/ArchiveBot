@@ -221,8 +221,12 @@ class Database:
                     # If migration fails, continue with existing schema
                     try:
                         cursor.execute("DROP TABLE IF EXISTS notes_new")
-                except Exception as cleanup_err:
-                    logger.debug(f"Failed to cleanup notes_new table: {cleanup_err}")
+                    except Exception as cleanup_err:
+                        logger.debug(f"Failed to cleanup notes_new table: {cleanup_err}")
+            
+            # Storage stats table - tracks storage usage
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS storage_stats (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     storage_type TEXT NOT NULL,
                     provider TEXT,
