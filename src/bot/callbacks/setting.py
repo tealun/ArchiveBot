@@ -177,6 +177,13 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         
         item_info = get_config_item_info(config_key)
         item_name = item_info['name']
+        category_key = _get_category_key(config_key)
+        
+        # 创建返回按钮
+        keyboard = [[
+            InlineKeyboardButton("⬅️ 返回配置分类", callback_data=f"setting_cat:{category_key}")
+        ]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         
         if success:
             await update.message.reply_text(
@@ -184,12 +191,14 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
                 f"<b>{item_name}</b>\n"
                 f"新值：<code>{value_str}</code>\n\n"
                 f"{message}",
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup
             )
         else:
             await update.message.reply_text(
                 f"❌ 配置更新失败\n\n{message}",
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup
             )
         
         # 清除等待状态
