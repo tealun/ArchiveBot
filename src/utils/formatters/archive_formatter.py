@@ -417,7 +417,9 @@ class ArchiveFormatter:
             if not caption:
                 caption = f"📚 {title}" if title else None
             
-            if content_type in ['photo', 'image']:
+            # 根据准确的 content_type 发送对应类型的消息
+            # content_type 来自 analyzer.py，确保类型匹配
+            if content_type == 'image':  # photo 在 analyzer 中被标记为 'image'
                 return await bot.send_photo(chat_id=chat_id, photo=file_id, caption=caption)
             elif content_type == 'video':
                 return await bot.send_video(chat_id=chat_id, video=file_id, caption=caption)
@@ -425,16 +427,17 @@ class ArchiveFormatter:
                 return await bot.send_audio(chat_id=chat_id, audio=file_id, caption=caption)
             elif content_type == 'voice':
                 return await bot.send_voice(chat_id=chat_id, voice=file_id, caption=caption)
-            elif content_type == 'animation':
+            elif content_type == 'animation':  # GIF
                 return await bot.send_animation(chat_id=chat_id, animation=file_id, caption=caption)
             elif content_type == 'sticker':
                 return await bot.send_sticker(chat_id=chat_id, sticker=file_id)
             elif content_type in ['document', 'ebook']:
                 return await bot.send_document(chat_id=chat_id, document=file_id, caption=caption)
             else:
-                # 对于未知类型，尝试作为文档发送
-                logger.warning(f"Unknown content_type '{content_type}', trying to send as document")
-                return await bot.send_document(chat_id=chat_id, document=file_id, caption=caption)
+                # 对于 text, link, contact, location, unknown 等类型不应该调用此方法
+                # 如果到这里说明数据有问题，记录警告
+                logger.warning(f"Unexpected content_type '{content_type}' in send_resource, cannot send")
+                return None
         
         except Exception as e:
             logger.error(f"Failed to send archive resource: {e}", exc_info=True)
