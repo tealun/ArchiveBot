@@ -119,12 +119,13 @@ class SystemFormatter:
                 db_storage = context.bot_data.get('db_storage')
                 if db_storage:
                     try:
+                        # 查询基本统计
                         cursor = db_storage.db.execute("""
                             SELECT 
                                 COUNT(*) as total,
-                                COUNT(CASE WHEN ai_summary IS NOT NULL THEN 1 END) as with_summary,
-                                COUNT(CASE WHEN ai_tags IS NOT NULL THEN 1 END) as with_tags,
-                                COUNT(CASE WHEN ai_category IS NOT NULL THEN 1 END) as with_category
+                                COUNT(CASE WHEN ai_summary IS NOT NULL AND ai_summary != '' THEN 1 END) as with_summary,
+                                COUNT(CASE WHEN ai_key_points IS NOT NULL AND ai_key_points != '' THEN 1 END) as with_key_points,
+                                COUNT(CASE WHEN ai_category IS NOT NULL AND ai_category != '' THEN 1 END) as with_category
                             FROM archives
                             WHERE deleted = 0
                         """)
@@ -132,16 +133,27 @@ class SystemFormatter:
                         
                         total = stats[0]
                         with_summary = stats[1]
-                        with_tags = stats[2]
+                        with_key_points = stats[2]
                         with_category = stats[3]
+                        
+                        # 查询AI生成的标签数量（标签类型为'ai'）
+                        cursor = db_storage.db.execute("""
+                            SELECT COUNT(DISTINCT at.archive_id)
+                            FROM archive_tags at
+                            INNER JOIN tags t ON at.tag_id = t.id
+                            INNER JOIN archives a ON at.archive_id = a.id
+                            WHERE t.tag_type = 'ai' AND a.deleted = 0
+                        """)
+                        with_ai_tags = cursor.fetchone()[0]
                         
                         status_text += "📊 **使用统计：**\n"
                         status_text += f"  • 总归档数：`{total}`\n"
                         status_text += f"  • AI摘要：`{with_summary}` ({int(with_summary/total*100) if total > 0 else 0}%)\n"
-                        status_text += f"  • AI标签：`{with_tags}` ({int(with_tags/total*100) if total > 0 else 0}%)\n"
+                        status_text += f"  • AI标签：`{with_ai_tags}` ({int(with_ai_tags/total*100) if total > 0 else 0}%)\n"
+                        status_text += f"  • AI关键点：`{with_key_points}` ({int(with_key_points/total*100) if total > 0 else 0}%)\n"
                         status_text += f"  • AI分类：`{with_category}` ({int(with_category/total*100) if total > 0 else 0}%)\n\n"
                     except Exception as e:
-                        logger.warning(f"Failed to get AI usage stats: {e}")
+                        logger.warning(f"Failed to get AI usage stats: {e}", exc_info=True)
                         status_text += "📊 **使用统计：** 无法获取\n\n"
                 
                 if chat_enabled:
