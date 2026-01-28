@@ -202,6 +202,7 @@ class StorageManager:
                     archive_data={
                         'title': analysis.get('title'),
                         'content': analysis.get('content'),
+                        'caption': analysis.get('caption'),  # 添加caption
                         'content_type': content_type,
                         'file_size': analysis.get('file_size', 0),
                         'tags': all_tags,
@@ -209,6 +210,7 @@ class StorageManager:
                         'storage_provider': storage_provider,
                         'storage_path': storage_path,
                         'source': analysis.get('source', '直接发送'),
+                        'ai_title': analysis.get('ai_title'),  # 添加AI标题
                         'ai_summary': analysis.get('ai_summary'),
                         'ai_category': analysis.get('ai_category'),
                         'ai_key_points': analysis.get('ai_key_points', [])
@@ -345,6 +347,7 @@ class StorageManager:
                 archive_data={
                     'title': analysis.get('title'),
                     'content': analysis.get('content'),
+                    'caption': analysis.get('caption'),  # 添加caption
                     'content_type': content_type,
                     'file_size': analysis.get('file_size', 0),
                     'tags': all_tags,
@@ -352,6 +355,7 @@ class StorageManager:
                     'storage_provider': storage_provider,
                     'storage_path': storage_path,
                     'source': analysis.get('source', '直接发送'),
+                    'ai_title': analysis.get('ai_title'),  # 添加AI标题
                     'ai_summary': analysis.get('ai_summary'),
                     'ai_category': analysis.get('ai_category'),
                     'ai_key_points': analysis.get('ai_key_points', [])

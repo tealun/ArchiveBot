@@ -137,6 +137,8 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             
             # 可分析的内容类型：文本、链接、文档、电子书
             analyzable_types = ['text', 'link', 'article', 'document', 'ebook']
+            # 媒体类型（图片、视频等）如果有caption或merged_caption也可分析
+            media_types = ['photo', 'image', 'video', 'audio', 'voice', 'animation']
             # 文档文件扩展名
             analyzable_extensions = ['.txt', '.md', '.doc', '.docx', '.pdf', '.epub', '.rtf']
             
@@ -150,6 +152,12 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                 file_name = analysis.get('file_name', '').lower()
                 if any(file_name.endswith(ext) for ext in analyzable_extensions):
                     should_analyze = True
+            elif content_type in media_types:
+                # 媒体类型：如果有caption或merged_caption则可分析
+                has_caption = bool(message.caption or merged_caption)
+                if has_caption:
+                    should_analyze = True
+                    logger.info(f"Media {content_type} has caption/comment, will perform AI analysis")
             
             if should_analyze:
                 # 自动生成AI标签
@@ -157,7 +165,16 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                     if progress_callback:
                         await progress_callback(lang_ctx.t('progress_ai_generating_tags'), 0.45)
                     try:
-                        content_for_ai = analysis.get('content') or analysis.get('title', '')
+                        # 确定用于AI分析的文本内容
+                        # 优先级：merged_caption（含用户评论） > caption > content
+                        content_for_ai = ''
+                        if content_type in media_types:
+                            # 媒体类型：优先使用merged_caption，其次message.caption
+                            content_for_ai = merged_caption or message.caption or ''
+                        else:
+                            # 其他类型：使用content或title
+                            content_for_ai = analysis.get('content') or analysis.get('title', '')
+                        
                         if content_for_ai:
                             start = time.time()
                             user_language = lang_ctx.language
@@ -197,12 +214,13 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                     except Exception as e:
                         logger.warning(f"AI tag generation failed: {e}")
                 
-                # 自动生成摘要（仅对长文本）
+                # 自动生成摘要
                 if config.ai.get('auto_summarize', False):
                     if progress_callback:
                         await progress_callback(lang_ctx.t('progress_ai_analyzing_content'), 0.5)
                     try:
-                        content_for_ai = analysis.get('content') or ''
+                        # 确定用于AI分析的文本内容
+                        content_for_ai = ''
                         file_name = (analysis.get('file_name') or '').lower()
                         
                         # 对于电子书或大文件，使用元数据而非内容
@@ -219,7 +237,12 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
 3. 基于文件名、文件扩展名、获得的信息等提供可能的分类和标签
 4. 标签应包含文件属性（如：电子书、小说、技术文档、教程、电影、照片、证件照等）"""
                             logger.info(f"Using metadata for large file analysis: {title} ({file_size / 1024 / 1024:.2f}MB)")
+                        elif content_type in media_types:
+                            # 媒体类型：使用merged_caption或caption
+                            content_for_ai = merged_caption or message.caption or ''
                         else:
+                            # 其他类型：使用content
+                            content_for_ai = analysis.get('content') or ''
                             # 截断内容以节省token（最多4000字符，约1000个token）
                             if len(content_for_ai) > 4000:
                                 content_for_ai = content_for_ai[:4000] + "...[内容已截断]"
@@ -355,11 +378,18 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                     )
                     if ai_title:
                         analysis['title'] = source_prefix + ai_title
+                        analysis['ai_title'] = source_prefix + ai_title  # 保存AI标题供formatter使用
                         logger.info(f"AI generated title: {analysis['title']}")
                         if progress_callback:
                             await progress_callback(lang_ctx.t('progress_title_complete'), 0.65)
             except Exception as e:
                 logger.warning(f"AI title generation failed: {e}")
+        
+        # 保存caption到analysis供formatter使用
+        if message.caption:
+            analysis['caption'] = message.caption
+        elif merged_caption:
+            analysis['caption'] = merged_caption
         
         # Get storage manager
         if progress_callback:
@@ -476,7 +506,22 @@ async def _auto_generate_note(
         content_type = analysis.get('content_type', '')
         note_content = None
         
-        # 判断是否需要生成笔记
+        # 获取AI分析结果
+        ai_summary = analysis.get('ai_summary')
+        ai_category = analysis.get('ai_category')
+        ai_key_points = analysis.get('ai_key_points', [])
+        
+        # 检查是否有任何可用内容（AI、用户评论、caption）
+        has_ai_content = bool(ai_summary or ai_category or ai_key_points)
+        has_user_comment = bool(user_comment)
+        has_caption = bool(original_caption)
+        
+        # 只有在完全没有内容时才不生成笔记
+        if not (has_ai_content or has_user_comment or has_caption):
+            logger.debug(f"No content available for note generation, skipping archive {archive_id}")
+            return None
+        
+        # ========== 生成AI笔记部分 ==========
         
         # 1. 文本内容：判断长度，≥阈值则生成简洁笔记
         if content_type in ['text', 'article']:
@@ -537,12 +582,8 @@ URL：{analysis.get('url', '')}
                     logger.info(f"Auto-generated note for link archive {archive_id}")
         
         # 3. 文档：如果有AI分析结果，整理完整笔记
-        elif content_type == 'document':
-            ai_summary = analysis.get('ai_summary')
-            ai_key_points = analysis.get('ai_key_points', [])
-            ai_category = analysis.get('ai_category', '')
-            
-            if ai_summary and ai_summarizer and ai_summarizer.is_available():
+        elif content_type in ['document', 'ebook']:
+            if has_ai_content and ai_summarizer and ai_summarizer.is_available():
                 from telegram import Update as TelegramUpdate
                 temp_update = TelegramUpdate(update_id=0, message=message)
                 lang_ctx = get_language_context(temp_update, context)
@@ -562,20 +603,17 @@ URL：{analysis.get('url', '')}
                     note_content = f"[自动] {note_content}"
                     logger.info(f"Auto-generated note for document archive {archive_id}")
         
-        # 4. 其他媒体类型：整合AI生成的笔记 + 用户评论 + 原始caption
-        # 这适用于图片、视频、音频等转发的媒体
-        elif content_type in ['photo', 'video', 'audio', 'voice', 'animation', 'sticker']:
-            # 如果有AI分析结果，生成基础笔记
-            ai_summary = analysis.get('ai_summary')
-            if ai_summary and ai_summarizer and ai_summarizer.is_available():
+        # 4. 其他类型（图片、视频、音频等）：如果有AI分析，生成笔记
+        else:
+            if has_ai_content and ai_summarizer and ai_summarizer.is_available():
                 from telegram import Update as TelegramUpdate
                 temp_update = TelegramUpdate(update_id=0, message=message)
                 lang_ctx = get_language_context(temp_update, context)
                 language = lang_ctx.language
                 
-                # 生成AI笔记
+                # 使用AI摘要生成笔记
                 note_content = await ai_summarizer.generate_note_from_content(
-                    content=ai_summary,
+                    content=ai_summary or ai_category or '',
                     content_type=content_type,
                     max_length=250,
                     language=language
@@ -583,6 +621,7 @@ URL：{analysis.get('url', '')}
                 
                 if note_content:
                     note_content = f"[自动] {note_content}"
+                    logger.info(f"Auto-generated note for {content_type} archive {archive_id}")
         
         # 构建完整的笔记内容：AI生成 + 用户评论 + 原始caption
         if note_content or user_comment or original_caption:

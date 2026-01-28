@@ -15,6 +15,74 @@ from ..config import get_config
 logger = logging.getLogger(__name__)
 
 
+def _get_channel_name_from_path(storage_path: str) -> Optional[str]:
+    """
+    从storage_path提取频道ID并查找频道名称
+    
+    Args:
+        storage_path: 格式如 "channel_id:message_id" 或 "channel_id:message_id:file_id"
+        
+    Returns:
+        频道名称或None
+    """
+    if not storage_path or ':' not in storage_path:
+        return None
+    
+    try:
+        from ..config import get_config
+        config = get_config()
+        
+        # 解析channel_id
+        parts = storage_path.split(':')
+        channel_id = int(parts[0])
+        
+        # 定义频道ID到名称的映射（从config读取）
+        # 优先级：type_mapping > channels配置
+        channels_config = config.get('storage.telegram.channels', {})
+        type_mapping = config.get('storage.telegram.type_mapping', {})
+        source_mapping = config.get('storage.telegram.source_mapping', [])
+        tag_mapping = config.get('storage.telegram.tag_mapping', [])
+        direct_send_config = config.get('storage.telegram.direct_send', {})
+        
+        # 创建ID到名称的映射表
+        channel_names = {
+            channels_config.get('default'): '默认频道',
+            channels_config.get('text'): '文本频道',
+            channels_config.get('image'): '图片频道',
+            channels_config.get('video'): '视频频道',  
+            channels_config.get('document'): '文档频道',
+            channels_config.get('ebook'): '电子书频道',
+            channels_config.get('media'): '媒体频道',
+            channels_config.get('note'): '笔记频道',
+        }
+        
+        # 从direct_send配置添加
+        if direct_send_config and direct_send_config.get('channels'):
+            ds_channels = direct_send_config['channels']
+            channel_names[ds_channels.get('default')] = '私人频道'
+        
+        # 从source_mapping添加
+        for mapping in source_mapping or []:
+            ch_id = mapping.get('channel_id')
+            if ch_id:
+                # 使用第一个来源作为名称提示
+                sources = mapping.get('sources', [])
+                if sources:
+                    channel_names[ch_id] = f'转发频道'
+        
+        # 查找匹配的频道名
+        channel_name = channel_names.get(channel_id)
+        if channel_name:
+            return channel_name
+        
+        # 如果没找到，返回ID
+        return f"频道 {channel_id}"
+        
+    except Exception as e:
+        logger.debug(f"Error getting channel name: {e}")
+        return None
+
+
 class ArchiveFormatter:
     """归档格式化器 - 处理归档相关的消息格式化"""
     
@@ -36,14 +104,60 @@ class ArchiveFormatter:
             格式化的HTML消息文本
         """
         content_type = archive_data.get('content_type', '')
-        title = archive_data.get('title', '')
         emoji = get_content_type_emoji(content_type)
         
         success_msg = f"{emoji} {i18n.t('archive_success')}"
         
-        if title:
-            success_msg += f"\n\n<b>{i18n.t('title')}</b>: {truncate_text(title, 100)}"
+        # ========== 标题：带存储位置跳转链接 ==========
+        # 优先级：AI生成标题 > 内容截断(32字符，第一段) > 原标题 > 类型名
+        title_text = None
+        ai_title = archive_data.get('ai_title')  # 优先使用AI标题
+        content = archive_data.get('content', '')
+        caption = archive_data.get('caption', '')
+        original_title = archive_data.get('title', '')
         
+        # 判断是否有任何可用内容
+        has_content = bool(ai_title or content or caption)
+        
+        if ai_title:
+            title_text = ai_title
+        elif content or caption:
+            # 使用内容或caption的第一段落，截断32字符
+            text_source = content or caption
+            # 提取第一自然段（以换行符分割）
+            first_para = text_source.split('\n')[0].strip()
+            if len(first_para) > 32:
+                title_text = first_para[:32] + '...'
+            else:
+                title_text = first_para if first_para else text_source[:32]
+        elif original_title:
+            # 如果没有AI/content/caption，使用原标题
+            title_text = original_title
+        else:
+            # 最后才使用类型名
+            content_type_key = f'content_type_{content_type}'
+            title_text = i18n.t(content_type_key)
+            if title_text == content_type_key:
+                title_text = content_type
+        
+        # 构建存储位置链接
+        storage_path = archive_data.get('storage_path')
+        if storage_path and isinstance(storage_path, str) and ':' in storage_path:
+            # 解析 storage_path: "channel_id:message_id" 或 "channel_id:message_id:file_id"
+            parts = storage_path.split(':')
+            if len(parts) >= 2:
+                channel_id_str = parts[0].replace('-100', '')
+                message_id = parts[1]
+                storage_link = f"https://t.me/c/{channel_id_str}/{message_id}"
+                title_display = f'<a href="{storage_link}">{title_text}</a>'
+            else:
+                title_display = title_text
+        else:
+            title_display = title_text
+        
+        success_msg += f"\n\n<b>{i18n.t('title')}</b>: {title_display}"
+        
+        # ========== 内容类型 ==========
         if content_type:
             content_type_key = f'content_type_{content_type}'
             content_type_display = i18n.t(content_type_key)
@@ -51,10 +165,12 @@ class ArchiveFormatter:
                 content_type_display = content_type
             success_msg += f"\n<b>{i18n.t('content_type')}</b>: {content_type_display}"
         
+        # ========== 文件大小 ==========
         file_size = archive_data.get('file_size')
         if file_size and file_size > 0:
             success_msg += f"\n<b>{i18n.t('file_size')}</b>: {format_file_size(file_size)}"
         
+        # ========== 标签 ==========
         tags = archive_data.get('tags', [])
         if tags:
             tags_str = ' '.join(f"#{tag}" for tag in tags[:5])
@@ -62,18 +178,20 @@ class ArchiveFormatter:
                 tags_str += f" +{len(tags) - 5}"
             success_msg += f"\n<b>{i18n.t('tags')}</b>: {tags_str}"
         
-        storage_type = archive_data.get('storage_type')
-        storage_provider = archive_data.get('storage_provider')
-        if storage_type:
-            storage_str = storage_type
-            if storage_provider:
-                storage_str += f" ({storage_provider})"
-            success_msg += f"\n<b>{i18n.t('storage')}</b>: {storage_str}"
+        # ========== 存储：显示频道名称 ==========
+        storage_path = archive_data.get('storage_path')
+        if storage_path:
+            # 获取频道名称（从config中查找）
+            channel_name = _get_channel_name_from_path(storage_path)
+            if channel_name:
+                success_msg += f"\n<b>{i18n.t('storage')}</b>: {channel_name}"
         
+        # ========== 来源 ==========
         source = archive_data.get('source')
         if source:
             success_msg += f"\n<b>{i18n.t('source')}</b>: {source}"
         
+        # ========== AI分析信息 ==========
         if include_ai_info:
             ai_summary = archive_data.get('ai_summary')
             ai_category = archive_data.get('ai_category')
