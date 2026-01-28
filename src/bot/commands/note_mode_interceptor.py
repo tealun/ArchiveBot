@@ -28,7 +28,10 @@ def intercept_in_note_mode(func):
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         # Check if user is in note mode
-        if context.user_data.get('note_mode'):
+        note_mode = context.user_data.get('note_mode', False)
+        logger.info(f"Interceptor called for {update.message.text if update.message else 'unknown'}, note_mode={note_mode}")
+        
+        if note_mode:
             # User is in note mode - show choice dialog
             command_text = update.message.text if update.message else ''
             

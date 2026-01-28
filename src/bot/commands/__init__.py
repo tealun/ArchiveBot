@@ -103,6 +103,7 @@ async def dispatch_command_after_note(
         handler = COMMAND_HANDLERS.get(command)
         if not handler:
             logger.warning(f"Unknown command: {command}")
+            # Get language context only when needed for error message
             lang_ctx = get_language_context(update, context)
             await update.callback_query.message.reply_text(
                 lang_ctx.t('unknown_command_hint', command=command)
@@ -115,19 +116,11 @@ async def dispatch_command_after_note(
         else:
             context.args = []
         
-        # Get language context
-        lang_ctx = get_language_context(update, context)
-        
         # Execute command handler
-        # Note: We need to modify the update object to have a message attribute
-        # since handlers expect update.message
+        # Note: Don't pass lang_ctx here - let the @with_language_context decorator handle it
+        # The handler will use update.effective_message which works for callbacks
         if update.callback_query and update.callback_query.message:
-            # Create a pseudo-update that looks like it came from a command message
-            # This is safe because all our handlers use update.message or update.effective_message
-            original_message = update.callback_query.message
-            
-            # The handler will use update.effective_message which works for callbacks
-            await handler(update, context, lang_ctx)
+            await handler(update, context)
             
             logger.info(f"✓ Command executed: {command}")
             return True
