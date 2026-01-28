@@ -27,7 +27,8 @@ async def handle_setting_category_callback(update: Update, context: ContextTypes
     
     try:
         # 解析callback_data: setting_cat:category_key
-        callback_data = query.data
+        # 检查是否有临时回调数据（从设置保存后返回）
+        callback_data = context.user_data.pop('_temp_callback', None) or query.data
         category_key = callback_data.split(':')[1]
         
         if category_key not in CONFIG_CATEGORIES:
@@ -140,10 +141,7 @@ async def handle_setting_set_callback(update: Update, context: ContextTypes.DEFA
             callback_data = f"setting_cat:{category_key}"
             context.user_data['_temp_callback'] = callback_data
             
-            # 模拟点击返回按钮
-            from telegram import CallbackQuery
-            new_query = update.callback_query
-            new_query._data = callback_data
+            # 调用分类回调来显示更新后的分类页面
             await handle_setting_category_callback(update, context)
         else:
             await query.edit_message_text(
