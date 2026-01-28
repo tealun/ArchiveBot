@@ -271,28 +271,29 @@ class SystemFormatter:
         
         text = f"⚙️ <b>{item_name}</b>\n\n"
         text += f"📝 {description}\n\n"
-        text += f"当前值：<code>{current_value}</code>\n\n"
         
         keyboard = []
         
         if item_type == 'bool':
-            text += "请输入新值：\n"
-            text += "• true/false\n"
-            text += "• yes/no\n"
-            text += "• 1/0\n"
-            text += "• 开/关"
+            # 布尔类型：显示状态和切换按钮
+            status_text = "✅ 已启用" if current_value else "❌ 已禁用"
+            text += f"当前状态：{status_text}\n"
             
-            keyboard = [
-                [
-                    InlineKeyboardButton("✅ 启用", callback_data=f"setting_set:{config_key}:true"),
-                    InlineKeyboardButton("❌ 禁用", callback_data=f"setting_set:{config_key}:false")
-                ],
-                [
-                    InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")
+            # 根据当前状态显示相反的操作按钮
+            if current_value:
+                keyboard = [
+                    [InlineKeyboardButton("❌ 禁用", callback_data=f"setting_set:{config_key}:false")],
+                    [InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")]
                 ]
-            ]
+            else:
+                keyboard = [
+                    [InlineKeyboardButton("✅ 启用", callback_data=f"setting_set:{config_key}:true")],
+                    [InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")]
+                ]
         
         elif item_type == 'int':
+            text += f"当前值：<code>{current_value}</code>\n\n"
+            
             min_val = item_info.get('min')
             max_val = item_info.get('max')
             default_val = item_info.get('default')
@@ -312,6 +313,8 @@ class SystemFormatter:
             ]]
         
         elif item_type == 'string':
+            text += f"当前值：<code>{current_value}</code>\n\n"
+            
             example = item_info.get('example', '')
             
             text += "请输入新值（文本）：\n"

@@ -90,7 +90,7 @@ async def handle_setting_item_callback(update: Update, context: ContextTypes.DEF
             reply_markup=reply_markup
         )
         
-        # 对于需要文本输入的类型，设置等待状态
+        # 只对需要文本输入的类型设置等待状态（布尔类型通过按钮切换，不需要等待输入）
         if item_info['type'] in ('int', 'string'):
             context.user_data['waiting_setting_input'] = config_key
         
