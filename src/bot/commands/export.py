@@ -92,5 +92,5 @@ async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
         logger.error(f"Error in export_command: {e}", exc_info=True)
         try:
             await send_or_update_reply(update, context, lang_ctx.t('error_occurred', error=str(e)), 'export')
-        except:
-            pass
+        except Exception as reply_err:
+            logger.error(f"Failed to send error message: {reply_err}")

@@ -505,8 +505,8 @@ async def handle_note_delete_callback(update: Update, context: ContextTypes.DEFA
             # 删除显示笔记的消息
             try:
                 await query.message.delete()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to delete note message: {e}")
             logger.info(f"Deleted note {note_id}")
         else:
             await query.answer("❌ 删除失败", show_alert=True)

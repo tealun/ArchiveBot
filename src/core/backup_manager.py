@@ -142,8 +142,8 @@ class BackupManager:
                         import json
                         with open(metadata_file, 'r', encoding='utf-8') as f:
                             metadata = json.load(f)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Failed to load backup metadata: {e}")
                 
                 # Fallback to file stats if no metadata
                 if not metadata:

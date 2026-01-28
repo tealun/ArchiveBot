@@ -6,7 +6,6 @@ import logging
 import re
 from datetime import datetime
 from typing import List, Optional
-from urllib.parse import urlparse
 from .config import get_config
 
 logger = logging.getLogger(__name__)

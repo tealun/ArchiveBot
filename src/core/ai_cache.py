@@ -97,13 +97,15 @@ class AICache:
             pass
 
 
-def example_usage():
-    cache = AICache("data/ai_cache.db", ttl=60)
-    key = content_hash("hello world")
-    cache.set(key, {"summary": "hi"})
-    print(cache.get(key))
-    cache.close()
-
-
-if __name__ == "__main__":
-    example_usage()
+# Example usage (for development/testing only)
+# Uncomment if needed for debugging
+# def example_usage():
+#     cache = AICache("data/ai_cache.db", ttl=60)
+#     key = content_hash("hello world")
+#     cache.set(key, {"summary": "hi"})
+#     print(cache.get(key))
+#     cache.close()
+# 
+# 
+# if __name__ == "__main__":
+#     example_usage()

@@ -3,11 +3,9 @@ Link metadata extractor
 链接元数据提取器 - 提取网页标题、描述、图片等信息
 """
 
-import logging
 import re
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse
-import asyncio
 
 logger = logging.getLogger(__name__)
 

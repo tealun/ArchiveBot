@@ -44,8 +44,8 @@ async def handle_export_format_callback(update: Update, context: ContextTypes.DE
         # 显示处理中提示（编辑消息而不是 answer，因为 router 已经 answer 过了）
         try:
             await query.edit_message_text("⏳ 正在导出数据，请稍候...")
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to edit message: {e}")
         
         # 导出数据
         data = None

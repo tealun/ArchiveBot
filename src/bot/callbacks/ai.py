@@ -55,8 +55,8 @@ async def handle_ai_view_callback(update: Update, context: ContextTypes.DEFAULT_
             try:
                 import json
                 ai_key_points = json.loads(ai_key_points_json)
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to parse AI key points JSON: {e}")
         
         # Build AI analysis message
         title = archive.get('title', 'Untitled')

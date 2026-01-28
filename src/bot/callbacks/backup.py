@@ -67,8 +67,9 @@ async def handle_backup_create_now_callback(update: Update, context: ContextType
                     cooldown_message,
                     parse_mode=ParseMode.HTML
                 )
-            except:
+            except Exception as e:
                 # 如果编辑失败（例如消息内容相同），则发送新消息
+                logger.debug(f"Failed to edit cooldown message, sending new: {e}")
                 await context.bot.send_message(
                     chat_id=query.message.chat_id,
                     text=cooldown_message,

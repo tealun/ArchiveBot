@@ -189,6 +189,6 @@ async def handle_review_callback(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"Error handling review callback: {e}", exc_info=True)
         try:
             await query.edit_message_text(lang_ctx.t('error_occurred', error=str(e)))
-        except:
-            pass
+        except Exception as edit_err:
+            logger.debug(f"Failed to edit message with error: {edit_err}")
         await query.answer(f"Error: {str(e)}", show_alert=True)

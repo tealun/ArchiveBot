@@ -6,6 +6,7 @@ Handles incoming messages for archiving
 import logging
 import time
 import asyncio
+from datetime import datetime
 from typing import Optional, List, Dict
 from telegram import Update, Message, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -284,8 +285,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         lang_ctx = get_language_context(update, context)
         try:
             await update.message.reply_text(lang_ctx.t('error_occurred', error=str(e)))
-        except:
-            pass
+        except Exception as reply_err:
+            logger.error(f"Failed to send error message: {reply_err}")
 
 
 # Import and re-export media handlers from handlers package

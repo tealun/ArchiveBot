@@ -198,8 +198,8 @@ async def _process_ai_message(
             # 删除进度消息，发送确认消息
             try:
                 await progress_msg.delete()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to delete progress message: {e}")
             
             await message.reply_text(confirmation_msg, reply_markup=reply_markup)
             logger.info(f"Write operation confirmation sent for {confirmation_id}")
@@ -273,8 +273,8 @@ async def _handle_resource_response(
         # 删除进度消息
         try:
             await progress_msg.delete()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to delete progress message: {e}")
         
         # 统一调用资源发送函数
         await _send_resources(message, context, lang_ctx, strategy, resources, count)

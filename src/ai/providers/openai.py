@@ -30,7 +30,9 @@ class OpenAIProvider(AIProvider):
                 transport=httpx.AsyncHTTPTransport(retries=2)  # 自动重试2次
             )
             self.available = True
-        except: self.available = False
+        except Exception as e:
+            logger.error(f"Failed to initialize OpenAI provider: {e}")
+            self.available = False
     
     async def summarize(self, content, max_tokens=500, language='zh-CN', 
                        context: Optional[Dict[str, Any]] = None):
@@ -251,5 +253,6 @@ Please respond in JSON format:
                 json={"model": self.model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 20, "temperature": self.temperature})
             category = r.json()['choices'][0]['message']['content'].strip()
             return category if category else default_category
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to classify category: {e}")
             return default_category

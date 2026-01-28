@@ -36,8 +36,8 @@ async def _handle_note_mode_message(update: Update, context: ContextTypes.DEFAUL
         if 'note_timeout_job' in context.user_data:
             try:
                 context.user_data['note_timeout_job'].schedule_removal()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove note timeout job: {e}")
         
         # 创建新的超时任务
         from datetime import timedelta
@@ -451,5 +451,5 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
         try:
             for key in ['note_mode', 'note_messages', 'note_archives', 'note_start_time', 'note_timeout_job', 'pending_command']:
                 context.user_data.pop(key, None)
-        except:
-            pass
+        except Exception as cleanup_err:
+            logger.debug(f"Failed to cleanup user_data: {cleanup_err}")

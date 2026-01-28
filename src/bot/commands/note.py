@@ -65,8 +65,8 @@ async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE, lang_
         if 'note_timeout_job' in context.user_data:
             try:
                 context.user_data['note_timeout_job'].schedule_removal()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove previous timeout job: {e}")
         
         # 创建新的超时任务
         from datetime import timedelta
