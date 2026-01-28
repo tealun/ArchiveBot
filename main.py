@@ -505,10 +505,15 @@ def main():
             except Exception as e:
                 logger.error(f"Failed to set bot commands: {e}")
         
-        # 通过 job_queue 延迟执行命令菜单设置（避免 event loop 冲突）
-        if job_queue:
-            job_queue.run_once(set_bot_commands_job, when=5)
-            logger.info("✓ Bot commands setup scheduled (will execute in 5 seconds)")
+        # 使用 post_init 在 bot 初始化后设置命令菜单
+        async def post_init_callback(application: Application) -> None:
+            """在 bot 初始化后执行的回调"""
+            logger.info("Bot initialized, setting up commands menu...")
+            if job_queue:
+                job_queue.run_once(set_bot_commands_job, when=5)
+                logger.info("✓ Bot commands setup scheduled (will execute in 5 seconds)")
+        
+        application.post_init = post_init_callback
         
         logger.info("Bot is ready! Starting polling...")
         
