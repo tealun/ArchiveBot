@@ -93,7 +93,9 @@ class ChatPrompts:
    - 不需要精確搜尋，只需基礎統計數據
    - 例：「我有多少歸檔」「標籤有哪些」「最近歸檔了什麼」
    - 僅need_statistics=true，其他false
-   - 特別注意：查詢筆記時，notes_query.enabled=true（如“最近的筆記”“我的筆記”）
+   - ‼️ 重要：查詢筆記時必須設置 notes_query.enabled=true
+     例：「最近的筆記」「我的筆記」「有多少筆記」「第一條筆記」「筆記列表」
+     設置：{{"enabled": true, "limit": 10, "sort": "recent"}}
 
 3. specific_search（精確搜尋）
    - 明確關鍵詞、主題、內容的搜尋需求
@@ -211,7 +213,9 @@ class ChatPrompts:
    - 不需要精确搜索，只需基础统计数据
    - 例：「我有多少归档」「标签有哪些」「最近归档了什么」
    - 仅need_statistics=true，其他false
-   - 特别注意：查询笔记时，notes_query.enabled=true（如“最近的笔记”“我的笔记”）
+   - ‼️ 重要：查询笔记时必须设置 notes_query.enabled=true
+     例：「最近的笔记」「我的笔记」「有多少笔记」「第一条笔记」「笔记列表」
+     设置：{{"enabled": true, "limit": 10, "sort": "recent"}}
 
 
 3. specific_search（精确搜索）
@@ -336,7 +340,9 @@ Please understand the user's need and plan the response. Return JSON (no markdow
    - No precise search needed, only basic stats
    - e.g., "how many archives do I have", "what tags", "recent archives"
    - ONLY need_statistics=true, others false
-   - Special note: When querying notes, set notes_query.enabled=true (e.g., "recent notes", "my notes")
+   - ‼️ IMPORTANT: When querying notes, MUST set notes_query.enabled=true
+     e.g., "recent notes", "my notes", "how many notes", "first note", "note list"
+     Set: {{"enabled": true, "limit": 10, "sort": "recent"}}
 
 3. specific_search (Specific search)
    - Clear keywords, topics, content search needs
