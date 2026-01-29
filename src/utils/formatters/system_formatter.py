@@ -599,7 +599,8 @@ class SystemFormatter:
         """
         parts = []
         
-        show_stats = user_intent in ['specific_search', 'stats_analysis', 'resource_request']
+        # 扩展：general_query也需要显示统计数据
+        show_stats = user_intent in ['general_query', 'specific_search', 'stats_analysis', 'resource_request']
         
         if data_context.get('statistics') and show_stats:
             stats = data_context['statistics']
