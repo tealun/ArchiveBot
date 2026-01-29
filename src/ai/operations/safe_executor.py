@@ -212,8 +212,8 @@ async def _execute_notes(
             return True, _get_success_message('notes_search_results', language, len(notes), query), data
         
         else:
-            # Get all notes (standalone)
-            notes = note_manager.get_all_standalone_notes()
+            # Get all notes
+            notes = note_manager.get_all_notes(limit=100)
             if not notes:
                 return True, _get_success_message('no_notes_found', language), {'count': 0, 'notes': []}
             

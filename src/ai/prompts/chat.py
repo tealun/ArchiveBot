@@ -61,6 +61,12 @@ class ChatPrompts:
         "need_sample_archives": true/false,
         "need_tags_analysis": true/false,
         "need_recent_context": true/false,  # 如果提到「最近」「剛才」等時間詞
+        "notes_query": {{  # 如果用戶查詢筆記
+            "enabled": true/false,
+            "limit": 10,  # 返回數量，默認10
+            "sort": "recent|oldest",  # 排序方式：最近/最早
+            "has_link": null  # 篩選條件：true=僅有鏈接, false=僅無鏈接, null=不限
+        }},
         "resource_query": {{  # 如果用戶需要實際文件/圖片/視頻等資源
             "enabled": true/false,
             "type": "random|search|filter",  # 隨機/搜尋/篩選
@@ -87,6 +93,7 @@ class ChatPrompts:
    - 不需要精確搜尋，只需基礎統計數據
    - 例：「我有多少歸檔」「標籤有哪些」「最近歸檔了什麼」
    - 僅need_statistics=true，其他false
+   - 特別注意：查詢筆記時，notes_query.enabled=true（如“最近的筆記”“我的筆記”）
 
 3. specific_search（精確搜尋）
    - 明確關鍵詞、主題、內容的搜尋需求
@@ -172,6 +179,12 @@ class ChatPrompts:
         "need_sample_archives": true/false,
         "need_tags_analysis": true/false,
         "need_recent_context": true/false,  # 如果提到「最近」「刚才」等时间词
+        "notes_query": {{  # 如果用户查询笔记
+            "enabled": true/false,
+            "limit": 10,  # 返回数量，默认10
+            "sort": "recent|oldest",  # 排序方式：最近/最早
+            "has_link": null  # 筛选条件：true=仅有链接, false=仅无链接, null=不限
+        }},
         "resource_query": {{  # 如果用户需要实际文件/图片/视频等资源
             "enabled": true/false,
             "type": "random|search|filter",  # 随机/搜索/筛选
@@ -198,6 +211,8 @@ class ChatPrompts:
    - 不需要精确搜索，只需基础统计数据
    - 例：「我有多少归档」「标签有哪些」「最近归档了什么」
    - 仅need_statistics=true，其他false
+   - 特别注意：查询笔记时，notes_query.enabled=true（如“最近的笔记”“我的笔记”）
+
 
 3. specific_search（精确搜索）
    - 明确关键词、主题、内容的搜索需求
@@ -289,6 +304,12 @@ Please understand the user's need and plan the response. Return JSON (no markdow
         "need_sample_archives": true/false,
         "need_tags_analysis": true/false,
         "need_recent_context": true/false,  # If mentions "recent" "lately" "just" etc time words
+        "notes_query": {{  # If user queries notes
+            "enabled": true/false,
+            "limit": 10,  # Number to return, default 10
+            "sort": "recent|oldest",  # Sort order: recent/oldest
+            "has_link": null  # Filter: true=with links only, false=without links only, null=no limit
+        }},
         "resource_query": {{  # If user needs actual files/photos/videos/resources
             "enabled": true/false,
             "type": "random|search|filter",  # random/search/filter
@@ -315,6 +336,7 @@ Please understand the user's need and plan the response. Return JSON (no markdow
    - No precise search needed, only basic stats
    - e.g., "how many archives do I have", "what tags", "recent archives"
    - ONLY need_statistics=true, others false
+   - Special note: When querying notes, set notes_query.enabled=true (e.g., "recent notes", "my notes")
 
 3. specific_search (Specific search)
    - Clear keywords, topics, content search needs

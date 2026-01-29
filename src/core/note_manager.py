@@ -122,10 +122,10 @@ class NoteManager:
                 cursor = self.db.execute(
                     """
                     SELECT 
-                        n.id, n.archive_id, n.content, n.created_at,
+                        n.id, n.archive_id, n.content, n.title, n.storage_path, n.created_at,
                         a.title as archive_title, 
                         a.storage_type, 
-                        a.storage_path
+                        a.storage_path as archive_storage_path
                     FROM notes n
                     LEFT JOIN archives a ON n.archive_id = a.id
                     WHERE n.deleted = 0
@@ -137,7 +137,7 @@ class NoteManager:
             else:
                 cursor = self.db.execute(
                     """
-                    SELECT id, archive_id, content, created_at
+                    SELECT id, archive_id, content, title, storage_path, created_at
                     FROM notes
                     WHERE deleted = 0
                     ORDER BY created_at DESC

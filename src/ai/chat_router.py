@@ -1004,6 +1004,59 @@ async def gather_data(need_data: Dict[str, Any], context: Any, user_intent: str 
             else:
                 logger.info("✗ No recent archives in last 24 hours")
         
+        # 笔记查询（用户查询笔记）
+        notes_query = need_data.get('notes_query', {})
+        if notes_query and notes_query.get('enabled'):
+            note_manager = context.bot_data.get('note_manager')
+            if note_manager:
+                limit = notes_query.get('limit', 10)
+                sort_order = notes_query.get('sort', 'recent')  # recent 或 oldest
+                has_link = notes_query.get('has_link')  # True/False/None
+                
+                logger.info(f"⏳ Notes query: limit={limit}, sort={sort_order}, has_link={has_link}")
+                
+                try:
+                    # 获取所有笔记（包含title和storage_path）
+                    all_notes = note_manager.get_all_notes(limit=100)
+                    
+                    if all_notes:
+                        # 为每个笔记添加has_link字段
+                        for note in all_notes:
+                            note['has_link'] = bool(note.get('storage_path'))
+                        
+                        # 筛选条件：是否有链接
+                        if has_link is not None:
+                            if has_link:
+                                # 仅有链接的笔记
+                                all_notes = [n for n in all_notes if n.get('has_link')]
+                            else:
+                                # 仅无链接的笔记
+                                all_notes = [n for n in all_notes if not n.get('has_link')]
+                        
+                        # 排序
+                        if sort_order == 'oldest':
+                            # 按创建时间升序（最早的在前）
+                            all_notes.sort(key=lambda x: x.get('created_at', 0))
+                        else:
+                            # 按创建时间降序（最近的在前）- 默认
+                            all_notes.sort(key=lambda x: x.get('created_at', 0), reverse=True)
+                        
+                        # 限制数量
+                        notes_list = all_notes[:limit]
+                        
+                        data['notes'] = notes_list
+                        logger.info(f"✅ Notes query: Found {len(notes_list)} notes (filtered from {len(all_notes)} total)")
+                    else:
+                        logger.info("❌ Notes query: No notes found")
+                        data['notes'] = []
+                        
+                except Exception as e:
+                    logger.error(f"Notes query error: {e}", exc_info=True)
+                    data['notes'] = []
+            else:
+                logger.warning("⚠️ Note manager not available")
+                data['notes'] = []
+        
         # 资源查询（用于直接返回文件）
         resource_query = need_data.get('resource_query', {})
         if resource_query and resource_query.get('enabled') and db_storage:
