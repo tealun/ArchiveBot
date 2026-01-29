@@ -148,29 +148,66 @@ class ChatPrompts:
 
 【系統 API 規範】（必須嚴格遵守）：
 
+== 數據庫表結構 ==
+表1: archives (歸檔表)
+  - id: INTEGER 主鍵
+  - content_type: TEXT 內容類型 (text/photo/video/audio/file/ebook)
+  - title: TEXT 標題 (可空)
+  - content: TEXT 內容 (可空)
+  - file_id: TEXT Telegram文件ID (可空)
+  - storage_type: TEXT 存儲類型 (database/telegram)
+  - storage_path: TEXT 存儲路徑 (可空)
+  - favorite: INTEGER 是否收藏 (0未收藏/1已收藏)
+  - deleted: INTEGER 是否刪除 (0未刪除/1已刪除)
+  - created_at: TEXT 創建時間
+  - archived_at: TEXT 歸檔時間
+
+表2: notes (筆記表)
+  - id: INTEGER 主鍵
+  - archive_id: INTEGER 關聯歸檔ID (可空,空=獨立筆記)
+  - content: TEXT 筆記內容
+  - title: TEXT 筆記標題 (可空)
+  - storage_path: TEXT 頻道消息鏈接 (可空)
+  - deleted: INTEGER 是否刪除 (0未刪除/1已刪除)
+  - created_at: TEXT 創建時間
+
+表3: tags (標籤表)
+  - id: INTEGER 主鍵
+  - tag_name: TEXT 標籤名 (唯一)
+  - tag_type: TEXT 標籤類型
+  - count: INTEGER 引用計數
+  - created_at: TEXT 創建時間
+
+== API 參數規範 ==
+
 1. 統計數據字段（need_statistics=true 返回）：
    {{
-     "total": int,           # 歸檔總數（不是 total_archives）
-     "tags": int,            # 標籤總數（不是 total_tags）
+     "total": int,           # 歸檔總數 ‼️不是 total_archives
+     "tags": int,            # 標籤總數 ‼️不是 total_tags
      "recent_week": int      # 最近7天歸檔數
    }}
 
 2. 筆記查詢參數（notes_query）：
    {{
-     "enabled": true/false,  # 必須設置，不能省略
-     "limit": int,           # 返回數量，1-100，不能設置為0
+     "enabled": true/false,  # 必須設置
+     "limit": int,           # 返回數量 1-100 ‼️不能為0
      "sort": "recent|oldest", # 排序方式
      "has_link": true|false|null  # 篩選條件
    }}
-   返回字段：id, content, title, storage_path, created_at, archive_id
+   查詢條件: deleted=0 (只返回未刪除筆記)
+   返回字段: id, content, title, storage_path, created_at, archive_id
 
 3. 搜尋關鍵詞（search_keywords）：
    - 類型：string，不能為 null
    - 用於 FTS 全文搜尋
+   - 搜尋範圍: archives表的title和content字段
+   - 查詢條件: deleted=0 (只搜尋未刪除歸檔)
    - 返回字段：id, title, content_type, created_at
 
 4. 標籤分析（need_tags_analysis）：
-   返回格式：[{{"tag_name": str, "count": int}}, ...]
+   - 統計所有標籤的使用頻率
+   - 返回格式：[{{"tag_name": str, "count": int}}, ...]
+   - 字段來源: tags.tag_name, tags.count
 
 5. 資源查詢（resource_query）：
    {{
@@ -179,11 +216,15 @@ class ChatPrompts:
      "content_types": ["photo", "video", "document", "text", "link", "audio"],
      "limit": int (1-10)
    }}
+   查詢條件: deleted=0, content_type IN content_types
+   返回字段: id, title, content_type, file_id, storage_path, created_at
 
-【重要約束】：
-- limit 參數永遠不能設置為 0（最小值為 1）
-- 字段名必須精確匹配，不能使用 total_archives、total_tags 等不存在的字段
-- 所有參數都有明確類型，不要猜測
+【嚴格約束】：
+‼️ limit 參數: 最小值1, 最大值100, 絕不能為0
+‼️ 字段名: 必須完全匹配表結構, 不能猜測
+‼️ 查詢條件: 默認 deleted=0 (不查詢已刪除數據)
+‼️ favorite字段: 0=未收藏, 1=已收藏
+‼️ 禁止使用: total_archives, total_tags, archive_count等不存在的字段
 
 【重要】響應策略選擇：
 - pure_chat → direct_answer（無需數據）
@@ -308,29 +349,66 @@ class ChatPrompts:
 
 【系统 API 规范】（必须严格遵守）：
 
+== 数据库表结构 ==
+表1: archives (存档表)
+  - id: INTEGER 主键
+  - content_type: TEXT 内容类型 (text/photo/video/audio/file/ebook)
+  - title: TEXT 标题 (可空)
+  - content: TEXT 内容 (可空)
+  - file_id: TEXT Telegram文件ID (可空)
+  - storage_type: TEXT 存储类型 (database/telegram)
+  - storage_path: TEXT 存储路径 (可空)
+  - favorite: INTEGER 是否收藏 (0未收藏/1已收藏)
+  - deleted: INTEGER 是否删除 (0未删除/1已删除)
+  - created_at: TEXT 创建时间
+  - archived_at: TEXT 归档时间
+
+表2: notes (笔记表)
+  - id: INTEGER 主键
+  - archive_id: INTEGER 关联存档ID (可空,空=独立笔记)
+  - content: TEXT 笔记内容
+  - title: TEXT 笔记标题 (可空)
+  - storage_path: TEXT 频道消息链接 (可空)
+  - deleted: INTEGER 是否删除 (0未删除/1已删除)
+  - created_at: TEXT 创建时间
+
+表3: tags (标签表)
+  - id: INTEGER 主键
+  - tag_name: TEXT 标签名 (唯一)
+  - tag_type: TEXT 标签类型
+  - count: INTEGER 引用计数
+  - created_at: TEXT 创建时间
+
+== API 参数规范 ==
+
 1. 统计数据字段（need_statistics=true 返回）：
    {
-     "total": int,           # 归档总数（不是 total_archives）
-     "tags": int,            # 标签总数（不是 total_tags）
+     "total": int,           # 归档总数 ‼️不是 total_archives
+     "tags": int,            # 标签总数 ‼️不是 total_tags
      "recent_week": int      # 最近7天归档数
    }
 
 2. 笔记查询参数（notes_query）：
    {
-     "enabled": true/false,  # 必须设置，不能省略
-     "limit": int,           # 返回数量，1-100，不能设置为0
+     "enabled": true/false,  # 必须设置
+     "limit": int,           # 返回数量 1-100 ‼️不能为0
      "sort": "recent|oldest", # 排序方式
      "has_link": true|false|null  # 筛选条件
    }
-   返回字段：id, content, title, storage_path, created_at, archive_id
+   查询条件: deleted=0 (只返回未删除笔记)
+   返回字段: id, content, title, storage_path, created_at, archive_id
 
 3. 搜索关键词（search_keywords）：
    - 类型：string，不能为 null
    - 用于 FTS 全文搜索
+   - 搜索范围: archives表的title和content字段
+   - 查询条件: deleted=0 (只搜索未删除存档)
    - 返回字段：id, title, content_type, created_at
 
 4. 标签分析（need_tags_analysis）：
-   返回格式：[{"tag_name": str, "count": int}, ...]
+   - 统计所有标签的使用频率
+   - 返回格式：[{"tag_name": str, "count": int}, ...]
+   - 字段来源: tags.tag_name, tags.count
 
 5. 资源查询（resource_query）：
    {
@@ -339,11 +417,15 @@ class ChatPrompts:
      "content_types": ["photo", "video", "document", "text", "link", "audio"],
      "limit": int (1-10)
    }
+   查询条件: deleted=0, content_type IN content_types
+   返回字段: id, title, content_type, file_id, storage_path, created_at
 
-【重要约束】：
-- limit 参数永远不能设置为 0（最小值为 1）
-- 字段名必须精确匹配，不能使用 total_archives、total_tags 等不存在的字段
-- 所有参数都有明确类型，不要猜测
+【严格约束】：
+‼️ limit 参数: 最小值1, 最大值100, 绝不能为0
+‼️ 字段名: 必须完全匹配表结构, 不能猜测
+‼️ 查询条件: 默认 deleted=0 (不查询已删除数据)
+‼️ favorite字段: 0=未收藏, 1=已收藏
+‼️ 禁止使用: total_archives, total_tags, archive_count等不存在的字段
 
 【重要】响应策略选择：
 - pure_chat → direct_answer（无需数据）
@@ -473,29 +555,66 @@ Planning principles:
 
 【System API Specification】(Must strictly follow):
 
+== Database Table Structure ==
+Table 1: archives (Archives table)
+  - id: INTEGER primary key
+  - content_type: TEXT content type (text/photo/video/audio/file/ebook)
+  - title: TEXT title (nullable)
+  - content: TEXT content (nullable)
+  - file_id: TEXT Telegram file ID (nullable)
+  - storage_type: TEXT storage type (database/telegram)
+  - storage_path: TEXT storage path (nullable)
+  - favorite: INTEGER is favorited (0=no/1=yes)
+  - deleted: INTEGER is deleted (0=no/1=yes)
+  - created_at: TEXT created time
+  - archived_at: TEXT archived time
+
+Table 2: notes (Notes table)
+  - id: INTEGER primary key
+  - archive_id: INTEGER related archive ID (nullable, null=standalone note)
+  - content: TEXT note content
+  - title: TEXT note title (nullable)
+  - storage_path: TEXT channel message link (nullable)
+  - deleted: INTEGER is deleted (0=no/1=yes)
+  - created_at: TEXT created time
+
+Table 3: tags (Tags table)
+  - id: INTEGER primary key
+  - tag_name: TEXT tag name (unique)
+  - tag_type: TEXT tag type
+  - count: INTEGER reference count
+  - created_at: TEXT created time
+
+== API Parameter Specification ==
+
 1. Statistics data fields (returned when need_statistics=true):
    {{
-     "total": int,           # Total archives (NOT total_archives)
-     "tags": int,            # Total tags (NOT total_tags)
+     "total": int,           # Total archives ‼️NOT total_archives
+     "tags": int,            # Total tags ‼️NOT total_tags
      "recent_week": int      # Archives in last 7 days
    }}
 
 2. Notes query parameters (notes_query):
    {{
-     "enabled": true/false,  # Must set, cannot omit
-     "limit": int,           # Count to return, 1-100, NEVER set to 0
+     "enabled": true/false,  # Must set
+     "limit": int,           # Count 1-100 ‼️NEVER 0
      "sort": "recent|oldest", # Sort order
      "has_link": true|false|null  # Filter condition
    }}
+   Query condition: deleted=0 (only return non-deleted notes)
    Returned fields: id, content, title, storage_path, created_at, archive_id
 
 3. Search keywords (search_keywords):
    - Type: string, cannot be null
    - Used for FTS full-text search
+   - Search scope: title and content fields of archives table
+   - Query condition: deleted=0 (only search non-deleted archives)
    - Returned fields: id, title, content_type, created_at
 
 4. Tag analysis (need_tags_analysis):
-   Return format: [{{"tag_name": str, "count": int}}, ...]
+   - Count usage frequency of all tags
+   - Return format: [{{"tag_name": str, "count": int}}, ...]
+   - Field source: tags.tag_name, tags.count
 
 5. Resource query (resource_query):
    {{
@@ -504,11 +623,15 @@ Planning principles:
      "content_types": ["photo", "video", "document", "text", "link", "audio"],
      "limit": int (1-10)
    }}
+   Query condition: deleted=0, content_type IN content_types
+   Returned fields: id, title, content_type, file_id, storage_path, created_at
 
-【Important Constraints】:
-- limit parameter can NEVER be set to 0 (minimum value is 1)
-- Field names must match exactly, don't use non-existent fields like total_archives, total_tags
-- All parameters have explicit types, don't guess
+【Strict Constraints】:
+‼️ limit parameter: min 1, max 100, NEVER 0
+‼️ Field names: must exactly match table structure, no guessing
+‼️ Query condition: default deleted=0 (don't query deleted data)
+‼️ favorite field: 0=not favorited, 1=favorited
+‼️ Forbidden: total_archives, total_tags, archive_count and other non-existent fields
 
 【CRITICAL】Response strategy mapping:
 - pure_chat → direct_answer (no data needed)
