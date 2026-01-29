@@ -2,6 +2,16 @@
 AI Chat Prompt Templates
 Handles prompts for AI interactive chat mode
 Supports Simplified Chinese, Traditional Chinese, and English
+
+TODO: 架构重构 - 提示词应当从硬编码迁移到模板文件
+当前问题：
+1. 提示词硬编码在Python代码中，维护困难
+2. 多语言支持混在代码逻辑里，重复代码多
+3. 无法热更新，修改提示词需要重启服务
+4. 难以版本控制和A/B测试
+
+重构方案详见：docs/PROMPT_ARCHITECTURE_REFACTOR.md
+优先级：中（功能稳定后进行）
 """
 
 
