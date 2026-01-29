@@ -983,10 +983,10 @@ async def gather_data(need_data: Dict[str, Any], context: Any, user_intent: str 
             cutoff_time = datetime.now() - timedelta(hours=24)
             cutoff_timestamp = int(cutoff_time.timestamp())
             
-            # 查询最近24小时的归档（限制数量避免内存消耗）
-            recent_archives = db_storage.db.get_archives(
+            # 查询最近的归档（使用search_archives方法）
+            recent_archives = db_storage.search_archives(
                 limit=20,  # 最多20条，避免内存消耗过大
-                order_by='created_at DESC'
+                offset=0
             )
             
             # 筛选24小时内的
@@ -1014,6 +1014,12 @@ async def gather_data(need_data: Dict[str, Any], context: Any, user_intent: str 
             note_manager = context.bot_data.get('note_manager')
             if note_manager:
                 limit = notes_query.get('limit', 10)
+                
+                # 修复：如果AI设置了limit=0，理解为查询所有笔记
+                if limit == 0:
+                    limit = 100  # 默认获取最多100条
+                    logger.info(f"⚠️ AI set limit=0, adjusted to {limit}")
+                
                 sort_order = notes_query.get('sort', 'recent')  # recent 或 oldest
                 has_link = notes_query.get('has_link')  # True/False/None
                 
