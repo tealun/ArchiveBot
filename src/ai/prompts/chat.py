@@ -25,18 +25,26 @@ class ChatPrompts:
         
         Args:
             user_message: User's message
-            language: Language code (zh-CN, zh-TW, en)
+            language: Language code (zh-CN, zh-TW, en, ja, ko, es)
             stats: Statistics about archive system (total, tags, etc.)
             
         Returns:
             Complete prompt string
         """
+        # CJK语言（中日韩）使用中文提示词
+        # 优势：同属东亚文化圈，AI理解更准确，关键词提取更精准
         if language.startswith('zh'):
             is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
             return ChatPrompts._get_understanding_prompt_zh(
                 user_message, stats, is_traditional
             )
+        elif language in ['ja', 'ko']:
+            # 日语/韩语使用简体中文提示词（CJK语言相似性高）
+            return ChatPrompts._get_understanding_prompt_zh(
+                user_message, stats, is_traditional=False
+            )
         else:
+            # 英语、西班牙语等使用英文提示词
             return ChatPrompts._get_understanding_prompt_en(user_message, stats)
     
     @staticmethod
@@ -112,6 +120,11 @@ class ChatPrompts:
    - 需要FTS全文搜尋引擎
    - 例：「找關於Python的內容」「搜尋AI相關」「有沒有講Docker的」
    - search_keywords必填，need_statistics可選
+   - ‼️ 關鍵詞提取約束：
+     * 提取用戶消息中的原始語言關鍵詞（不要翻譯）
+     * 中文問題提取中文關鍵詞，日文問題提取日文關鍵詞
+     * 示例：用戶說「查詢新聞」→ search_keywords="新聞"（不是"news"）
+     * 示例：用戶說「ニュース」→ search_keywords="ニュース"（不是"news"）
 
 4. stats_analysis（統計分析）
    - 需要詳細統計、趨勢分析、深度洞察
@@ -313,6 +326,11 @@ class ChatPrompts:
    - 需要FTS全文搜索引擎
    - 例：「找关于Python的内容」「搜索AI相关」「有没有讲Docker的」
    - search_keywords必填，need_statistics可选
+   - ‼️ 关键词提取约束：
+     * 提取用户消息中的原始语言关键词（不要翻译）
+     * 中文问题提取中文关键词，日文问题提取日文关键词
+     * 示例：用户说「查询新闻」→ search_keywords="新闻"（不是"news"）
+     * 示例：用户说「ニュース」→ search_keywords="ニュース"（不是"news"）
 
 4. stats_analysis（统计分析）
    - 需要详细统计、趋势分析、深度洞察
@@ -518,8 +536,11 @@ Please understand the user's need and plan the response. Return JSON (no markdow
    - Clear keywords, topics, content search needs
    - Requires FTS full-text search engine
    - e.g., "find Python content", "search AI related", "any Docker tutorials"
-   - search_keywords required, need_statistics optional
-
+   - search_keywords required, need_statistics optional   - ‼️ Keyword extraction constraints:
+     * Extract keywords in the user's ORIGINAL language (DO NOT translate)
+     * Chinese query → Chinese keywords, Japanese query → Japanese keywords
+     * Example: User says "查詢新聞" → search_keywords="新聞" (NOT "news")
+     * Example: User says "ニュース" → search_keywords="ニュース" (NOT "news")
 4. stats_analysis (Statistical analysis)
    - Need detailed stats, trend analysis, deep insights
    - Multi-dimensional data: stats+tags+samples
@@ -673,19 +694,26 @@ Return JSON only."""
             user_message: User's original message
             plan: Understanding plan from Stage 1
             data_summary: Gathered data summary
-            language: Language code
+            language: Language code (zh-CN, zh-TW, en, ja, ko, es)
             conversation_history: Previous conversation messages
             knowledge_base: System knowledge base content (optional)
             
         Returns:
             Message list for API call
         """
+        # CJK语言使用中文提示词
         if language.startswith('zh'):
             is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
             return ChatPrompts._get_response_prompt_zh(
                 user_message, plan, data_summary, conversation_history, is_traditional, knowledge_base
             )
+        elif language in ['ja', 'ko']:
+            # 日语/韩语使用简体中文提示词
+            return ChatPrompts._get_response_prompt_zh(
+                user_message, plan, data_summary, conversation_history, False, knowledge_base
+            )
         else:
+            # 英语、西班牙语等使用英文提示词
             return ChatPrompts._get_response_prompt_en(
                 user_message, plan, data_summary, conversation_history, knowledge_base
             )
