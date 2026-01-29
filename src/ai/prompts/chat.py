@@ -146,6 +146,45 @@ class ChatPrompts:
 - 純聊天不查詢數據，直接友好回覆
 - 優先判斷是否為純聊天，避免過度查詢
 
+【系統 API 規範】（必須嚴格遵守）：
+
+1. 統計數據字段（need_statistics=true 返回）：
+   {{
+     "total": int,           # 歸檔總數（不是 total_archives）
+     "tags": int,            # 標籤總數（不是 total_tags）
+     "recent_week": int      # 最近7天歸檔數
+   }}
+
+2. 筆記查詢參數（notes_query）：
+   {{
+     "enabled": true/false,  # 必須設置，不能省略
+     "limit": int,           # 返回數量，1-100，不能設置為0
+     "sort": "recent|oldest", # 排序方式
+     "has_link": true|false|null  # 篩選條件
+   }}
+   返回字段：id, content, title, storage_path, created_at, archive_id
+
+3. 搜尋關鍵詞（search_keywords）：
+   - 類型：string，不能為 null
+   - 用於 FTS 全文搜尋
+   - 返回字段：id, title, content_type, created_at
+
+4. 標籤分析（need_tags_analysis）：
+   返回格式：[{{"tag_name": str, "count": int}}, ...]
+
+5. 資源查詢（resource_query）：
+   {{
+     "enabled": true/false,
+     "type": "random|search|filter",
+     "content_types": ["photo", "video", "document", "text", "link", "audio"],
+     "limit": int (1-10)
+   }}
+
+【重要約束】：
+- limit 參數永遠不能設置為 0（最小值為 1）
+- 字段名必須精確匹配，不能使用 total_archives、total_tags 等不存在的字段
+- 所有參數都有明確類型，不要猜測
+
 【重要】響應策略選擇：
 - pure_chat → direct_answer（無需數據）
 - general_query → direct_answer（僅基礎統計）
@@ -266,6 +305,45 @@ class ChatPrompts:
 - 开放问题可以分析趋势、提供洞察
 - 纯聊天不查询数据，直接友好回复
 - 优先判断是否为纯聊天，避免过度查询
+
+【系统 API 规范】（必须严格遵守）：
+
+1. 统计数据字段（need_statistics=true 返回）：
+   {
+     "total": int,           # 归档总数（不是 total_archives）
+     "tags": int,            # 标签总数（不是 total_tags）
+     "recent_week": int      # 最近7天归档数
+   }
+
+2. 笔记查询参数（notes_query）：
+   {
+     "enabled": true/false,  # 必须设置，不能省略
+     "limit": int,           # 返回数量，1-100，不能设置为0
+     "sort": "recent|oldest", # 排序方式
+     "has_link": true|false|null  # 筛选条件
+   }
+   返回字段：id, content, title, storage_path, created_at, archive_id
+
+3. 搜索关键词（search_keywords）：
+   - 类型：string，不能为 null
+   - 用于 FTS 全文搜索
+   - 返回字段：id, title, content_type, created_at
+
+4. 标签分析（need_tags_analysis）：
+   返回格式：[{"tag_name": str, "count": int}, ...]
+
+5. 资源查询（resource_query）：
+   {
+     "enabled": true/false,
+     "type": "random|search|filter",
+     "content_types": ["photo", "video", "document", "text", "link", "audio"],
+     "limit": int (1-10)
+   }
+
+【重要约束】：
+- limit 参数永远不能设置为 0（最小值为 1）
+- 字段名必须精确匹配，不能使用 total_archives、total_tags 等不存在的字段
+- 所有参数都有明确类型，不要猜测
 
 【重要】响应策略选择：
 - pure_chat → direct_answer（无需数据）
@@ -392,6 +470,45 @@ Planning principles:
 - Open questions can analyze trends and provide insights
 - Pure chat needs no data, respond friendly directly
 - Prioritize detecting pure_chat to avoid over-querying
+
+【System API Specification】(Must strictly follow):
+
+1. Statistics data fields (returned when need_statistics=true):
+   {{
+     "total": int,           # Total archives (NOT total_archives)
+     "tags": int,            # Total tags (NOT total_tags)
+     "recent_week": int      # Archives in last 7 days
+   }}
+
+2. Notes query parameters (notes_query):
+   {{
+     "enabled": true/false,  # Must set, cannot omit
+     "limit": int,           # Count to return, 1-100, NEVER set to 0
+     "sort": "recent|oldest", # Sort order
+     "has_link": true|false|null  # Filter condition
+   }}
+   Returned fields: id, content, title, storage_path, created_at, archive_id
+
+3. Search keywords (search_keywords):
+   - Type: string, cannot be null
+   - Used for FTS full-text search
+   - Returned fields: id, title, content_type, created_at
+
+4. Tag analysis (need_tags_analysis):
+   Return format: [{{"tag_name": str, "count": int}}, ...]
+
+5. Resource query (resource_query):
+   {{
+     "enabled": true/false,
+     "type": "random|search|filter",
+     "content_types": ["photo", "video", "document", "text", "link", "audio"],
+     "limit": int (1-10)
+   }}
+
+【Important Constraints】:
+- limit parameter can NEVER be set to 0 (minimum value is 1)
+- Field names must match exactly, don't use non-existent fields like total_archives, total_tags
+- All parameters have explicit types, don't guess
 
 【CRITICAL】Response strategy mapping:
 - pure_chat → direct_answer (no data needed)
