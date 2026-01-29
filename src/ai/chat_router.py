@@ -98,6 +98,7 @@ async def understand_and_plan(user_message: str, language: str, context: Any, st
                 user_goal = plan.get('user_goal', 'unknown')
                 response_strategy = plan.get('response_strategy', 'unknown')
                 reasoning = plan.get('reasoning', '')
+                need_data = plan.get('need_data', {})
                 
                 # 如果没有user_intent字段，根据response_strategy降级推断
                 if 'user_intent' not in plan:
@@ -124,6 +125,10 @@ async def understand_and_plan(user_message: str, language: str, context: Any, st
                 logger.info(f"  Strategy: {response_strategy}")
                 if reasoning:
                     logger.info(f"  Reasoning: {reasoning}")
+                
+                # 调试：输出need_data关键字段
+                if need_data.get('notes_query'):
+                    logger.info(f"  Notes Query: {need_data.get('notes_query')}")
                 
                 return plan
             else:
@@ -973,7 +978,6 @@ async def gather_data(need_data: Dict[str, Any], context: Any, user_intent: str 
         # 最近记录上下文（24小时内，关键词触发）
         if need_data.get('need_recent_context') and db_storage:
             from datetime import datetime, timedelta
-            from ..models.database import ArchiveDB
             
             # 获取24小时内的归档
             cutoff_time = datetime.now() - timedelta(hours=24)
