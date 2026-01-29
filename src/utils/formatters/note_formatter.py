@@ -244,3 +244,61 @@ class NoteFormatter:
         share_text += f"🔖 来自归档 #{archive_id}"
         
         return share_text
+    
+    @staticmethod
+    def format_ai_summary(
+        notes: List[Dict],
+        language: str = 'zh-CN',
+        max_items: int = 10
+    ) -> str:
+        """
+        格式化笔记列表摘要（用于AI上下文）
+        
+        Args:
+            notes: 笔记列表
+            language: 语言代码
+            max_items: 最多显示条数
+            
+        Returns:
+            格式化后的笔记摘要文本
+        """
+        if not notes:
+            if language == 'en':
+                return "No notes available"
+            elif language == 'zh-TW':
+                return "暫無筆記"
+            else:
+                return "暂无笔记"
+        
+        if language == 'en':
+            header = f"📝 {len(notes[:max_items])} Notes Found:\n"
+        elif language == 'zh-TW':
+            header = f"📝 找到 {len(notes[:max_items])} 條筆記：\n"
+        else:
+            header = f"📝 找到 {len(notes[:max_items])} 条笔记：\n"
+        
+        text = header
+        for i, note in enumerate(notes[:max_items], 1):
+            note_id = note.get('id', '?')
+            content = note.get('content', '')
+            title = note.get('title', '')
+            
+            # 优先显示标题，没有标题则显示内容摘要
+            if title:
+                display_text = title
+            elif content:
+                display_text = content
+            else:
+                display_text = '(无内容)' if language.startswith('zh') else '(No content)'
+            
+            # 截断过长文本
+            if len(display_text) > 50:
+                display_text = display_text[:50] + '...'
+            
+            # 显示是否有链接
+            has_link = note.get('storage_path') or note.get('archive_storage_path')
+            link_icon = '🔗' if has_link else ''
+            
+            text += f"{i}. #{note_id} {link_icon}{display_text}\n"
+        
+        return text.rstrip()
