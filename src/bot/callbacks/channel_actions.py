@@ -28,14 +28,21 @@ async def handle_channel_note(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
         
         archive_id = int(data[1])
+        logger.info(f"Handling channel note button for archive_id={archive_id}")
         
         # 查询是否有笔记
         db_storage = context.bot_data.get('db_storage')
         if not db_storage:
+            logger.error("db_storage not found in context.bot_data")
             await query.answer("数据库不可用", show_alert=True)
             return
         
         db = db_storage.db
+        if not db:
+            logger.error("db_storage.db is None")
+            await query.answer("数据库连接错误", show_alert=True)
+            return
+        
         notes = db.execute(
             "SELECT id, storage_path FROM notes WHERE archive_id = ? AND deleted = 0",
             (archive_id,)
@@ -87,12 +94,19 @@ async def handle_channel_delete(update: Update, context: ContextTypes.DEFAULT_TY
             await query.answer("数据格式错误", show_alert=True)
             return
         
+        logger.info(f"Handling channel delete button: {query.data}")
+        
         db_storage = context.bot_data.get('db_storage')
         if not db_storage:
+            logger.error("db_storage not found in context.bot_data")
             await query.answer("数据库不可用", show_alert=True)
             return
         
         db = db_storage.db
+        if not db:
+            logger.error("db_storage.db is None")
+            await query.answer("数据库连接错误", show_alert=True)
+            return
         
         if data[0] == 'ch_del':
             # 删除存档
@@ -162,14 +176,21 @@ async def handle_channel_back(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
         
         archive_id = int(data[1])
+        logger.info(f"Handling channel back button for archive_id={archive_id}")
         
         # 查询是否有笔记
         db_storage = context.bot_data.get('db_storage')
         if not db_storage:
+            logger.error("db_storage not found in context.bot_data")
             await query.answer("数据库不可用", show_alert=True)
             return
         
         db = db_storage.db
+        if not db:
+            logger.error("db_storage.db is None")
+            await query.answer("数据库连接错误", show_alert=True)
+            return
+        
         notes_count = db.execute(
             "SELECT COUNT(*) as count FROM notes WHERE archive_id = ? AND deleted = 0",
             (archive_id,)
@@ -208,14 +229,24 @@ async def handle_channel_archive(update: Update, context: ContextTypes.DEFAULT_T
             return
         
         archive_id = int(data[1])
+        logger.info(f"Handling channel archive button for archive_id={archive_id}")
         
-        # 查询存档的storage_path
+        # 获取数据库存储实例
         db_storage = context.bot_data.get('db_storage')
         if not db_storage:
+            logger.error("db_storage not found in context.bot_data")
             await query.answer("数据库不可用", show_alert=True)
             return
         
+        # 获取数据库实例
         db = db_storage.db
+        if not db:
+            logger.error("db_storage.db is None")
+            await query.answer("数据库连接错误", show_alert=True)
+            return
+        
+        # 查询存档信息
+        logger.debug(f"Querying archive {archive_id} from database")
         archive = db.execute(
             "SELECT storage_path, title FROM archives WHERE id = ? AND deleted = 0",
             (archive_id,)
