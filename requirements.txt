@@ -1,0 +1,27 @@
+# ArchiveBot Dependencies - Version Locked for v1.0
+
+# Telegram Bot Framework
+python-telegram-bot[all]==20.7
+
+# Configuration
+PyYAML==6.0.2
+python-dotenv==1.0.0
+
+# File handling
+python-magic==0.4.27
+python-magic-bin==0.4.14; sys_platform == 'win32'
+
+# Logging
+colorlog==6.8.2
+
+# Date and time
+python-dateutil==2.9.0.post0
+
+# Link metadata extraction and web archiving
+httpx==0.25.2
+beautifulsoup4==4.12.3
+lxml==6.0.2
+trafilatura==2.0.0
+readability-lxml==0.8.4.1
+weasyprint==61.2  # PDF generation (on Windows: requires GTK3 runtime)
+reportlab==4.2.5   # Fallback PDF generator

@@ -1,0 +1,228 @@
+# ArchiveBot 設定範本
+# 複製此檔案為 config.yaml 並填寫你的值
+
+bot:
+  token: BOT_TOKEN  # 從 @BotFather 取得（建議使用環境變數 BOT_TOKEN）
+  owner_id: OWNER_ID  # 你的 Telegram ID，從 @userinfobot 取得（建議使用環境變數 OWNER_ID）
+  language: "zh-TW"  # 介面語言: en, zh-CN, zh-TW
+  polling_interval: 1  # 輪詢間隔（秒）
+  feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # 使用者回饋連結
+
+  # 靜默歸檔來源配置（不回覆且刪除轉發消息）
+  # 支持頻道ID和用戶名兩種匹配方式
+  # 示例：[-1001234567890, -1009876543210, '@channel_username']
+  # 環境變量：SILENT_SOURCES（支持JSON格式或逗號分隔）
+  silent_sources: []
+
+  # 靜默歸檔來源配置（這些來源的歸檔不會發送成功消息，並自動刪除轉發消息）
+  # 支持頻道ID和用戶名兩種匹配方式
+  # 示例：[-1001234567890, -1009876543210, '@channel_username']
+  silent_sources: []  # 環境變量：SILENT_SOURCES（逗號分隔）
+
+features:
+  auto_tag: true  # 自動產生類型標籤
+  auto_file_type_tag: false  # 是否自動產生檔案類型標籤（如#圖片、#影片等），預設false
+  enable_fts: true  # 啟用全文搜尋
+  enable_ocr: false  # 啟用圖片OCR識別
+
+ai:
+  enabled: false  # 啟用AI功能
+  auto_summarize: false  # 自動摘要新歸檔內容
+  auto_generate_tags: false  # 自動產生AI標籤  auto_generate_title: true  # 自動為筆記產生AI標題（15-20字）  max_generated_tags: 8  # AI自動產生標籤的最大數量（5-10為佳，預設8）
+  min_content_length_for_summary: 150  # AI摘要的最小內容長度（字元數），低於此長度不生成摘要
+
+  # 統一AI設定（建議）。為避免硬編碼金鑰，建議透過環境變數設定API金鑰
+  # 並在 api.api_key_env 中引用環境變數名稱
+  api:
+    provider: AI_API_PROVIDER  # 供應商: openai, claude, gemini, grok 等
+    api_key_env: AI_API_KEY  # 環境變數名稱（建議使用）
+    api_url: AI_API_URL  # 自訂API位址（可選，或使用環境變數 AI_API_URL）
+    model: AI_MODEL  # 模型（或使用環境變數 AI_MODEL）
+    reasoning_model: AI_REASONING_MODEL  # 用於意圖分析的推理模型（或使用環境變數 AI_REASONING_MODEL）
+    temperature: 0.7  # 生成多樣性（0-1之間）
+    max_tokens: 1000  # 最大token數
+    timeout: 30  # 逾時時間（秒）
+
+  # 執行時控制和保護措施
+  cache_enabled: true            # 啟用AI回應快取以避免重複呼叫和成本
+  cache_path: "data/ai_cache.db" # 快取資料庫路徑（sqlite）
+  cache_ttl_seconds: 604800      # 快取有效期（秒），預設7天
+  rate_limit_per_minute: 60      # 全域每分鐘API呼叫次數限制
+  log_calls: true                # 是否記錄AI呼叫詳情（便於除錯，生產環境可設為false）
+  retry_on_failure: 1            # 暫時性錯誤重試次數
+  auto_summary_on_forward: true  # 轉發訊息時自動觸發摘要（處理器層級）
+  auto_tagging: true             # 套用AI產生的標籤（可設為false僅產生建議）
+  
+  # AI聊天模式（互動式對話）
+  chat_enabled: false           # 啟用短訊息自動AI聊天模式
+  chat_session_ttl_seconds: 600 # 工作階段逾時時間（預設10分鐘）
+  chat_history_length: 10       # 工作階段歷史保留訊息對數（預設10，即20條訊息）
+  chat_allow_write_ops: false   # 允許AI執行寫入操作（歸檔/刪除/標籤）- 為安全起見保持false
+  chat_use_reasoning: true      # 啟用推理模型進行意圖分析（預設啟用）
+  
+  # 文本長度阈值設定（統一管理）
+  text_thresholds:
+    short_text: 50         # 短文本判斷閾值（觸發AI對話或意圖詢問）
+    note_chinese: 150      # 中文筆記判斷閾值(AI互動模式下用於區分長文本是否要做筆記還是繼續對話)
+    note_english: 250      # 英文筆記判斷閾值(AI互動模式下用於區分長文本是否要做筆記還是繼續對話)
+  
+  # AI參考內容排除設定（用於AI互動模式的上下文資料過濾）
+  exclude_from_context:
+    channel_ids: AI_EXCLUDE_CHANNELS  # 排除的歸檔頻道ID清單，例如: [-1001234567890, -1009876543210]
+    tags: AI_EXCLUDE_TAGS  # 排除的標籤清單，例如: ['私密', '草稿', '臨時', '不存檔', 'exclude', 'skip']
+    apply_to_ai_interactions: true  # 是否將排除規則應用於AI互動模式的統計與分析（true=完全隱藏，false=僅排除上下文樣本）
+
+logging:
+  level: "INFO"  # 記錄層級: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"  # 記錄檔路徑
+  console: true  # 是否輸出到主控台
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+storage:
+  database:
+    path: "data/archive.db"  # 資料庫檔案路徑
+  
+  backup:
+    auto_interval_hours: 24  # 自動備份間隔（小時），預設24小時
+    keep_count: 10           # 保留備份數量，預設保留最近10個
+  
+  telegram:
+    enabled: true  # 啟用Telegram儲存
+    # 向後相容：舊的單頻道設定（如果設定了channels.default則此項被忽略）
+    channel_id: CHANNEL_DEFAULT  # 從環境變數讀取
+    
+    # 多頻道設定（建議使用環境變數）
+    channels:
+      default: CHANNEL_DEFAULT  # 從環境變數讀取（必填）
+      text: CHANNEL_TEXT  # 從環境變數讀取（可選）
+      ebook: CHANNEL_EBOOK  # 從環境變數讀取（可選）
+      document: CHANNEL_DOCUMENT  # 從環境變數讀取（可選）
+      image: CHANNEL_IMAGE  # 從環境變數讀取（可選）
+      media: CHANNEL_MEDIA  # 從環境變數讀取（可選）      note: CHANNEL_NOTE  # 筆記專用頻道，從環境變數讀取（可選，未配置則使用text或default）    
+    # 類型到頻道的對映規則
+    type_mapping:
+      text: text           # 純文字 → 文字頻道
+      link: text           # 連結 → 文字頻道      note: text           # 筆記 → 文字頻道（如果未配置note頻道）      ebook: ebook         # 電子書 → 電子書頻道
+      document: document   # 文件 → 文件頻道
+      image: image         # 圖片 → 圖片頻道
+      animation: image     # 動畫GIF → 圖片頻道
+      sticker: image       # 貼圖 → 圖片頻道
+      video: media         # 影片 → 媒體頻道
+      audio: media         # 音訊 → 媒體頻道
+      voice: media         # 語音 → 媒體頻道
+      contact: default     # 聯絡人 → 預設頻道
+      location: default    # 位置 → 預設頻道
+
+# 智慧網頁存檔配置
+web_archiver:
+  enabled: true                # 是否啟用智慧連結存檔功能
+  
+  # 抓取策略配置
+  strategies:
+    http:
+      enabled: true              # 啟用HTTP抓取
+      timeout: 30                # 抓取逾時（秒）
+      follow_redirects: true     # 跟隨重新導向
+      max_redirects: 5           # 最大重新導向次數
+    
+    telegram:
+      enabled: true              # 啟用Telegram預覽提取（作為備援）
+  
+  # 正文提取配置
+  content_extraction:
+    min_length: 200              # 最小正文長度
+    favor_recall: true           # 寧濫勿缺（提取更多內容）
+  
+  # PDF生成配置
+  pdf_generation:
+    enabled: true                # 是否生成PDF
+    page_size: A4                # 頁面大小（A4/Letter）
+    include_images: true         # 是否包含圖片
+  
+  # 品質閾值（0-1）
+  # 品質評分規則：內容長度(0-0.5分) + 元數據完整性(0-0.5分)
+  # - 內容：>3000字=0.5, >1500字=0.4, >800字=0.3, >400字=0.2, >200字=0.1
+  # - 元數據：標題+0.2, 作者+0.15, 日期+0.15
+  # 示例：3000字文章+標題 = 0.5+0.2 = 0.7分
+  quality:
+    min_score_for_pdf: 0.5       # 生成PDF的最低品質分數（建議0.5，避免低品質內容浪費資源）
+    min_score_for_ai: 0.3        # AI摘要的最低品質分數（建議0.3，短文也能獲得摘要）
+    
+    # 來源到頻道的對映設定（優先順序高於類型對映）
+    # 根據轉發來源（頻道/群組/用戶）指定儲存頻道
+    # 
+    # 支持的來源類型：
+    # 1. 頻道 (Channel): 可用名稱或ID匹配，如: '技術頻道' 或 -1001234567890 或 1234567890
+    # 2. 群組 (Group/Supergroup): 可用名稱或ID匹配，如: '開發群組' 或 -1009876543210 或 9876543210
+    # 3. 個人用戶 (User): 僅用名稱匹配（@username或顯示名），如: 'JohnDoe' 或 '張三' 或 '@JohnDoe'
+    # 4. 機器人 (Bot): 僅用名稱匹配（@username），如: 'MyBot' 或 '@MyBot'
+    # 5. 隱藏用戶 (Hidden User): 用顯示名稱匹配，如: 'Deleted Account'
+    #
+    # ID格式說明：
+    # - 可以使用完整ID（-1001234567890）或去掉-100前綴的簡化ID（1234567890）
+    # - 系統會自動處理-100前綴，無需擔心格式問題
+    # - 從Telegram客戶端複製的ID通常不帶-100前綴，可以直接使用
+    #
+    # 注意：
+    # - 多個來源可以對映到同一個頻道
+    # - 一個來源不能對映到多個頻道（取第一個匹配項）
+    # - 用戶ID不支持匹配（因為普通用戶ID是正數，與頻道/群組ID格式不同）
+    # - 名稱匹配區分大小寫，建議使用ID以避免名稱變更問題
+    source_mapping:
+      # 範例：
+      # - sources: ['技術頻道', '開發群組', 1234567890]  # 頻道/群組：支持名稱或ID（可不帶-100前綴）
+      #   channel_id: -1001111111111  # 目標儲存頻道（建議使用完整ID）
+      # - sources: ['生活日常', -1009876543210, 'JohnDoe']  # 混合：名稱 + 完整ID + 用戶名
+      #   channel_id: -1002222222222
+      # - sources: ['MyBot', '@NewsBot']  # 機器人：支持帶@或不帶@
+      #   channel_id: -1003333333333
+    
+    # 標籤到頻道的對映設定（最高優先順序）
+    # 根據訊息標籤指定儲存頻道
+    # 多個標籤可以對映到同一個頻道，但一個標籤不能對映到多個頻道
+    tag_mapping:
+      # 範例：
+      # - tags: ['工作', '專案', '任務']  # 多個標籤對映到同一頻道
+      #   channel_id: -1001111111111
+      # - tags: ['學習', '筆記']
+      #   channel_id: -1002222222222
+    
+    # 個人直接傳送內容的儲存設定（無轉發來源時）
+    direct_send:
+      # 個人直發的頻道設定（可選，不設定則使用系統channels）
+      channels:
+        # 範例（可以設定與系統不同的頻道）：
+        # default: -1003675667626  # 預設頻道
+        # text: -1003779168344     # 文字頻道
+        # ebook: -1003859375248    # 電子書頻道
+        # document: -1003869785901 # 文件頻道
+        # image: -1003534777860    # 圖片頻道
+        # media: -1003843636869    # 媒體頻道
+      
+      # 個人直發的類型對映規則（可選，不設定則使用系統type_mapping）
+      type_mapping:
+        # 範例（與系統type_mapping保持一致）：
+        # text: text           # 純文字 → 文字頻道
+        # link: text           # 連結 → 文字頻道
+        # ebook: ebook         # 電子書 → 電子書頻道
+        # document: document   # 文件 → 文件頻道
+        # image: image         # 圖片 → 圖片頻道
+        # animation: image     # 動畫GIF → 圖片頻道
+        # sticker: image       # 貼圖 → 圖片頻道
+        # video: media         # 影片 → 媒體頻道
+        # audio: media         # 音訊 → 媒體頻道
+        # voice: media         # 語音 → 媒體頻道
+        # contact: default     # 聯絡人 → 預設頻道
+        # location: default    # 位置 → 預設頻道
+  
+  cloud:
+    google_drive:
+      enabled: false  # 啟用Google Drive儲存
+      client_id: ""  # Google Drive客戶端ID
+      client_secret: ""  # Google Drive客戶端密鑰
+      folder_name: "ArchiveBot"  # 儲存資料夾名稱
+    
+    aliyun:
+      enabled: false  # 啟用阿里雲盤儲存
+      refresh_token: ""  # 阿里雲盤重新整理權杖
+      folder_name: "歸檔"  # 儲存資料夾名稱

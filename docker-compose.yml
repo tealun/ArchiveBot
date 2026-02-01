@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  archivebot:
+    build: .
+    container_name: archivebot
+    restart: unless-stopped
+    
+    # 挂载卷 - 持久化数据和配置
+    volumes:
+      - ./data:/app/data              # 数据库、备份、缓存
+      - ./config:/app/config          # 配置文件目录
+    
+    # 环境变量文件（可选）
+    # 如果需要使用 .env 文件，取消下面的注释
+    # env_file:
+    #   - .env
+    
+    # 环境变量（可选）- 用于覆盖 config.yaml 中的敏感信息
+    # 优先级：环境变量 > config.yaml
+    environment:
+      # Telegram Bot 配置（可选，如果不设置则使用 config.yaml 中的值）
+      # - BOT_TOKEN=your_bot_token_here
+      # - OWNER_ID=your_telegram_user_id
+      # - CHANNEL_ID=-100xxxxxxxxxx
+      
+      # AI 配置（可选）
+      # - AI_API_KEY=your_xai_api_key_here
+      # - AI_API_URL=https://api.x.ai/v1/chat/completions
+      # - AI_MODEL=grok-4-1-fast-non-reasoning
+      
+      # Python 配置
+      - PYTHONUNBUFFERED=1
+    
+    # 健康检查（检测 Bot 进程是否真正运行）
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'python main.py' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# 注意事项：
+# 1. 首次运行前，请复制 config/config.template.yaml 为 config/config.yaml 并填写配置
+# 2. 如果使用环境变量，取消上面相应行的注释并填写真实值
+# 3. 不要将包含真实密钥的 docker-compose.yml 提交到 Git

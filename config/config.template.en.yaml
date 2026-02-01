@@ -1,0 +1,230 @@
+# ArchiveBot Configuration Template
+# Copy this file to config.yaml and fill in your values
+
+bot:
+  token: BOT_TOKEN  # Get from @BotFather (Recommended: use env var BOT_TOKEN)
+  owner_id: OWNER_ID  # Your Telegram ID from @userinfobot (Recommended: use env var OWNER_ID)
+  language: "en"  # Interface language: en, zh-CN, zh-TW
+  polling_interval: 1  # Polling interval in seconds
+  feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # User feedback link
+
+  # Silent archive source configuration (no reply and delete forwarded messages)
+  # Supports channel ID and username matching
+  # Example: [-1001234567890, -1009876543210, '@channel_username']
+  # Environment variable: SILENT_SOURCES (supports JSON format or comma-separated)
+  silent_sources: []
+
+  # Silent archive source configuration (archives from these sources won't send success messages and will auto-delete forwarded messages)
+  # Supports channel ID and username matching
+  # Example: [-1001234567890, -1009876543210, '@channel_username']
+  silent_sources: []  # Environment variable: SILENT_SOURCES (comma-separated)
+
+features:
+  auto_tag: true  # Automatically generate type tags
+  auto_file_type_tag: false  # Automatically generate file type tags (e.g., #image, #video), default false
+  enable_fts: true  # Enable full-text search
+  enable_ocr: false  # Enable OCR for images
+
+ai:
+  enabled: false  # Enable AI features
+  auto_summarize: false  # Automatically summarize new archives
+  auto_generate_tags: false  # Automatically generate AI tags  auto_generate_title: true  # Automatically generate AI title for notes (15-20 chars)  max_generated_tags: 8  # Maximum number of AI-generated tags (5-10 recommended, default 8)
+  min_content_length_for_summary: 150  # Minimum content length (characters) for AI summary generation
+
+  # Unified AI configuration (recommended). To avoid hardcoding secrets, 
+  # set API keys via environment variables and reference the variable name in api.api_key_env
+  api:
+    provider: AI_API_PROVIDER  # Provider: openai, claude, gemini, grok, etc.
+    api_key_env: AI_API_KEY  # Environment variable name (recommended)
+    api_url: AI_API_URL  # Custom API URL (optional, or use env var AI_API_URL)
+    model: AI_MODEL  # Model (or use env var AI_MODEL)
+    reasoning_model: AI_REASONING_MODEL  # Reasoning model for intent analysis (or use env var AI_REASONING_MODEL)
+    temperature: 0.7  # Generation diversity (between 0-1)
+    max_tokens: 1000  # Maximum tokens
+    timeout: 30  # Timeout in seconds
+
+  # Runtime controls and safeguards
+  cache_enabled: true            # Enable caching of AI responses to avoid duplicate calls and costs
+  cache_path: "data/ai_cache.db" # Path to cache DB (sqlite)
+  cache_ttl_seconds: 604800      # Cache TTL in seconds (default 7 days)
+  rate_limit_per_minute: 60      # Global approximate API calls per minute
+  log_calls: true                # Whether to log AI call details (useful for debugging, can set to false in production)
+  retry_on_failure: 1            # Number of retries for transient errors
+  auto_summary_on_forward: true  # Auto-trigger summary when forwarding messages (handler-level)
+  auto_tagging: true             # Apply AI-generated tags (can be set to false to only generate suggestions)
+  
+  # AI Chat Mode (interactive conversation)
+  chat_enabled: false           # Enable automatic AI chat mode for short messages
+  chat_session_ttl_seconds: 600 # Session timeout (default 10 minutes)
+  chat_history_length: 10       # Number of message pairs to keep in session history (default 10, i.e., 20 messages)
+  chat_allow_write_ops: false   # Allow AI to execute write operations (archive/delete/tag) - keep false for safety
+  chat_use_reasoning: true      # Enable reasoning model for intent analysis (default enabled)
+  
+  # Text length thresholds configuration (unified management)
+  text_thresholds:
+    short_text: 50         # Short text threshold (trigger AI chat or intent inquiry)
+    note_chinese: 150      # Chinese note threshold (distinguish long text for note or chat in AI mode)
+    note_english: 250      # English note threshold (distinguish long text for note or chat in AI mode)
+  
+  # AI reference content exclusion configuration (for filtering context data in AI interaction mode)
+  exclude_from_context:
+    channel_ids: AI_EXCLUDE_CHANNELS  # List of archive channel IDs to exclude, e.g.: [-1001234567890, -1009876543210]
+    tags: AI_EXCLUDE_TAGS  # List of tags to exclude, e.g.: ['private', 'draft', 'temp', 'no-archive', 'exclude', 'skip']
+    apply_to_ai_interactions: true  # Apply exclusion rules to AI stats & analysis (true=fully hidden, false=only exclude context samples)
+
+logging:
+  level: "INFO"  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"  # Log file path
+  console: true  # Whether to output to console
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+storage:
+  database:
+    path: "data/archive.db"  # Database file path
+  
+  backup:
+    auto_interval_hours: 24  # Automatic backup interval in hours (default 24)
+    keep_count: 10           # Number of backups to keep (default 10 most recent)
+  
+  telegram:
+    enabled: true  # Enable Telegram storage
+    # Backward compatibility: old single channel config (ignored if channels.default is set)
+    channel_id: CHANNEL_DEFAULT  # Read from environment variable
+    
+    # Multi-channel configuration (Recommended: use env vars)
+    channels:
+      default: CHANNEL_DEFAULT  # Read from environment variable (required)
+      text: CHANNEL_TEXT  # Read from environment variable (optional)
+      ebook: CHANNEL_EBOOK  # Read from environment variable (optional)
+      document: CHANNEL_DOCUMENT  # Read from environment variable (optional)
+      image: CHANNEL_IMAGE  # Read from environment variable (optional)
+      media: CHANNEL_MEDIA  # Read from environment variable (optional)
+      note: CHANNEL_NOTE  # Note-specific channel, read from environment variable (optional, fallback to text or default)
+    
+    # Type to channel mapping rules
+    type_mapping:
+      text: text           # Plain text → text channel
+      link: text           # Links → text channel      note: text           # Note → Text channel (if note channel not configured)      ebook: ebook         # E-books → ebook channel
+      document: document   # Documents → document channel
+      image: image         # Images → image channel
+      animation: image     # Animated GIFs → image channel
+      sticker: image       # Stickers → image channel
+      video: media         # Videos → media channel
+      audio: media         # Audio → media channel
+      voice: media         # Voice messages → media channel
+      contact: default     # Contacts → default channel
+      location: default    # Locations → default channel
+
+# Smart Web Archiver Configuration
+web_archiver:
+  enabled: true                # Enable smart link archiving
+  
+  # Fetching strategies
+  strategies:
+    http:
+      enabled: true              # Enable HTTP fetching
+      timeout: 30                # Fetch timeout (seconds)
+      follow_redirects: true     # Follow redirects
+      max_redirects: 5           # Maximum redirect count
+    
+    telegram:
+      enabled: true              # Enable Telegram preview extraction (fallback)
+  
+  # Content extraction settings
+  content_extraction:
+    min_length: 200              # Minimum content length
+    favor_recall: true           # Favor recall over precision
+  
+  # PDF generation settings
+  pdf_generation:
+    enabled: true                # Generate PDF archives
+    page_size: A4                # Page size (A4/Letter)
+    include_images: true         # Include images in PDF
+  
+  # Quality thresholds (0-1)
+  # Quality scoring rules: Content length (0-0.5) + Metadata completeness (0-0.5)
+  # - Content: >3000 chars=0.5, >1500=0.4, >800=0.3, >400=0.2, >200=0.1
+  # - Metadata: title+0.2, author+0.15, date+0.15
+  # Example: 3000-char article + title = 0.5+0.2 = 0.7 score
+  quality:
+    min_score_for_pdf: 0.5       # Minimum quality score for PDF (0.5 recommended to avoid low-quality content)
+    min_score_for_ai: 0.3        # Minimum quality score for AI summary (0.3 recommended for short articles)
+    
+    # Source to channel mapping configuration (higher priority than type mapping)
+    # Route messages based on forward source (channel/group/user)
+    # 
+    # Supported source types:
+    # 1. Channel: Match by name or ID, e.g.: 'Tech Channel' or -1001234567890 or 1234567890
+    # 2. Group/Supergroup: Match by name or ID, e.g.: 'Dev Group' or -1009876543210 or 9876543210
+    # 3. Personal User: Match by name only (@username or display name), e.g.: 'JohnDoe' or '@JohnDoe'
+    # 4. Bot: Match by name only (@username), e.g.: 'MyBot' or '@MyBot'
+    # 5. Hidden User: Match by display name, e.g.: 'Deleted Account'
+    #
+    # ID Format Notes:
+    # - You can use full ID (-1001234567890) or simplified ID without -100 prefix (1234567890)
+    # - System automatically handles -100 prefix, no need to worry about format
+    # - IDs copied from Telegram client usually don't have -100 prefix, you can use them directly
+    #
+    # Notes:
+    # - Multiple sources can map to the same channel
+    # - One source cannot map to multiple channels (first match wins)
+    # - User IDs are not supported for matching (normal user IDs are positive numbers)
+    # - Name matching is case-sensitive; using IDs is recommended to avoid name changes
+    source_mapping:
+      # Examples:
+      # - sources: ['Tech Channel', 'Dev Group', 1234567890]  # Name or ID (without -100 prefix is OK)
+      #   channel_id: -1001111111111  # Target storage channel (full ID recommended)
+      # - sources: ['Daily Life', -1009876543210, 'JohnDoe']  # Mixed: name + full ID + username
+      #   channel_id: -1002222222222
+      # - sources: ['MyBot', '@NewsBot']  # Bot: with or without @ prefix
+      #   channel_id: -1003333333333
+    
+    # Tag to channel mapping configuration (highest priority)
+    # Route messages based on message tags
+    # Multiple tags can map to the same channel, but one tag cannot map to multiple channels
+    tag_mapping:
+      # Examples:
+      # - tags: ['work', 'project', 'task']  # Multiple tags to same channel
+      #   channel_id: -1001111111111
+      # - tags: ['study', 'notes']
+      #   channel_id: -1002222222222
+    
+    # Storage configuration for directly sent content (no forward source)
+    direct_send:
+      # Channel configuration for direct sends (optional, uses system channels if not set)
+      channels:
+        # Examples (can configure different channels from system):
+        # default: -1003675667626  # Default channel
+        # text: -1003779168344     # Text channel
+        # ebook: -1003859375248    # E-book channel
+        # document: -1003869785901 # Document channel
+        # image: -1003534777860    # Image channel
+        # media: -1003843636869    # Media channel
+      
+      # Type mapping rules for direct sends (optional, uses system type_mapping if not set)
+      type_mapping:
+        # Examples (consistent with system type_mapping):
+        # text: text           # Plain text → text channel
+        # link: text           # Links → text channel
+        # ebook: ebook         # E-books → ebook channel
+        # document: document   # Documents → document channel
+        # image: image         # Images → image channel
+        # animation: image     # Animated GIFs → image channel
+        # sticker: image       # Stickers → image channel
+        # video: media         # Videos → media channel
+        # audio: media         # Audio → media channel
+        # voice: media         # Voice messages → media channel
+        # contact: default     # Contacts → default channel
+        # location: default    # Locations → default channel
+  
+  cloud:
+    google_drive:
+      enabled: false  # Enable Google Drive storage
+      client_id: ""  # Google Drive client ID
+      client_secret: ""  # Google Drive client secret
+      folder_name: "ArchiveBot"  # Storage folder name
+    
+    aliyun:
+      enabled: false  # Enable Aliyun Drive storage
+      refresh_token: ""  # Aliyun Drive refresh token
+      folder_name: "Archive"  # Storage folder name

@@ -1,0 +1,235 @@
+# ArchiveBot 설정 템플릿
+# 이 파일을 config.yaml로 복사하고 값을 입력하세요
+
+bot:
+  token: BOT_TOKEN  # @BotFather에서 획득 (환경 변수 BOT_TOKEN 사용 권장)
+  owner_id: OWNER_ID  # 당신의 Telegram ID, @userinfobot에서 획득 (환경 변수 OWNER_ID 사용 권장)
+  language: "zh-CN"  # 인터페이스 언어: en, zh-CN, zh-TW
+  polling_interval: 1  # 폴링 간격 (초)
+  feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # 사용자 피드백 링크
+
+  # 자동 보관 소스 구성 (응답 없이 전달된 메시지 삭제)
+  # 채널 ID 및 사용자 이름 매칭 지원
+  # 예: [-1001234567890, -1009876543210, '@channel_username']
+  # 환경 변수: SILENT_SOURCES (JSON 형식 또는 쉼표로 구분 지원)
+  silent_sources: []
+
+  # 무음 보관 소스 구성(이러한 소스의 보관은 성공 메시지를 보내지 않으며 전달된 메시지를 자동 삭제합니다)
+  # 채널 ID 및 사용자 이름 매칭 지원
+  # 예: [-1001234567890, -1009876543210, '@channel_username']
+  silent_sources: []  # 환경 변수: SILENT_SOURCES (쉼표로 구분)
+
+features:
+  auto_tag: true  # 타입 태그 자동 생성
+  auto_file_type_tag: false  # 파일 타입 태그(#이미지, #동영상 등) 자동 생성 여부, 기본값 false
+  extract_tags_from_caption: false  # 전달된 메시지 캡션에서 #태그 추출 (기본값 꺼짐, 태그 오염 방지)
+  enable_fts: true  # 전문 검색 활성화
+  enable_ocr: false  # 이미지 OCR 인식 활성화
+
+ai:
+  enabled: true  # AI 기능 활성화
+  auto_summarize: true  # 새 아카이브 콘텐츠 자동 요약
+  auto_generate_tags: true  # AI 태그 자동 생성
+  auto_generate_title: true  # 노트 AI 제목 자동 생성(15-20자)
+  max_generated_tags: 8  # AI 자동 생성 태그 최대 개수(5-10 권장, 기본값 8)
+  min_content_length_for_summary: 150  # AI 요약 생성을 위한 최소 콘텐츠 길이(문자 수)
+  auto_generate_title: true  # 노트에 AI 제목 자동 생성 (15-20자)
+  max_generated_tags: 8  # AI 자동 생성 태그 최대 개수 (5-10이 최적, 기본값 8)
+
+  # 통합 AI 설정 (권장). API 키 하드코딩을 피하기 위해 환경 변수를 통해 설정하고
+  # api.api_key_env에서 환경 변수명을 참조할 것을 권장
+  api:
+    provider: AI_API_PROVIDER  # 공급자: openai, claude, gemini, grok 등
+    api_key_env: AI_API_KEY  # 환경 변수명 (권장 사용)
+    api_url: AI_API_URL  # 사용자 정의 API 주소 (선택 사항, 또는 환경 변수 AI_API_URL 사용)
+    model: AI_MODEL  # 모델 (또는 환경 변수 AI_MODEL 사용)
+    reasoning_model: AI_REASONING_MODEL  # 의도 분석용 추론 모델 (또는 환경 변수 AI_REASONING_MODEL 사용)
+    temperature: 0.7  # 생성 다양성 (0-1 범위)
+    max_tokens: 1000  # 최대 토큰 수
+    timeout: 30  # 타임아웃 시간 (초)
+
+  # 런타임 제어 및 보호 조치
+  cache_enabled: true            # AI 응답 캐시를 활성화하여 중복 호출 및 비용 방지
+  cache_path: "data/ai_cache.db" # 캐시 데이터베이스 경로 (sqlite)
+  cache_ttl_seconds: 604800      # 캐시 유효 기간 (초), 기본값 7일
+  rate_limit_per_minute: 60      # 전역 분당 API 호출 횟수 제한
+  log_calls: false               # AI 호출 세부 정보 로깅 여부 (프로덕션 환경에서 전체 응답 로깅 방지)
+  retry_on_failure: 1            # 일시적 오류 시 재시도 횟수
+  auto_summary_on_forward: true  # 메시지 전달 시 자동으로 요약 트리거 (프로세서 레벨)
+  auto_tagging: true             # AI 생성 태그 적용 (false로 설정 시 제안만 생성)
+  
+  # AI 채팅 모드 (대화형 대화)
+  chat_enabled: false           # 짧은 메시지 자동 AI 채팅 모드 활성화
+  chat_session_ttl_seconds: 600 # 세션 타임아웃 시간 (기본값 10분)
+  chat_history_length: 10       # 세션 기록 보존 메시지 쌍 수 (기본값 10, 즉 20개 메시지)
+  chat_allow_write_ops: false   # AI에게 쓰기 작업 (아카이브/삭제/태그) 허용 - 보안상 false 유지
+  chat_use_reasoning: true      # 의도 분석에 추론 모델 사용 (기본값 활성화)
+  
+  # 텍스트 길이 임계값 설정 (통합 관리)
+  text_thresholds:
+    short_text: 50         # 짧은 텍스트 판단 임계값 (AI 대화 또는 의도 확인 트리거)
+    note_chinese: 150      # 중국어 노트 판단 임계값 (AI 대화 모드에서 긴 텍스트를 노트로 만들지 대화를 계속할지 구분)
+    note_english: 250      # 영어 노트 판단 임계값 (AI 대화 모드에서 긴 텍스트를 노트로 만들지 대화를 계속할지 구분)
+  
+  # AI 참조 콘텐츠 제외 설정 (AI 대화 모드의 컨텍스트 데이터 필터링용)
+  exclude_from_context:
+    channel_ids: AI_EXCLUDE_CHANNELS  # 제외할 아카이브 채널 ID 목록, 예: [-1001234567890, -1009876543210]
+    tags: AI_EXCLUDE_TAGS         # 제외할 태그 목록, 예: ['비공개', '초안', '임시', '아카이브 안 함', 'exclude', 'skip']
+    apply_to_ai_interactions: true  # 제외 규칙을 AI 대화 모드의 통계 및 분석에 적용 (true=완전히 숨김, false=컨텍스트 샘플만 제외)
+
+logging:
+  level: "INFO"  # 로그 레벨: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"  # 로그 파일 경로
+  console: true  # 콘솔에 출력 여부
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+storage:
+  database:
+    path: "data/archive.db"  # 데이터베이스 파일 경로
+  
+  backup:
+    auto_interval_hours: 168  # 자동 백업 간격 (시간), 기본값 168시간 (7일/매주)
+    keep_count: 10           # 보관 백업 개수, 기본값 최근 10개 보관
+  
+  telegram:
+    enabled: true  # Telegram 저장소 활성화
+    # 하위 호환성: 기존 단일 채널 설정 (channels.default가 설정된 경우 이 항목은 무시됨)
+    channel_id: CHANNEL_DEFAULT  # 환경 변수에서 읽기
+    
+    # 다중 채널 설정 (환경 변수 사용 권장)
+    channels:
+      default: CHANNEL_DEFAULT  # 환경 변수에서 읽기 (필수)
+      text: CHANNEL_TEXT  # 환경 변수에서 읽기 (선택)
+      ebook: CHANNEL_EBOOK  # 환경 변수에서 읽기 (선택)
+      document: CHANNEL_DOCUMENT  # 환경 변수에서 읽기 (선택)
+      image: CHANNEL_IMAGE  # 환경 변수에서 읽기 (선택)
+      media: CHANNEL_MEDIA  # 환경 변수에서 읽기 (선택)
+      note: CHANNEL_NOTE  # 노트 전용 채널, 환경 변수에서 읽기 (선택, 미설정 시 text 또는 default 사용)
+    
+    # 타입에서 채널로의 매핑 규칙
+    type_mapping:
+      text: text           # 순수 텍스트 → 텍스트 채널
+      link: text           # 링크 → 텍스트 채널
+      note: text           # 노트 → 텍스트 채널 (note 채널이 설정되지 않은 경우)
+      ebook: ebook         # 전자책 → 전자책 채널
+      document: document   # 문서 → 문서 채널
+      image: image         # 이미지 → 이미지 채널
+      animation: image     # 애니메이션 GIF → 이미지 채널
+      sticker: image       # 스티커 → 이미지 채널
+      video: media         # 비디오 → 미디어 채널
+      audio: media         # 오디오 → 미디어 채널
+      voice: media         # 음성 → 미디어 채널
+      contact: default     # 연락처 → 기본 채널
+      location: default    # 위치 → 기본 채널
+# 스마트 웹 아카이버 설정
+web_archiver:
+  enabled: true                # 스마트 링크 아카이빙 기능 활성화
+  
+  # 가져오기 전략 설정
+  strategies:
+    http:
+      enabled: true              # HTTP 가져오기 활성화
+      timeout: 30                # 가져오기 시간 제한(초)
+      follow_redirects: true     # 리디렉션 따르기
+      max_redirects: 5           # 최대 리디렉션 횟수
+    
+    telegram:
+      enabled: true              # Telegram 미리보기 추출 활성화(대체 방법)
+  
+  # 콘텐츠 추출 설정
+  content_extraction:
+    min_length: 200              # 최소 콘텐츠 길이
+    favor_recall: true           # 정밀도보다 재현율 우선
+  
+  # PDF 생성 설정
+  pdf_generation:
+    enabled: true                # PDF 아카이브 생성
+    page_size: A4                # 페이지 크기(A4/Letter)
+    include_images: true         # PDF에 이미지 포함
+  
+  # 품질 임계값(0-1)
+  # 품질 점수 규칙: 콘텐츠 길이(0-0.5점) + 메타데이터 완성도(0-0.5점)
+  # - 콘텐츠: >3000자=0.5, >1500=0.4, >800=0.3, >400=0.2, >200=0.1
+  # - 메타데이터: 제목+0.2, 저자+0.15, 날짜+0.15
+  # 예시: 3000자 기사+제목 = 0.5+0.2 = 0.7점
+  quality:
+    min_score_for_pdf: 0.5       # PDF 생성을 위한 최소 품질 점수 (저품질 콘텐츠 방지를 위해 0.5 권장)
+    min_score_for_ai: 0.3        # AI 요약을 위한 최소 품질 점수 (짧은 글도 요약하기 위해 0.3 권장)    
+    # 소스에서 채널로의 매핑 구성 (유형 매핑보다 우선)
+    # 전달 소스(채널/그룹/사용자)에 따라 메시지 라우팅
+    # 
+    # 지원되는 소스 유형:
+    # 1. 채널: 이름 또는 ID로 일치, 예: '기술 채널' 또는 -1001234567890 또는 1234567890
+    # 2. 그룹/슈퍼그룹: 이름 또는 ID로 일치, 예: '개발 그룹' 또는 -1009876543210 또는 9876543210
+    # 3. 개인 사용자: 이름으로만 일치(@username 또는 표시 이름), 예: 'JohnDoe' 또는 '@JohnDoe'
+    # 4. 봇: 이름으로만 일치(@username), 예: 'MyBot' 또는 '@MyBot'
+    # 5. 숨겨진 사용자: 표시 이름으로 일치, 예: 'Deleted Account'
+    #
+    # ID 형식 참고:
+    # - 전체 ID(-1001234567890) 또는 -100 접두사 없는 간단한 ID(1234567890)를 사용할 수 있습니다
+    # - 시스템이 -100 접두사를 자동으로 처리하므로 형식을 걱정할 필요가 없습니다
+    # - Telegram 클라이언트에서 복사한 ID는 일반적으로 -100 접두사가 없으며 직접 사용할 수 있습니다
+    #
+    # 참고:
+    # - 여러 소스를 같은 채널에 매핑할 수 있습니다
+    # - 한 소스를 여러 채널에 매핑할 수 없습니다(첫 번째 일치 항목 우선)
+    # - 사용자 ID는 일치를 지원하지 않습니다(일반 사용자 ID는 양수)
+    # - 이름 일치는 대소문자를 구분합니다. 이름 변경을 피하기 위해 ID 사용을 권장
+    source_mapping:
+      # 예시:
+      # - sources: ['기술 채널', '개발 그룹', 1234567890]  # 이름 또는 ID(-100 없이도 가능)
+      #   channel_id: -1001111111111  # 대상 저장 채널(전체 ID 권장)
+      # - sources: ['일상 생활', -1009876543210, 'JohnDoe']  # 혼합: 이름 + 전체 ID + 사용자 이름
+      #   channel_id: -1002222222222
+      # - sources: ['MyBot', '@NewsBot']  # 봇: @ 접두사 있음/없음 모두 가능
+      #   channel_id: -1003333333333
+    
+    # 태그에서 채널로의 매핑 설정 (최우선순위)
+    # 메시지 태그에 따라 저장 채널 지정
+    # 여러 태그를 동일한 채널에 매핑할 수 있지만 하나의 태그를 여러 채널에 매핑할 수 없음
+    tag_mapping:
+      # 예시:
+      # - tags: ['업무', '프로젝트', '작업']  # 여러 태그를 동일한 채널에 매핑
+      #   channel_id: -1001111111111
+      # - tags: ['학습', '노트']
+      #   channel_id: -1002222222222
+    
+    # 개인 직접 전송 콘텐츠 저장 설정 (전달 소스가 없을 때)
+    direct_send:
+      # 개인 직접 전송 채널 설정 (선택 사항, 설정하지 않으면 시스템 channels 사용)
+      channels:
+        default: CHANNEL_DIRECT_DEFAULT  # 환경 변수에서 읽기 (선택)
+        # 기타 채널 선택 설정:
+        # text: CHANNEL_TEXT
+        # ebook: CHANNEL_EBOOK
+        # document: CHANNEL_DOCUMENT
+        # image: CHANNEL_IMAGE
+        # media: CHANNEL_MEDIA
+      
+      # 개인 직접 전송 타입 매핑 규칙 (선택 사항, 설정하지 않으면 시스템 type_mapping 사용)
+      type_mapping:
+        # 예시 (시스템 type_mapping과 일치):
+        # text: text           # 순수 텍스트 → 텍스트 채널
+        # link: text           # 링크 → 텍스트 채널
+        # ebook: ebook         # 전자책 → 전자책 채널
+        # document: document   # 문서 → 문서 채널
+        # image: image         # 이미지 → 이미지 채널
+        # animation: image     # 애니메이션 GIF → 이미지 채널
+        # sticker: image       # 스티커 → 이미지 채널
+        # video: media         # 비디오 → 미디어 채널
+        # audio: media         # 오디오 → 미디어 채널
+        # voice: media         # 음성 → 미디어 채널
+        # contact: default     # 연락처 → 기본 채널
+        # location: default    # 위치 → 기본 채널
+  
+  cloud:
+    google_drive:
+      enabled: false  # Google Drive 저장소 활성화
+      client_id: ""  # Google Drive 클라이언트 ID
+      client_secret: ""  # Google Drive 클라이언트 시크릿
+      folder_name: "ArchiveBot"  # 저장 폴더 이름
+    
+    aliyun:
+      enabled: false  # Aliyun Drive 저장소 활성화
+      refresh_token: ""  # Aliyun Drive 리프레시 토큰
+      folder_name: "归档"  # 저장 폴더 이름

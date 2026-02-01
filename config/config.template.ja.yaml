@@ -1,0 +1,235 @@
+# ArchiveBot 設定テンプレート
+# このファイルを config.yaml にコピーして値を入力してください
+
+bot:
+  token: BOT_TOKEN  # @BotFather から取得（環境変数 BOT_TOKEN の使用を推奨）
+  owner_id: OWNER_ID  # あなたの Telegram ID、@userinfobot から取得（環境変数 OWNER_ID の使用を推奨）
+  language: "zh-CN"  # インターフェース言語: en, zh-CN, zh-TW
+  polling_interval: 1  # ポーリング間隔（秒）
+  feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # ユーザーフィードバックリンク
+
+  # サイレントアーカイブソース設定（返信なしで転送メッセージを削除）
+  # チャンネルIDとユーザー名のマッチングをサポート
+  # 例：[-1001234567890, -1009876543210, '@channel_username']
+  # 環境変数：SILENT_SOURCES（JSON形式またはカンマ区切りをサポート）
+  silent_sources: []
+
+  # サイレントアーカイブソース設定（これらのソースからのアーカイブは成功メッセージを送信せず、転送メッセージを自動削除します）
+  # チャンネルIDとユーザー名のマッチングをサポート
+  # 例: [-1001234567890, -1009876543210, '@channel_username']
+  silent_sources: []  # 環境変数：SILENT_SOURCES（カンマ区切り）
+
+features:
+  auto_tag: true  # タイプタグの自動生成
+  auto_file_type_tag: false  # ファイルタイプタグ（#画像、#動画など）の自動生成、デフォルトfalse
+  extract_tags_from_caption: false  # 転送メッセージのキャプションから#タグを抽出（デフォルトでオフ、タグ汚染を回避）
+  enable_fts: true  # 全文検索を有効化
+  enable_ocr: false  # 画像OCR認識を有効化
+
+ai:
+  enabled: true  # AI機能を有効化
+  auto_summarize: true  # 新規アーカイブコンテンツの自動要約
+  auto_generate_tags: true  # AIタグの自動生成
+  auto_generate_title: true  # ノートのAIタイトルを自動生成（15-20文字）
+  max_generated_tags: 8  # AI自動生成タグの最大数（5-10推奨、デフォルト8）
+  min_content_length_for_summary: 150  # AI要約生成の最小コンテンツ長（文字数）
+  auto_generate_title: true  # ノートにAIタイトルを自動生成（15-20文字）
+  max_generated_tags: 8  # AI自動生成タグの最大数（5-10が最適、デフォルト8）
+
+  # 統合AI設定（推奨）。APIキーのハードコーディングを避けるため、環境変数を使用して設定し
+  # api.api_key_env で環境変数名を参照することを推奨
+  api:
+    provider: AI_API_PROVIDER  # プロバイダー: openai, claude, gemini, grok など
+    api_key_env: AI_API_KEY  # 環境変数名（推奨使用）
+    api_url: AI_API_URL  # カスタムAPIアドレス（オプション、または環境変数 AI_API_URL を使用）
+    model: AI_MODEL  # モデル（または環境変数 AI_MODEL を使用）
+    reasoning_model: AI_REASONING_MODEL  # 意図分析用の推論モデル（または環境変数 AI_REASONING_MODEL を使用）
+    temperature: 0.7  # 生成の多様性（0-1の範囲）
+    max_tokens: 1000  # 最大トークン数
+    timeout: 30  # タイムアウト時間（秒）
+
+  # ランタイム制御と保護措置
+  cache_enabled: true            # AI応答キャッシュを有効化して重複呼び出しとコストを回避
+  cache_path: "data/ai_cache.db" # キャッシュデータベースパス（sqlite）
+  cache_ttl_seconds: 604800      # キャッシュ有効期間（秒）、デフォルト7日
+  rate_limit_per_minute: 60      # グローバル毎分API呼び出し回数制限
+  log_calls: false               # AI呼び出し詳細をログに記録するか（本番環境では完全なレスポンスの記録を避ける）
+  retry_on_failure: 1            # 一時的なエラー時のリトライ回数
+  auto_summary_on_forward: true  # メッセージ転送時に要約を自動トリガー（プロセッサーレベル）
+  auto_tagging: true             # AI生成タグを適用（falseに設定すると提案のみ生成）
+  
+  # AIチャットモード（対話型会話）
+  chat_enabled: false           # 短いメッセージの自動AIチャットモードを有効化
+  chat_session_ttl_seconds: 600 # セッションタイムアウト時間（デフォルト10分）
+  chat_history_length: 10       # セッション履歴保持メッセージペア数（デフォルト10、つまり20メッセージ）
+  chat_allow_write_ops: false   # AIに書き込み操作（アーカイブ/削除/タグ付け）を許可 - セキュリティのためfalseを維持
+  chat_use_reasoning: true      # 意図分析に推論モデルを使用（デフォルトで有効）
+  
+  # テキスト長しきい値設定（統合管理）
+  text_thresholds:
+    short_text: 50         # 短文判定しきい値（AI対話または意図確認をトリガー）
+    note_chinese: 150      # 中国語ノート判定しきい値（AI対話モードで長文をノートにするか対話を続けるかの区別に使用）
+    note_english: 250      # 英語ノート判定しきい値（AI対話モードで長文をノートにするか対話を続けるかの区別に使用）
+  
+  # AIリファレンスコンテンツ除外設定（AI対話モードのコンテキストデータフィルタリング用）
+  exclude_from_context:
+    channel_ids: AI_EXCLUDE_CHANNELS  # 除外するアーカイブチャンネルIDリスト、例: [-1001234567890, -1009876543210]
+    tags: AI_EXCLUDE_TAGS         # 除外するタグリスト、例: ['プライベート', '下書き', '一時', '非アーカイブ', 'exclude', 'skip']
+    apply_to_ai_interactions: true  # 除外ルールをAI対話モードの統計と分析に適用する（true=完全に非表示、false=コンテキストサンプルのみ除外）
+
+logging:
+  level: "INFO"  # ログレベル: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "data/bot.log"  # ログファイルパス
+  console: true  # コンソールに出力するか
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+storage:
+  database:
+    path: "data/archive.db"  # データベースファイルパス
+  
+  backup:
+    auto_interval_hours: 168  # 自動バックアップ間隔（時間）、デフォルト168時間（7日/毎週）
+    keep_count: 10           # 保持するバックアップ数、デフォルトで最新10個を保持
+  
+  telegram:
+    enabled: true  # Telegramストレージを有効化
+    # 後方互換性：旧単一チャンネル設定（channels.defaultが設定されている場合、この項目は無視される）
+    channel_id: CHANNEL_DEFAULT  # 環境変数から読み取り
+    
+    # マルチチャンネル設定（環境変数の使用を推奨）
+    channels:
+      default: CHANNEL_DEFAULT  # 環境変数から読み取り（必須）
+      text: CHANNEL_TEXT  # 環境変数から読み取り（オプション）
+      ebook: CHANNEL_EBOOK  # 環境変数から読み取り（オプション）
+      document: CHANNEL_DOCUMENT  # 環境変数から読み取り（オプション）
+      image: CHANNEL_IMAGE  # 環境変数から読み取り（オプション）
+      media: CHANNEL_MEDIA  # 環境変数から読み取り（オプション）
+      note: CHANNEL_NOTE  # ノート専用チャンネル、環境変数から読み取り（オプション、未設定の場合はtextまたはdefaultを使用）
+    
+    # タイプからチャンネルへのマッピングルール
+    type_mapping:
+      text: text           # プレーンテキスト → テキストチャンネル
+      link: text           # リンク → テキストチャンネル
+      note: text           # ノート → テキストチャンネル（noteチャンネルが未設定の場合）
+      ebook: ebook         # 電子書籍 → 電子書籍チャンネル
+      document: document   # ドキュメント → ドキュメントチャンネル
+      image: image         # 画像 → 画像チャンネル
+      animation: image     # アニメーションGIF → 画像チャンネル
+      sticker: image       # ステッカー → 画像チャンネル
+      video: media         # 動画 → メディアチャンネル
+      audio: media         # 音声 → メディアチャンネル
+      voice: media         # ボイス → メディアチャンネル
+      contact: default     # 連絡先 → デフォルトチャンネル
+      location: default    # 位置情報 → デフォルトチャンネル
+# スマートウェブアーカイバー設定
+web_archiver:
+  enabled: true                # スマートリンクアーカイブ機能を有効化
+  
+  # 取得戦略設定
+  strategies:
+    http:
+      enabled: true              # HTTP取得を有効化
+      timeout: 30                # 取得タイムアウト（秒）
+      follow_redirects: true     # リダイレクトをフォロー
+      max_redirects: 5           # 最大リダイレクト回数
+    
+    telegram:
+      enabled: true              # Telegramプレビュー抽出を有効化（フォールバック）
+  
+  # コンテンツ抽出設定
+  content_extraction:
+    min_length: 200              # 最小コンテンツ長
+    favor_recall: true           # 精度より再現率を優先
+  
+  # PDF生成設定
+  pdf_generation:
+    enabled: true                # PDFアーカイブを生成
+    page_size: A4                # ページサイズ（A4/Letter）
+    include_images: true         # 画像を含める
+  
+  # 品質閾値（0-1）
+  # 品質スコアルール：コンテンツ長(0-0.5点) + メタデータ完全性(0-0.5点)
+  # - コンテンツ：>3000文字=0.5, >1500=0.4, >800=0.3, >400=0.2, >200=0.1
+  # - メタデータ：タイトル+0.2, 著者+0.15, 日付+0.15
+  # 例：3000文字記事+タイトル = 0.5+0.2 = 0.7点
+  quality:
+    min_score_for_pdf: 0.5       # PDF生成の最小品質スコア（低品質コンテンツを避けるため0.5推奨）
+    min_score_for_ai: 0.3        # AI要約の最小品質スコア（短い記事も要約できるよう0.3推奨）
+    # ソースからチャンネルへのマッピング設定（タイプマッピングより優先度が高い）
+    # 転送元（チャンネル/グループ/ユーザー）に基づいてメッセージをルーティング
+    # 
+    # サポートされるソースタイプ：
+    # 1. チャンネル: 名前またはIDで一致、例: '技術チャンネル' または -1001234567890 または 1234567890
+    # 2. グループ/スーパーグループ: 名前またはIDで一致、例: '開発グループ' または -1009876543210 または 9876543210
+    # 3. 個人ユーザー: 名前のみで一致（@usernameまたは表示名）、例: 'JohnDoe' または '@JohnDoe'
+    # 4. ボット: 名前のみで一致（@username）、例: 'MyBot' または '@MyBot'
+    # 5. 非表示ユーザー: 表示名で一致、例: 'Deleted Account'
+    #
+    # ID形式の注意：
+    # - 完全なID（-1001234567890）または-100プレフィックスなしの簡略ID（1234567890）を使用可能
+    # - システムが-100プレフィックスを自動処理するため、形式を気にする必要はありません
+    # - TelegramクライアントからコピーしたIDは通常-100プレフィックスがなく、そのまま使用できます
+    #
+    # 注意：
+    # - 複数のソースを同じチャンネルにマップできます
+    # - 1つのソースを複数のチャンネルにマップできません（最初の一致が優先）
+    # - ユーザーIDは一致に対応していません（通常のユーザーIDは正の数値）
+    # - 名前の一致は大文字小文字を区別します。名前変更を避けるためIDの使用を推奨
+    source_mapping:
+      # 例：
+      # - sources: ['技術チャンネル', '開発グループ', 1234567890]  # 名前またはID（-100なしでOK）
+      #   channel_id: -1001111111111  # ターゲットストレージチャンネル（完全ID推奨）
+      # - sources: ['日常生活', -1009876543210, 'JohnDoe']  # 混合：名前 + 完全ID + ユーザー名
+      #   channel_id: -1002222222222
+      # - sources: ['MyBot', '@NewsBot']  # ボット：@プレフィックスありなし両方可
+      #   channel_id: -1003333333333
+    
+    # タグからチャンネルへのマッピング設定（最優先）
+    # メッセージタグに基づいてストレージチャンネルを指定
+    # 複数のタグを同じチャンネルにマップできますが、1つのタグを複数のチャンネルにマップすることはできません
+    tag_mapping:
+      # 例：
+      # - tags: ['仕事', 'プロジェクト', 'タスク']  # 複数のタグを同じチャンネルにマップ
+      #   channel_id: -1001111111111
+      # - tags: ['学習', 'ノート']
+      #   channel_id: -1002222222222
+    
+    # 個人直接送信コンテンツのストレージ設定（転送元がない場合）
+    direct_send:
+      # 個人直接送信のチャンネル設定（オプション、設定しない場合はシステムchannelsを使用）
+      channels:
+        default: CHANNEL_DIRECT_DEFAULT  # 環境変数から読み取り（オプション）
+        # その他のチャンネルはオプション設定：
+        # text: CHANNEL_TEXT
+        # ebook: CHANNEL_EBOOK
+        # document: CHANNEL_DOCUMENT
+        # image: CHANNEL_IMAGE
+        # media: CHANNEL_MEDIA
+      
+      # 個人直接送信のタイプマッピングルール（オプション、設定しない場合はシステムtype_mappingを使用）
+      type_mapping:
+        # 例（システムtype_mappingと一致させる）：
+        # text: text           # プレーンテキスト → テキストチャンネル
+        # link: text           # リンク → テキストチャンネル
+        # ebook: ebook         # 電子書籍 → 電子書籍チャンネル
+        # document: document   # ドキュメント → ドキュメントチャンネル
+        # image: image         # 画像 → 画像チャンネル
+        # animation: image     # アニメーションGIF → 画像チャンネル
+        # sticker: image       # ステッカー → 画像チャンネル
+        # video: media         # 動画 → メディアチャンネル
+        # audio: media         # 音声 → メディアチャンネル
+        # voice: media         # ボイス → メディアチャンネル
+        # contact: default     # 連絡先 → デフォルトチャンネル
+        # location: default    # 位置情報 → デフォルトチャンネル
+  
+  cloud:
+    google_drive:
+      enabled: false  # Google Driveストレージを有効化
+      client_id: ""  # Google DriveクライアントID
+      client_secret: ""  # Google Driveクライアントシークレット
+      folder_name: "ArchiveBot"  # ストレージフォルダー名
+    
+    aliyun:
+      enabled: false  # Aliyun Driveストレージを有効化
+      refresh_token: ""  # Aliyun Driveリフレッシュトークン
+      folder_name: "归档"  # ストレージフォルダー名

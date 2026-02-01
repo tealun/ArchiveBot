@@ -1,0 +1,79 @@
+# ArchiveBot .gitignore
+
+# Config files (contains sensitive info)
+config/config.yaml
+.env                # 环境变量文件
+docker-compose.override.yml  # 本地覆盖配置（不提交）
+
+# Data directory
+data/
+!data/.gitkeep
+!data/temp/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.bak
+
+# Test files
+test_*.py
+check_*.py
+diagnose_*.py
+deep_fix_*.py
+enable_*.py
+reset_*.py
+
+# Internal tools (not for public repo)
+sync_to_public.py
+verify_docker.py
+
+# Internal documentation (not for public repo)
+docs/DEVELOPMENT.md
+docs/ARCHITECTURE.md
+
+# Internal documentation (not for public repo)
+docs/DEVELOPMENT.md
+docs/ARCHITECTURE.md
+docs/SPONSORSHIP_GUIDE.md
+.env
