@@ -10,6 +10,83 @@ from telegram.ext import ContextTypes
 logger = logging.getLogger(__name__)
 
 
+async def update_archive_message_buttons(
+    context: ContextTypes.DEFAULT_TYPE,
+    archive_id: int
+) -> bool:
+    """
+    更新存档消息的按钮（当笔记状态变化时）
+    
+    Args:
+        context: Bot context
+        archive_id: 存档ID
+        
+    Returns:
+        是否成功更新
+    """
+    try:
+        telegram_storage = context.bot_data.get('telegram_storage')
+        db_storage = context.bot_data.get('db_storage')
+        
+        if not telegram_storage or not db_storage:
+            logger.debug("Storage not available for updating buttons")
+            return False
+        
+        # 查询存档的storage_path
+        archive = db_storage.db.execute(
+            "SELECT storage_path FROM archives WHERE id = ? AND deleted = 0",
+            (archive_id,)
+        ).fetchone()
+        
+        if not archive or not archive['storage_path']:
+            logger.debug(f"Archive {archive_id} has no storage_path")
+            return False
+        
+        storage_path = archive['storage_path']
+        
+        # 解析storage_path: channel_id:message_id:file_id
+        parts = storage_path.split(':')
+        if len(parts) < 2:
+            logger.debug(f"Invalid storage_path format: {storage_path}")
+            return False
+        
+        channel_id = int(parts[0])
+        message_id = int(parts[1])
+        
+        # 查询笔记和精选状态
+        notes_result = db_storage.db.execute(
+            "SELECT COUNT(*) as count FROM notes WHERE archive_id = ? AND deleted = 0",
+            (archive_id,)
+        ).fetchone()
+        has_notes = notes_result['count'] > 0 if notes_result else False
+        
+        fav_result = db_storage.db.execute(
+            "SELECT favorite FROM archives WHERE id = ?",
+            (archive_id,)
+        ).fetchone()
+        is_favorite = fav_result['favorite'] == 1 if fav_result else False
+        
+        # 生成新按钮
+        reply_markup = telegram_storage._create_archive_buttons(archive_id, has_notes, is_favorite)
+        
+        # 更新频道消息的按钮
+        try:
+            await context.bot.edit_message_reply_markup(
+                chat_id=channel_id,
+                message_id=message_id,
+                reply_markup=reply_markup
+            )
+            logger.info(f"Updated buttons for archive {archive_id} (has_notes={has_notes})")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to update message buttons: {e}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error updating archive message buttons: {e}", exc_info=True)
+        return False
+
+
 async def forward_note_to_channel(
     context: ContextTypes.DEFAULT_TYPE,
     note_id: int,

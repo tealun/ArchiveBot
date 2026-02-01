@@ -206,7 +206,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_channel_note(update, context)
         elif callback_data.startswith('ch_del:') or callback_data.startswith('ch_del_note:'):
             await handle_channel_delete(update, context)
-        elif callback_data.startswith('ch_back:'):
+        elif callback_data.startswith('ch_back:') or callback_data.startswith('ch_back_note:'):
             await handle_channel_back(update, context)
         elif callback_data.startswith('ch_archive:'):
             await handle_channel_archive(update, context)

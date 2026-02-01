@@ -346,7 +346,7 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                 return
             
             # 转发笔记到Telegram频道（使用统一的公共函数）
-            from ...utils.note_storage_helper import forward_note_to_channel
+            from ...utils.note_storage_helper import forward_note_to_channel, update_archive_message_buttons
             storage_path = await forward_note_to_channel(
                 context=context,
                 note_id=note_id,
@@ -354,6 +354,10 @@ async def _finalize_note_internal(context: ContextTypes.DEFAULT_TYPE, chat_id: i
                 note_title=note_title,
                 note_manager=note_manager
             )
+            
+            # 更新原始存档消息的按钮（如果有关联存档）
+            if archive_id:
+                await update_archive_message_buttons(context, archive_id)
             
             # 构建成功反馈消息
             reason_map = {

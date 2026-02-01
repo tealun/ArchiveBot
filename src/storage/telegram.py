@@ -8,6 +8,7 @@ from typing import Optional, Any
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 from .base import BaseStorage
+from ..utils.helpers import escape_html
 
 logger = logging.getLogger(__name__)
 
@@ -138,10 +139,10 @@ class TelegramStorage(BaseStorage):
                     logger.error("No content for text/link type")
                     return None
                 
-                # 添加标题（如果有）
+                # 添加标题（如果有）- 仅转义title，content已在message_processor中处理
                 title = metadata.get('title', '')
                 if title and title != content[:100]:
-                    formatted_text = f"<b>{title}</b>\n\n{content}"
+                    formatted_text = f"<b>{escape_html(title)}</b>\n\n{content}"
                 else:
                     formatted_text = content
                 
@@ -165,7 +166,8 @@ class TelegramStorage(BaseStorage):
                         message = await self.bot.send_document(
                             chat_id=channel_id,
                             document=text_file,
-                            caption=f"📄 长文本文档\n\n{title if title else '无标题'}" if title else "📄 长文本文档",
+                            caption=f"📄 长文本文档\n\n{escape_html(title) if title else '无标题'}" if title else "📄 长文本文档",
+                            parse_mode='HTML',
                             filename=file_name,
                             reply_markup=reply_markup
                         )
@@ -228,6 +230,10 @@ class TelegramStorage(BaseStorage):
                 logger.warning(f"Caption too long ({len(caption)} chars), truncating to 1024")
                 caption = caption[:1020] + "..."
             
+            # HTML转义caption（防止特殊字符破坏HTML结构）
+            if caption:
+                caption = escape_html(caption)
+            
             # 生成按钮（如果有archive_id）
             reply_markup = None
             if archive_id:
@@ -247,6 +253,7 @@ class TelegramStorage(BaseStorage):
                         chat_id=channel_id,
                         photo=file_id,
                         caption=caption,
+                        parse_mode='HTML',
                         reply_markup=reply_markup
                     )
                 elif send_type == 'video':
@@ -254,6 +261,7 @@ class TelegramStorage(BaseStorage):
                         chat_id=channel_id,
                         video=file_id,
                         caption=caption,
+                        parse_mode='HTML',
                         reply_markup=reply_markup
                     )
                 elif send_type in ['document', 'ebook']:
@@ -261,6 +269,7 @@ class TelegramStorage(BaseStorage):
                         chat_id=channel_id,
                         document=file_id,
                         caption=caption,
+                        parse_mode='HTML',
                         reply_markup=reply_markup
                     )
                 elif send_type == 'audio':
@@ -268,6 +277,7 @@ class TelegramStorage(BaseStorage):
                         chat_id=channel_id,
                         audio=file_id,
                         caption=caption,
+                        parse_mode='HTML',
                         reply_markup=reply_markup
                     )
                 elif send_type == 'voice':
@@ -275,6 +285,7 @@ class TelegramStorage(BaseStorage):
                         chat_id=channel_id,
                         voice=file_id,
                         caption=caption,
+                        parse_mode='HTML',
                         reply_markup=reply_markup
                     )
                 elif send_type == 'animation':
@@ -282,6 +293,7 @@ class TelegramStorage(BaseStorage):
                         chat_id=channel_id,
                         animation=file_id,
                         caption=caption,
+                        parse_mode='HTML',
                         reply_markup=reply_markup
                     )
                 else:
@@ -291,6 +303,7 @@ class TelegramStorage(BaseStorage):
                         chat_id=channel_id,
                         document=file_id,
                         caption=caption,
+                        parse_mode='HTML',
                         reply_markup=reply_markup
                     )
             except Exception as e:
@@ -374,20 +387,21 @@ class TelegramStorage(BaseStorage):
                     storage_paths[i] = await self.store(None, metadata)
                 return storage_paths
             
-            # 构建media_group
+            # 构建media_group（需要转义caption中的HTML特殊字符）
             media_group = []
             for i, metadata in enumerate(metadata_list):
                 file_id = metadata.get('file_id')
-                # 只有第一个item有caption
-                caption = metadata.get('caption', '') if i == 0 else None
+                # 只有第一个item有caption - 需要转义HTML特殊字符
+                raw_caption = metadata.get('caption', '') if i == 0 else None
+                caption = escape_html(raw_caption) if raw_caption else None
                 content_type = metadata.get('content_type')
                 
                 if content_type in ['photo', 'image']:
-                    media_group.append(InputMediaPhoto(media=file_id, caption=caption))
+                    media_group.append(InputMediaPhoto(media=file_id, caption=caption, parse_mode='HTML'))
                 elif content_type == 'video':
-                    media_group.append(InputMediaVideo(media=file_id, caption=caption))
+                    media_group.append(InputMediaVideo(media=file_id, caption=caption, parse_mode='HTML'))
                 elif content_type == 'audio':
-                    media_group.append(InputMediaAudio(media=file_id, caption=caption))
+                    media_group.append(InputMediaAudio(media=file_id, caption=caption, parse_mode='HTML'))
             
             # 发送media_group
             try:
@@ -416,16 +430,17 @@ class TelegramStorage(BaseStorage):
                     first_metadata = metadata_list[0]
                     archive_id = first_metadata.get('archive_id')
                     has_notes = first_metadata.get('has_notes', False)
+                    is_favorite = first_metadata.get('is_favorite', False)
                     
                     if archive_id:
                         try:
-                            reply_markup = self._create_archive_buttons(archive_id, has_notes)
+                            reply_markup = self._create_archive_buttons(archive_id, has_notes, is_favorite)
                             await self.bot.edit_message_reply_markup(
                                 chat_id=channel_id,
                                 message_id=messages[0].message_id,
                                 reply_markup=reply_markup
                             )
-                            logger.debug(f"Added buttons to first message of media_group")
+                            logger.debug(f"Added buttons to first message of media_group (archive_id={archive_id}, has_notes={has_notes})")
                         except Exception as e:
                             logger.warning(f"Failed to add buttons to media_group: {e}")
                 

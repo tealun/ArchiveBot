@@ -2,6 +2,7 @@
 Helper utility functions
 """
 
+import html
 import logging
 import re
 from datetime import datetime
@@ -10,6 +11,29 @@ from urllib.parse import urlparse
 from .config import get_config
 
 logger = logging.getLogger(__name__)
+
+
+def escape_html(text: str) -> str:
+    """
+    转义HTML特殊字符，防止HTML注入
+    
+    统一的HTML转义函数，用于所有需要在Telegram HTML消息中显示的用户输入文本。
+    
+    Args:
+        text: 需要转义的文本
+        
+    Returns:
+        转义后的安全HTML文本
+        
+    Examples:
+        >>> escape_html("A<B>&C")
+        'A&lt;B&gt;&amp;C'
+        >>> escape_html("正常文本")
+        '正常文本'
+    """
+    if not text:
+        return text
+    return html.escape(str(text))
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -86,9 +110,9 @@ def format_source_header(message, source_info: Optional[dict] = None) -> str:
     
     # 格式化来源信息（使用HTML标签隐藏URL）
     if source_link:
-        return f"来源 <a href='{source_link}'>{source_name}</a>  |  日期 {date_str}\n--------------------"
+        return f"来源 <a href='{source_link}'>{escape_html(source_name)}</a>  |  日期 {date_str}\n--------------------"
     else:
-        return f"来源 {source_name}  |  日期 {date_str}\n--------------------"
+        return f"来源 {escape_html(source_name)}  |  日期 {date_str}\n--------------------"
 
 
 def extract_hashtags(text: str) -> List[str]:

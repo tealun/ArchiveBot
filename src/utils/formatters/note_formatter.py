@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import html
 import logging
 from typing import List, Dict, Any, Optional
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -80,9 +81,9 @@ class NoteFormatter:
                         message_id = storage_path
                     
                     link = f"https://t.me/c/{channel_id}/{message_id}"
-                    result_text += f"📎 归档：<a href='{link}'>{archive_title}</a>\n"
+                    result_text += f"📎 归档：<a href='{link}'>{html.escape(archive_title)}</a>\n"
                 else:
-                    result_text += f"📎 归档：{archive_title}\n"
+                    result_text += f"📎 归档：{html.escape(archive_title)}\n"
             
             keyboard.append([
                 InlineKeyboardButton(

@@ -2,6 +2,7 @@
 Batch message processor
 """
 
+import html
 import logging
 import time
 from typing import List, Optional, Dict
@@ -143,9 +144,9 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
                 
                 # 生成标题（限制32字符）
                 if config.ai.get('auto_generate_title', False):
-                    ai_title = await ai_summarizer.generate_title(merged_caption, language=lang_ctx.language)
+                    ai_title = await ai_summarizer.generate_title_from_text(merged_caption, max_length=32, language=lang_ctx.language)
                     if ai_title:
-                        shared_ai_result['title'] = ai_title[:32]
+                        shared_ai_result['title'] = ai_title
                         logger.info(f"Batch AI generated title: {shared_ai_result['title']}")
                 
                 # 生成摘要（检查内容长度是否达到阈值）
@@ -336,11 +337,11 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                                 message_id = storage_path
                             
                             file_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                            dup_msg += lang_ctx.t('archive_duplicate_file_name', title=f"<a href='{file_link}'>{file_title}</a>") + "\n"
+                            dup_msg += lang_ctx.t('archive_duplicate_file_name', title=f"<a href='{file_link}'>{html.escape(file_title)}</a>") + "\n"
                         else:
-                            dup_msg += lang_ctx.t('archive_duplicate_file_name', title=file_title) + "\n"
+                            dup_msg += lang_ctx.t('archive_duplicate_file_name', title=html.escape(file_title)) + "\n"
                     else:
-                        dup_msg += lang_ctx.t('archive_duplicate_file_name', title=file_title) + "\n"
+                        dup_msg += lang_ctx.t('archive_duplicate_file_name', title=html.escape(file_title)) + "\n"
                     
                     dup_msg += lang_ctx.t('archive_duplicate_file_size', size=format_file_size(duplicate_info.get('file_size', 0))) + "\n"
                     dup_msg += lang_ctx.t('archive_duplicate_file_archived_at', time=duplicate_info.get('archived_at', lang_ctx.t('archive_duplicate_unknown_time'))) + "\n"

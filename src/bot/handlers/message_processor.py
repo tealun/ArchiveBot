@@ -455,12 +455,14 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             logger.info("Message sent directly by user (not forwarded)")
         
         # 添加来源信息头部到content
-        from ...utils.helpers import format_source_header
+        from ...utils.helpers import format_source_header, escape_html
         source_header = format_source_header(message, source_info)
         
-        # 将来源信息添加到content开头
+        # 将来源信息添加到content开头（转义用户原始文本）
         if analysis.get('content'):
-            analysis['content'] = f"{source_header}\n{analysis['content']}"
+            # source_header已包含HTML标签，仅转义用户content
+            user_content = escape_html(analysis['content'])
+            analysis['content'] = f"{source_header}\n{user_content}"
         else:
             analysis['content'] = source_header
         
@@ -689,7 +691,7 @@ URL：{analysis.get('url', '')}
                 logger.info(f"Auto-generated note {note_id} for archive {archive_id} (with_user_comment={bool(user_comment)}, with_caption={bool(original_caption)})")
                 
                 # 转发笔记到Telegram频道（与手动笔记模式保持一致）
-                from ...utils.note_storage_helper import forward_note_to_channel
+                from ...utils.note_storage_helper import forward_note_to_channel, update_archive_message_buttons
                 storage_path = await forward_note_to_channel(
                     context=context,
                     note_id=note_id,
@@ -700,6 +702,9 @@ URL：{analysis.get('url', '')}
                 
                 if storage_path:
                     logger.info(f"Auto-generated note {note_id} forwarded to channel: {storage_path}")
+                
+                # 更新原始存档消息的按钮（将"添加笔记"改为"查看笔记"）
+                await update_archive_message_buttons(context, archive_id)
                 
                 return note_id
         

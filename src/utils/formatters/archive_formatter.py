@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import html
 import logging
 from typing import List, Dict, Any, Optional
 from telegram import Bot, Message, InlineKeyboardButton, InlineKeyboardMarkup
@@ -121,25 +122,42 @@ class ArchiveFormatter:
         success_msg = f"<b>{i18n.t('archive_success')}</b>"
         
         # ========== 标题：带存储位置跳转链接 ==========
-        # 优先级：AI生成标题 > 内容截断(45字符，第一段) > 原标题 > 类型名
+        # 优先级：AI生成标题 > 内容截断(45字符，第一段) > 原标题 > 文件名 > 类型名
         title_text = None
         ai_title = archive_data.get('ai_title')
         content = archive_data.get('content', '')
         caption = archive_data.get('caption', '')
         original_title = archive_data.get('title', '')
+        file_name = archive_data.get('file_name', '')
         
         if ai_title:
             title_text = ai_title
         elif content or caption:
             # 使用内容或caption的第一段落，截断45字符
+            # 注意：content可能包含HTML格式的来源信息，需要跳过或使用纯文本部分
             text_source = content or caption
-            first_para = text_source.split('\n')[0].strip()
+            
+            # 如果content包含来源分隔符，提取实际内容部分
+            if text_source and '--------------------' in text_source:
+                # 跳过来源信息行，提取实际内容
+                parts = text_source.split('--------------------', 1)
+                if len(parts) > 1:
+                    text_source = parts[1].strip()
+            
+            # 提取第一段（去除HTML标签）
+            import re
+            # 移除HTML标签
+            text_source_plain = re.sub(r'<[^>]+>', '', text_source)
+            first_para = text_source_plain.split('\n')[0].strip()
             if len(first_para) > 45:
                 title_text = first_para[:45] + '...'
             else:
-                title_text = first_para if first_para else text_source[:45]
+                title_text = first_para if first_para else text_source_plain[:45]
         elif original_title:
             title_text = original_title
+        elif file_name:
+            # 使用文件名作为标题
+            title_text = file_name
         else:
             # 最后才使用类型名
             content_type_key = f'content_type_{content_type}'
@@ -147,7 +165,7 @@ class ArchiveFormatter:
             if title_text == content_type_key:
                 title_text = content_type
         
-        # 构建存储位置链接
+        # 构建存储位置链接（需要转义title_text以防止HTML注入）
         storage_path = archive_data.get('storage_path')
         if storage_path and isinstance(storage_path, str) and ':' in storage_path:
             parts = storage_path.split(':')
@@ -155,11 +173,11 @@ class ArchiveFormatter:
                 channel_id_str = parts[0].replace('-100', '')
                 message_id = parts[1]
                 storage_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                title_display = f'📄 <a href="{storage_link}">{title_text}</a>'
+                title_display = f'📄 <a href="{storage_link}">{html.escape(title_text)}</a>'
             else:
-                title_display = f'{emoji} {title_text}'
+                title_display = f'{emoji} {html.escape(title_text)}'
         else:
-            title_display = f'{emoji} {title_text}'
+            title_display = f'{emoji} {html.escape(title_text)}'
         
         success_msg += f"\n\n{title_display}"
         
@@ -218,14 +236,14 @@ class ArchiveFormatter:
                             channel_username = username_part[1:]  # 去掉@
                             channel_link = f"https://t.me/{channel_username}"
                     
-                    # 构建显示文本（使用HTML链接）
+                    # 构建显示文本（使用HTML链接，转义用户输入）
                     if channel_link:
-                        success_msg += f"\n🔗 来源 <a href=\"{channel_link}\">{main_source}</a>"
+                        success_msg += f"\n🔗 来源 <a href=\"{channel_link}\">{html.escape(main_source)}</a>"
                     else:
-                        success_msg += f"\n🔗 来源 {main_source}"
+                        success_msg += f"\n🔗 来源 {html.escape(main_source)}"
             else:
-                # 如果没有特定格式，直接显示
-                success_msg += f"\n🔗 <i>{source}</i>"
+                # 如果没有特定格式，直接显示（转义用户输入）
+                success_msg += f"\n🔗 <i>{html.escape(source)}</i>"
         
         # ========== AI分析信息（分隔显示） ==========
         if include_ai_info:
@@ -602,11 +620,11 @@ class ArchiveFormatter:
                 channel_id_str = parts[0].replace('-100', '')
                 message_id = parts[1]
                 link = f"https://t.me/c/{channel_id_str}/{message_id}"
-                text = f"{emoji} <a href='{link}'>{title}</a>\n"
+                text = f"{emoji} <a href='{link}'>{html.escape(title)}</a>\n"
             else:
-                text = f"{emoji} {title}\n"
+                text = f"{emoji} {html.escape(title)}\n"
         else:
-            text = f"{emoji} {title}\n"
+            text = f"{emoji} {html.escape(title)}\n"
         
         text += "----------------------------------"
         

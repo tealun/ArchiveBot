@@ -724,12 +724,26 @@ class StorageManager:
         )
         
         # 构建metadata
+        # 对于媒体类型（非text/link），如果content包含来源信息，使用它作为caption
+        # text/link类型，content包含完整的来源信息和正文，会被telegram.py特殊处理
+        # 媒体类型，content可能包含 "来源信息\n用户caption"，适合作为caption显示
+        caption = None
+        if content_type in ['text', 'link']:
+            # text/link类型不需要caption，使用content字段
+            caption = None
+        else:
+            # 媒体类型：优先使用content（已包含来源信息），fallback到title
+            if analysis.get('content'):
+                caption = analysis.get('content')
+            elif analysis.get('title'):
+                caption = analysis.get('title')
+        
         metadata = {
             'file_id': file_id,
             'content_type': content_type,
             'title': analysis.get('title'),
             'content': analysis.get('content'),  # 文本和链接需要content字段
-            'caption': analysis.get('title') or analysis.get('content'),
+            'caption': caption,
             'file_size': file_size
         }
         
