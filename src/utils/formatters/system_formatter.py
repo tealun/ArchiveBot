@@ -228,6 +228,10 @@ class SystemFormatter:
             
             if item_info['type'] == 'bool':
                 value_display = "✅" if current_value else "❌"
+            elif item_info['type'] == 'float':
+                value_display = f"{current_value:.2f}" if current_value is not None else "未设置"
+            elif item_info['type'] == 'choice':
+                value_display = str(current_value) if current_value else "未设置"
             else:
                 value_display = str(current_value) if current_value is not None else "未设置"
             
@@ -327,21 +331,49 @@ class SystemFormatter:
                 InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")
             ]]
         
+        elif item_type == 'float':
+            text += f"当前值：<code>{current_value}</code>\n\n"
+            
+            min_val = item_info.get('min')
+            max_val = item_info.get('max')
+            default_val = item_info.get('default')
+            step = item_info.get('step', 0.1)
+            
+            text += "请输入新值（小数）：\n"
+            if min_val is not None:
+                text += f"• 最小值：{min_val}\n"
+            if max_val is not None:
+                text += f"• 最大值：{max_val}\n"
+            if default_val is not None:
+                text += f"• 默认值：{default_val}\n"
+            if step:
+                text += f"• 步进：{step}\n"
+            
+            text += f"\n💡 直接回复数字即可"
+            
+            keyboard = [[
+                InlineKeyboardButton("⬅️ 返回", callback_data=f"setting_cat:{category_key}")
+            ]]
+        
         elif item_type == 'choice':
+            text += f"当前值：<code>{current_value}</code>\n\n"
             choices = item_info.get('choices', [])
             default_val = item_info.get('default')
             
             text += "请选择新值：\n"
             for choice in choices:
-                text += f"• {choice}\n"
+                marker = "• " if choice != current_value else "✓ "
+                text += f"{marker}{choice}\n"
             if default_val:
                 text += f"\n默认值：{default_val}\n"
             
             keyboard = []
             for choice in choices:
+                # 当前值显示为选中状态
+                button_text = f"✓ {choice}" if choice == current_value else choice
                 keyboard.append([
                     InlineKeyboardButton(
-                        choice,
+                        button_text,
                         callback_data=f"setting_set:{config_key}:{choice}"
                     )
                 ])

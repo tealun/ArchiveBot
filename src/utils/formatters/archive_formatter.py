@@ -228,19 +228,8 @@ class ArchiveFormatter:
                             main_source = main_source[len(prefix):].strip()
                             break
                     
-                    # 尝试提取频道链接（如果第二部分是@username）
-                    channel_link = None
-                    if len(source_parts) > 1:
-                        username_part = source_parts[1].strip()
-                        if username_part.startswith('@'):
-                            channel_username = username_part[1:]  # 去掉@
-                            channel_link = f"https://t.me/{channel_username}"
-                    
-                    # 构建显示文本（使用HTML链接，转义用户输入）
-                    if channel_link:
-                        success_msg += f"\n🔗 来源 <a href=\"{channel_link}\">{html.escape(main_source)}</a>"
-                    else:
-                        success_msg += f"\n🔗 来源 {html.escape(main_source)}"
+                    # 构建显示文本（纯文本，不使用链接）
+                    success_msg += f"\n🔗 来源 {html.escape(main_source)}"
             else:
                 # 如果没有特定格式，直接显示（转义用户输入）
                 success_msg += f"\n🔗 <i>{html.escape(source)}</i>"

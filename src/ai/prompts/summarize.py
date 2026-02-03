@@ -3,6 +3,7 @@
 负责生成内容分析、分类、标签提取等功能的 prompts
 支持简体中文、繁体中文和英文
 """
+from ..operations.message_helper import is_traditional_chinese
 
 
 class SummarizePrompts:
@@ -21,7 +22,7 @@ class SummarizePrompts:
             角色描述字符串
         """
         if language.startswith('zh'):
-            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            is_traditional = is_traditional_chinese(language)
             if is_formal:
                 return "你是一位專業的技術資訊分析師，擅長處理技術文件、學術資料和專業內容。" if is_traditional else "你是一位专业的技术信息分析师，擅长处理技术文档、学术资料和专业内容。"
             else:
@@ -59,7 +60,7 @@ class SummarizePrompts:
         """
         if language.startswith('zh'):
             # 判断是否为繁体中文
-            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            is_traditional = is_traditional_chinese(language)
             return SummarizePrompts._get_prompt_zh(
                 content, is_formal, language_instruction, context_info, 
                 example_categories, example_tags, is_traditional

@@ -21,6 +21,53 @@ class ContentAnalyzer:
     """
     
     @staticmethod
+    def _extract_telegram_link_preview(message: Message) -> Optional[Dict[str, Any]]:
+        """
+        提取 Telegram 自动生成的链接预览信息
+        
+        Args:
+            message: Telegram message object
+            
+        Returns:
+            包含预览信息的字典，如果没有预览则返回 None
+        """
+        try:
+            # Telegram Bot API 的 link_preview_options (7.0+)
+            # 但预览内容（标题、描述等）通常不直接提供给 bot
+            # 需要通过其他方式获取
+            
+            # 检查消息实体中是否有 URL 的 text_link
+            if message.entities:
+                for entity in message.entities:
+                    if entity.type == 'text_link' and entity.url:
+                        logger.debug(f"Found text_link entity: {entity.url}")
+                        # 可以记录但无法获取预览内容
+            
+            # 检查 web_page 字段（某些 Telegram 客户端可能有）
+            if hasattr(message, 'web_page') and message.web_page:
+                web_page = message.web_page
+                preview_data = {
+                    'source': 'telegram_preview',
+                    'title': getattr(web_page, 'title', None),
+                    'description': getattr(web_page, 'description', None),
+                    'url': getattr(web_page, 'url', None),
+                    'site_name': getattr(web_page, 'site_name', None),
+                }
+                
+                # 过滤空值
+                preview_data = {k: v for k, v in preview_data.items() if v}
+                
+                if len(preview_data) > 1:  # 至少有 source 和一个其他字段
+                    logger.info(f"✓ Extracted Telegram link preview: {preview_data.get('title', 'No title')}")
+                    return preview_data
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Failed to extract Telegram link preview: {e}")
+            return None
+    
+    @staticmethod
     def analyze(message: Message) -> Dict[str, Any]:
         """
         Analyze message and extract metadata
@@ -146,44 +193,22 @@ class ContentAnalyzer:
             # 先用同步方法做基础分析
             result = ContentAnalyzer.analyze(message)
             
-            # 如果是link类型，使用WebArchiver做深度提取
+            # 如果是link类型，尝试提取 Telegram 的链接预览
             if result.get('content_type') == 'link':
                 url = result.get('url')
                 if url:
-                    try:
-                        from ..utils.web_archiver import WebArchiver
-                        from ..utils.config import get_config
+                    telegram_preview = ContentAnalyzer._extract_telegram_link_preview(message)
+                    if telegram_preview:
+                        # 使用 Telegram 的预览数据
+                        result['title'] = telegram_preview.get('title') or result.get('title')
+                        result['telegram_preview'] = telegram_preview
                         
-                        config = get_config()
-                        web_archiver_enabled = config.get('web_archiver.enabled', False)
+                        if telegram_preview.get('description'):
+                            # 添加描述到内容中
+                            existing_content = result.get('content', '')
+                            result['content'] = f"{existing_content}\n\n📝 {telegram_preview['description']}".strip()
                         
-                        if web_archiver_enabled:
-                            logger.info(f"Using WebArchiver for link: {url}")
-                            
-                            archiver = WebArchiver()
-                            archive_result = await archiver.archive(
-                                url=url,
-                                telegram_message=message
-                            )
-                            
-                            if archive_result.success:
-                                # 更新分析结果
-                                result['title'] = archive_result.title or result.get('title')
-                                result['content'] = archive_result.content or result.get('content')
-                                result['web_archive_metadata'] = archive_result.metadata
-                                result['web_archive_summary'] = archive_result.summary
-                                result['web_archive_pdf'] = archive_result.pdf_bytes
-                                result['web_archive_quality'] = archive_result.quality_score
-                                
-                                logger.info(f"WebArchiver success: quality={archive_result.quality_score:.2f}, has_pdf={archive_result.pdf_bytes is not None}")
-                            else:
-                                logger.warning(f"WebArchiver failed: {archive_result.error}")
-                        else:
-                            logger.debug("WebArchiver disabled, skipping deep extraction")
-                            
-                    except Exception as e:
-                        logger.error(f"WebArchiver error: {e}", exc_info=True)
-                        # 不影响原有流程，继续使用基础分析结果
+                        logger.info("✓ Using Telegram link preview data")
             
             return result
             
@@ -191,44 +216,6 @@ class ContentAnalyzer:
             logger.error(f"Error in async analyze: {e}", exc_info=True)
             # Fallback到同步分析
             return ContentAnalyzer.analyze(message)
-    
-    @staticmethod
-    async def _analyze_text_with_metadata(message: Message) -> Dict[str, Any]:
-        """Analyze text message with link metadata extraction"""
-        from ..utils.link_extractor import extract_link_metadata
-        
-        text = message.text or ''
-        
-        # Check if it's a URL
-        urls = extract_urls(text)
-        if urls or is_url(text.strip()):
-            url = urls[0] if urls else text.strip()
-            
-            # 尝试提取链接元数据
-            try:
-                metadata = await extract_link_metadata(url)
-                return {
-                    'content_type': 'link',
-                    'title': metadata.get('title') or url,
-                    'content': text,
-                    'url': url,
-                    'link_metadata': metadata  # 保存完整元数据
-                }
-            except Exception as e:
-                logger.warning(f"Failed to extract link metadata: {e}")
-                # 降级到基本链接处理
-                return {
-                    'content_type': 'link',
-                    'title': url,
-                    'content': text,
-                    'url': url
-                }
-        
-        return {
-            'content_type': 'text',
-            'title': text[:100] if len(text) > 100 else text,
-            'content': text
-        }
     
     @staticmethod
     def _analyze_text(message: Message) -> Dict[str, Any]:
@@ -340,10 +327,10 @@ class ContentAnalyzer:
         # 1. 扩展名直接判断
         if file_ext in EBOOK_EXTENSIONS:
             content_type = 'ebook'
-        # 2. PDF等需要AI判断
+        # 2. 文档类型，可能需要AI判断是否为电子书
         elif file_ext in ['.pdf', '.doc', '.docx']:
             content_type = 'document'
-            needs_ai_ebook_check = True  # 标记需要AI判断
+            needs_ai_ebook_check = True
         
         result = {
             'content_type': content_type,

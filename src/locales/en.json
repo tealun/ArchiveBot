@@ -235,7 +235,7 @@
   "setting_category_ai": "🤖 AI Settings",
   "setting_category_storage": "💾 Storage Settings",
   "setting_category_logging": "📝 Logging Settings",
-  "setting_category_web_archiver": "🌐 Web Archiver",
+
   "setting_updated": "✅ Setting Updated\n\n<b>{name}</b>\nNew value: <code>{value}</code>\n\n⚠️ Note: Some settings require restarting the bot to take effect",
   "setting_update_failed": "❌ Setting Update Failed\n\n{error}",
   "setting_invalid_value": "❌ Invalid Value\n\n{error}",
@@ -253,6 +253,7 @@
   "content_type_animation": "Animation",
   "content_type_contact": "Contact",
   "content_type_location": "Location",
+  "content_type_ebook": "E-book",
   "content_type_mixed": "Mixed Content",
   "storage": "Storage",
   "source": "Source",
@@ -263,5 +264,8 @@
   "ai_summary": "💭 Summary",
   "ai_key_points": "🔑 Key Points",
   "batch_source_from": "📌 Source: {source}",
-  "batch_source_direct": "📌 Source: Direct Send"
+  "batch_source_direct": "📌 Source: Direct Send",
+  "restart_initiated": "🔄 <b>System Restart Initiated</b>\n\n⚠️ The bot is restarting now...\n\nPlease wait a moment, the bot will be back online shortly.\n\n💡 Note: This requires the bot to be running under a process manager (systemd, Docker, etc.)",
+  "restart_failed": "❌ <b>Restart Failed</b>\n\nError: {error}\n\nPlease restart the bot manually or check system logs.",
+  "restart_complete": "✅ <b>System Restart Complete</b>\n\n🤖 The bot has successfully restarted and is now online.\n\n📊 All services are operational.\n⏰ Restart completed at: {time}"
 }

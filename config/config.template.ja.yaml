@@ -4,7 +4,7 @@
 bot:
   token: BOT_TOKEN  # @BotFather から取得（環境変数 BOT_TOKEN の使用を推奨）
   owner_id: OWNER_ID  # あなたの Telegram ID、@userinfobot から取得（環境変数 OWNER_ID の使用を推奨）
-  language: "zh-CN"  # インターフェース言語: en, zh-CN, zh-TW
+  language: "zh-CN"  # インターフェース言語: en, zh-CN, zh-TW, ja, ko, es
   polling_interval: 1  # ポーリング間隔（秒）
   feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # ユーザーフィードバックリンク
 
@@ -121,40 +121,7 @@ storage:
       voice: media         # ボイス → メディアチャンネル
       contact: default     # 連絡先 → デフォルトチャンネル
       location: default    # 位置情報 → デフォルトチャンネル
-# スマートウェブアーカイバー設定
-web_archiver:
-  enabled: true                # スマートリンクアーカイブ機能を有効化
-  
-  # 取得戦略設定
-  strategies:
-    http:
-      enabled: true              # HTTP取得を有効化
-      timeout: 30                # 取得タイムアウト（秒）
-      follow_redirects: true     # リダイレクトをフォロー
-      max_redirects: 5           # 最大リダイレクト回数
-    
-    telegram:
-      enabled: true              # Telegramプレビュー抽出を有効化（フォールバック）
-  
-  # コンテンツ抽出設定
-  content_extraction:
-    min_length: 200              # 最小コンテンツ長
-    favor_recall: true           # 精度より再現率を優先
-  
-  # PDF生成設定
-  pdf_generation:
-    enabled: true                # PDFアーカイブを生成
-    page_size: A4                # ページサイズ（A4/Letter）
-    include_images: true         # 画像を含める
-  
-  # 品質閾値（0-1）
-  # 品質スコアルール：コンテンツ長(0-0.5点) + メタデータ完全性(0-0.5点)
-  # - コンテンツ：>3000文字=0.5, >1500=0.4, >800=0.3, >400=0.2, >200=0.1
-  # - メタデータ：タイトル+0.2, 著者+0.15, 日付+0.15
-  # 例：3000文字記事+タイトル = 0.5+0.2 = 0.7点
-  quality:
-    min_score_for_pdf: 0.5       # PDF生成の最小品質スコア（低品質コンテンツを避けるため0.5推奨）
-    min_score_for_ai: 0.3        # AI要約の最小品質スコア（短い記事も要約できるよう0.3推奨）
+
     # ソースからチャンネルへのマッピング設定（タイプマッピングより優先度が高い）
     # 転送元（チャンネル/グループ/ユーザー）に基づいてメッセージをルーティング
     # 

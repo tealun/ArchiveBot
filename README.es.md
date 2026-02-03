@@ -37,8 +37,8 @@ ArchiveBot es un Bot de Telegram de código abierto que te ayuda a clasificar y 
 - 🔄 **Copia de Seguridad Automática**: Copia de seguridad periódica automática de la base de datos para garantizar la seguridad de los datos
 - 🤖 **Mejora Inteligente AI**: Análisis inteligente Grok-4 (resumen/puntos clave/clasificación/etiquetas)
 - 💬 **Diálogo Inteligente AI**: Interacción en lenguaje natural, reconocimiento inteligente de intenciones y devolución directa de archivos de recursos
-- 🌏 **Optimización Multilingüe**: Inglés/Chino Simplificado/Chino Tradicional (incluyendo terminología regional)
-- 🔗 **Enlaces Inteligentes**: Extrae automáticamente metadatos como título y descripción de páginas web
+- 🌏 **Soporte Multilingüe**: 6 idiomas (Inglés/Chino Simplificado/Chino Tradicional/Japonés/Coreano/Español)
+- 🔗 **Extracción Inteligente de Enlaces**: Extrae automáticamente metadatos como títulos de páginas web, descripciones, autores e información clave para facilitar la búsqueda y gestión posterior
 - 💾 **Almacenamiento Simplificado**: Almacenamiento local de datos pequeños → Almacenamiento de archivos grandes en canales → Solo referencia de archivos muy grandes (estrategia de tres niveles)
 - 🔒 **Protección de Privacidad**: Datos completamente privados, modo de usuario único
 - 🛡️ **Seguro y Confiable**: Protección contra inyección SQL, filtrado de información sensible, seguridad de hilos
@@ -197,8 +197,7 @@ ArchiveBot adopta una estrategia de almacenamiento simplificada de tres niveles,
 | `/export` | - | Exportar datos de archivo |
 | `/backup` | - | Crear copia de seguridad de la base de datos |
 | `/ai` | - | Ver estado de funcionalidad de IA |
-| `/language` | `/la` | Cambiar idioma de la interfaz |
-| `/cancel` | - | Cancelar operación actual |
+| `/language` | `/la` | Cambiar idioma de la interfaz || `/restart` | - | Reiniciar sistema || `/cancel` | - | Cancelar operación actual |
 
 ### Archivar Contenido
 
@@ -306,7 +305,10 @@ ArchiveBot/
 │   └── locales/                 # Archivos de idiomas
 │       ├── en.json
 │       ├── zh-CN.json
-│       └── zh-TW.json
+│       ├── zh-TW.json
+│       ├── ja.json
+│       ├── ko.json
+│       └── es.json
 └── config/
     └── config.yaml              # Archivo de configuración
 ```

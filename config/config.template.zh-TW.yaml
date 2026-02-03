@@ -4,7 +4,7 @@
 bot:
   token: BOT_TOKEN  # 從 @BotFather 取得（建議使用環境變數 BOT_TOKEN）
   owner_id: OWNER_ID  # 你的 Telegram ID，從 @userinfobot 取得（建議使用環境變數 OWNER_ID）
-  language: "zh-TW"  # 介面語言: en, zh-CN, zh-TW
+  language: "zh-TW"  # 介面語言: en, zh-CN, zh-TW, ja, ko, es
   polling_interval: 1  # 輪詢間隔（秒）
   feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # 使用者回饋連結
 
@@ -113,41 +113,6 @@ storage:
       contact: default     # 聯絡人 → 預設頻道
       location: default    # 位置 → 預設頻道
 
-# 智慧網頁存檔配置
-web_archiver:
-  enabled: true                # 是否啟用智慧連結存檔功能
-  
-  # 抓取策略配置
-  strategies:
-    http:
-      enabled: true              # 啟用HTTP抓取
-      timeout: 30                # 抓取逾時（秒）
-      follow_redirects: true     # 跟隨重新導向
-      max_redirects: 5           # 最大重新導向次數
-    
-    telegram:
-      enabled: true              # 啟用Telegram預覽提取（作為備援）
-  
-  # 正文提取配置
-  content_extraction:
-    min_length: 200              # 最小正文長度
-    favor_recall: true           # 寧濫勿缺（提取更多內容）
-  
-  # PDF生成配置
-  pdf_generation:
-    enabled: true                # 是否生成PDF
-    page_size: A4                # 頁面大小（A4/Letter）
-    include_images: true         # 是否包含圖片
-  
-  # 品質閾值（0-1）
-  # 品質評分規則：內容長度(0-0.5分) + 元數據完整性(0-0.5分)
-  # - 內容：>3000字=0.5, >1500字=0.4, >800字=0.3, >400字=0.2, >200字=0.1
-  # - 元數據：標題+0.2, 作者+0.15, 日期+0.15
-  # 示例：3000字文章+標題 = 0.5+0.2 = 0.7分
-  quality:
-    min_score_for_pdf: 0.5       # 生成PDF的最低品質分數（建議0.5，避免低品質內容浪費資源）
-    min_score_for_ai: 0.3        # AI摘要的最低品質分數（建議0.3，短文也能獲得摘要）
-    
     # 來源到頻道的對映設定（優先順序高於類型對映）
     # 根據轉發來源（頻道/群組/用戶）指定儲存頻道
     # 

@@ -211,8 +211,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                         # 普通添加模式
                         note_id = note_manager.add_note(archive_id, message.text)
                         if note_id:
+                            # 提取标题：使用笔记文本的前 50 个字符
+                            note_title = message.text[:50] if message.text else None
+                            
+                            # 转发笔记到Telegram频道
+                            from ...utils.note_storage_helper import forward_note_to_channel, update_archive_message_buttons
+                            storage_path = await forward_note_to_channel(
+                                context=context,
+                                note_id=note_id,
+                                note_content=message.text,
+                                note_title=note_title,
+                                note_manager=note_manager
+                            )
+                            
+                            # 更新存档消息按钮
+                            if archive_id:
+                                await update_archive_message_buttons(context, archive_id)
+                            
                             await message.reply_text(lang_ctx.t('note_added_to_archive', archive_id=archive_id, note_id=note_id))
-                            logger.info(f"Added note {note_id} to archive {archive_id}")
+                            logger.info(f"Added note {note_id} to archive {archive_id}, forwarded to channel: {storage_path}")
                         else:
                             await message.reply_text(lang_ctx.t('note_add_failed_error'))
                 else:

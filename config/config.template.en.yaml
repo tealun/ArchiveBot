@@ -4,7 +4,7 @@
 bot:
   token: BOT_TOKEN  # Get from @BotFather (Recommended: use env var BOT_TOKEN)
   owner_id: OWNER_ID  # Your Telegram ID from @userinfobot (Recommended: use env var OWNER_ID)
-  language: "en"  # Interface language: en, zh-CN, zh-TW
+  language: "en"  # Interface language: en, zh-CN, zh-TW, ja, ko, es
   polling_interval: 1  # Polling interval in seconds
   feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # User feedback link
 
@@ -115,41 +115,6 @@ storage:
       contact: default     # Contacts → default channel
       location: default    # Locations → default channel
 
-# Smart Web Archiver Configuration
-web_archiver:
-  enabled: true                # Enable smart link archiving
-  
-  # Fetching strategies
-  strategies:
-    http:
-      enabled: true              # Enable HTTP fetching
-      timeout: 30                # Fetch timeout (seconds)
-      follow_redirects: true     # Follow redirects
-      max_redirects: 5           # Maximum redirect count
-    
-    telegram:
-      enabled: true              # Enable Telegram preview extraction (fallback)
-  
-  # Content extraction settings
-  content_extraction:
-    min_length: 200              # Minimum content length
-    favor_recall: true           # Favor recall over precision
-  
-  # PDF generation settings
-  pdf_generation:
-    enabled: true                # Generate PDF archives
-    page_size: A4                # Page size (A4/Letter)
-    include_images: true         # Include images in PDF
-  
-  # Quality thresholds (0-1)
-  # Quality scoring rules: Content length (0-0.5) + Metadata completeness (0-0.5)
-  # - Content: >3000 chars=0.5, >1500=0.4, >800=0.3, >400=0.2, >200=0.1
-  # - Metadata: title+0.2, author+0.15, date+0.15
-  # Example: 3000-char article + title = 0.5+0.2 = 0.7 score
-  quality:
-    min_score_for_pdf: 0.5       # Minimum quality score for PDF (0.5 recommended to avoid low-quality content)
-    min_score_for_ai: 0.3        # Minimum quality score for AI summary (0.3 recommended for short articles)
-    
     # Source to channel mapping configuration (higher priority than type mapping)
     # Route messages based on forward source (channel/group/user)
     # 

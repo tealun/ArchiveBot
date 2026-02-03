@@ -66,6 +66,8 @@ from .callbacks import (
     handle_setting_set_callback,
     handle_setting_back_callback,
     handle_setting_input,
+    handle_auto_install_callback,
+    handle_manual_install_callback,
 )
 
 # Import channel actions handlers
@@ -198,6 +200,10 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await handle_setting_set_callback(update, context)
         elif callback_data == 'setting_back':
             await handle_setting_back_callback(update, context)
+        elif callback_data.startswith('auto_install:'):
+            await handle_auto_install_callback(update, context)
+        elif callback_data.startswith('manual_install:'):
+            await handle_manual_install_callback(update, context)
         elif callback_data.startswith('ai_confirm:'):
             await handle_ai_confirm_callback(update, context)
         elif callback_data.startswith('ai_cancel:'):

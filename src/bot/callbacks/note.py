@@ -738,6 +738,19 @@ async def handle_continuity_callback(update: Update, context: ContextTypes.DEFAU
             note_id = note_manager.add_note(None, pending_text)
             
             if note_id:
+                # 提取标题：使用文本的前 50 个字符
+                note_title = pending_text[:50] if pending_text else None
+                
+                # 转发笔记到Telegram频道
+                from ...utils.note_storage_helper import forward_note_to_channel
+                storage_path = await forward_note_to_channel(
+                    context=context,
+                    note_id=note_id,
+                    note_content=pending_text,
+                    note_title=note_title,
+                    note_manager=note_manager
+                )
+                
                 await query.answer("✅ 已创建新笔记")
                 await query.edit_message_text(
                     f"✅ 笔记已保存\n📝 笔记 #{note_id}"
@@ -748,7 +761,7 @@ async def handle_continuity_callback(update: Update, context: ContextTypes.DEFAU
                 context.user_data['last_note_id'] = note_id
                 context.user_data['last_note_time'] = datetime.now()
                 
-                logger.info(f"Continuity: created new note {note_id}")
+                logger.info(f"Continuity: created new note {note_id}, forwarded to channel: {storage_path}")
             else:
                 await query.answer("❌ 创建失败", show_alert=True)
         

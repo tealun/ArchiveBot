@@ -20,6 +20,7 @@ from .backup import backup_command
 from .review import review_command
 from .setting import setting_command
 from .rand import rand_command
+from .restart import restart_command
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ __all__ = [
     'review_command',
     'setting_command',
     'rand_command',
+    'restart_command',
     'dispatch_command_after_note',
 ]
 
@@ -69,6 +71,7 @@ COMMAND_HANDLERS = {
     '/set': setting_command,
     '/rand': rand_command,
     '/r': rand_command,
+    '/restart': restart_command,
 }
 
 

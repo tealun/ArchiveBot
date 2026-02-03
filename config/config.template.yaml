@@ -4,7 +4,7 @@
 bot:
   token: BOT_TOKEN  # 从 @BotFather 获取（推荐使用环境变量 BOT_TOKEN）
   owner_id: OWNER_ID  # 你的 Telegram ID，从 @userinfobot 获取（推荐使用环境变量 OWNER_ID）
-  language: "zh-CN"  # 界面语言: en, zh-CN, zh-TW
+  language: "zh-CN"  # 界面语言: en, zh-CN, zh-TW, ja, ko, es
   polling_interval: 1  # 轮询间隔（秒）
   feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # 用户反馈链接
   
@@ -45,9 +45,9 @@ ai:
   cache_enabled: true            # 启用AI响应缓存以避免重复调用和成本
   cache_path: "data/ai_cache.db" # 缓存数据库路径（sqlite）
   cache_ttl_seconds: 604800      # 缓存有效期（秒），默认7天
-  rate_limit_per_minute: 60      # 全局每分钟API调用次数限制
+  rate_limit_per_minute: 60      # 全局每分钟API调用次数限制（启用请求队列后，可以设置更高的值如60-120，系统会自动排队避免触发API限制）
   log_calls: true                # 是否记录AI调用详情（便于调试，生产环境可设为false）
-  retry_on_failure: 1            # 临时错误重试次数
+  retry_on_failure: 2            # 临时错误重试次数（建议2-3次，配合指数退避策略）
   auto_summary_on_forward: true  # 转发消息时自动触发摘要（处理器层级）
   auto_tagging: true             # 应用AI生成的标签（可设为false仅生成建议）
   
@@ -116,41 +116,6 @@ storage:
       contact: default     # 联系人 → 默认频道
       location: default    # 位置 → 默认频道
 
-# 智能网页存档配置
-web_archiver:
-  enabled: true                # 是否启用智能链接存档功能
-  
-  # 抓取策略配置
-  strategies:
-    http:
-      enabled: true              # 启用HTTP抓取
-      timeout: 30                # 抓取超时（秒）
-      follow_redirects: true     # 跟随重定向
-      max_redirects: 5           # 最大重定向次数
-    
-    telegram:
-      enabled: true              # 启用Telegram预览提取（作为fallback）
-  
-  # 正文提取配置
-  content_extraction:
-    min_length: 200              # 最小正文长度
-    favor_recall: true           # 宁滥勿缺（提取更多内容）
-  
-  # PDF生成配置
-  pdf_generation:
-    enabled: true                # 是否生成PDF
-    page_size: A4                # 页面大小（A4/Letter）
-    include_images: true         # 是否包含图片
-  
-  # 质量阈值（0-1）
-  # 质量评分规则：内容长度(0-0.5分) + 元数据完整性(0-0.5分)
-  # - 内容: >3000字=0.5, >1500字=0.4, >800字=0.3, >400字=0.2, >200字=0.1
-  # - 元数据: 标题+0.2, 作者+0.15, 日期+0.15
-  # 示例: 3000字文章+标题 = 0.5+0.2 = 0.7分
-  quality:
-    min_score_for_pdf: 0.5       # 生成PDF的最低质量分数（建议0.5，避免低质量内容浪费资源）
-    min_score_for_ai: 0.3        # AI摘要的最低质量分数（建议0.3，短文也能获得摘要）
-    
     # 来源到频道的映射配置（优先级高于类型映射）
     # 根据转发来源（频道/群组/用户）指定存储频道
     # 

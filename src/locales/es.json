@@ -241,7 +241,7 @@
   "setting_category_ai": "🤖 Configuración de IA",
   "setting_category_storage": "💾 Configuración de Almacenamiento",
   "setting_category_logging": "📝 Configuración de Registro",
-  "setting_category_web_archiver": "🌐 Archivador Web",
+
   "setting_updated": "✅ Configuración Actualizada\n\n<b>{name}</b>\nNuevo valor: <code>{value}</code>\n\n⚠️ Nota: Algunas configuraciones requieren reiniciar el bot para surtir efecto",
   "setting_update_failed": "❌ Error al Actualizar Configuración\n\n{error}",
   "setting_invalid_value": "❌ Valor Inválido\n\n{error}",
@@ -259,6 +259,7 @@
   "content_type_animation": "Animación",
   "content_type_contact": "Contacto",
   "content_type_location": "Ubicación",
+  "content_type_ebook": "Libro electrónico",
   "content_type_mixed": "Contenido Mixto",
   "storage": "Almacenamiento",
   "source": "Origen",
@@ -269,5 +270,8 @@
   "ai_summary": "💭 Resumen",
   "ai_key_points": "🔑 Puntos Clave",
   "batch_source_from": "📌 Fuente: {source}",
-  "batch_source_direct": "📌 Fuente: Envío Directo"
+  "batch_source_direct": "📌 Fuente: Envío Directo",
+  "restart_initiated": "🔄 <b>Reinicio del Sistema Iniciado</b>\n\n⚠️ El bot se está reiniciando ahora...\n\nPor favor espere un momento, el bot volverá a estar en línea en breve.\n\n💡 Nota: Esto requiere que el bot se ejecute bajo un administrador de procesos (systemd, Docker, etc.)",
+  "restart_failed": "❌ <b>Reinicio Fallido</b>\n\nError: {error}\n\nPor favor reinicie el bot manualmente o revise los registros del sistema.",
+  "restart_complete": "✅ <b>Reinicio del Sistema Completo</b>\n\n🤖 El bot se ha reiniciado correctamente y está en línea.\n\n📊 Todos los servicios están operativos.\n⏰ Reinicio completado a las: {time}"
 }

@@ -11,7 +11,13 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from ...utils.language_context import get_language_context
-from ...utils.helpers import format_file_size, truncate_text, extract_hashtags
+from ...utils.helpers import (
+    format_file_size,
+    truncate_text,
+    extract_hashtags,
+    remove_forward_signature,
+    extract_user_comment_from_merged
+)
 from .message_processor import _process_single_message, _auto_generate_note
 
 logger = logging.getLogger(__name__)
@@ -88,18 +94,31 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
         await progress_callback(0, total, lang_ctx.t('batch_progress_analyzing'))
     
     analyses = []
+    original_captions = []
+    source_name = source_info.get('name') if source_info else None
     for i, message in enumerate(messages):
         # 基础分析
         analysis = ContentAnalyzer.analyze(message)
         
-        # link类型使用异步深度分析（WebArchiver）
+        # link类型使用异步分析（Telegram预览提取）
         if analysis.get('content_type') == 'link':
             try:
-                logger.debug(f"Link detected in batch message {i}, attempting WebArchiver analysis...")
+                logger.debug(f"Link detected in batch message {i}, attempting Telegram preview extraction...")
                 analysis = await ContentAnalyzer.analyze_async(message)
             except Exception as e:
                 logger.warning(f"Async analyze failed for batch message {i}: {e}")
                 # 已经有基础analysis，继续使用
+        
+        original_caption = analysis.get('content')
+        original_captions.append(original_caption)
+        
+        # 清理转发消息尾部签名（来源名 + URL）
+        if is_forwarded:
+            cleaned_caption = remove_forward_signature(original_caption, source_name)
+            if cleaned_caption != original_caption:
+                analysis['content'] = cleaned_caption
+                if analysis.get('title') == original_caption:
+                    analysis['title'] = cleaned_caption or None
         
         analyses.append(analysis)
         if progress_callback and (i + 1) % max(1, total // 10) == 0:
@@ -110,9 +129,10 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
         await progress_callback(total, total, lang_ctx.t('batch_progress_extracting_tags'))
     
     # 提取共享的hashtags（从merged_caption）- 这是用户主动输入的标签
+    cleaned_merged_caption = remove_forward_signature(merged_caption, source_name) if merged_caption else None
     shared_hashtags = []
-    if merged_caption:
-        shared_hashtags = extract_hashtags(merged_caption)
+    if cleaned_merged_caption:
+        shared_hashtags = extract_hashtags(cleaned_merged_caption)
         logger.info(f"Extracted shared hashtags from caption: {shared_hashtags}")
     
     # 阶段3: AI处理 (20-50%) - 批量消息只分析一次合并的caption
@@ -127,14 +147,14 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
         config = get_config()
         
         # 只分析一次：使用merged_caption（包含用户评论）
-        if config.ai.get('auto_generate_tags', False) and merged_caption:
+        if config.ai.get('auto_generate_tags', False) and cleaned_merged_caption:
             try:
                 start = time.time()
                 max_tags = config.ai.get('max_generated_tags', 8)
                 max_tags = max(3, min(max_tags, 5))  # 批量时限制在3-5之间
                 
                 # 生成标签
-                ai_tags = await ai_summarizer.generate_tags(merged_caption, max_tags, language=lang_ctx.language)
+                ai_tags = await ai_summarizer.generate_tags(cleaned_merged_caption, max_tags, language=lang_ctx.language)
                 duration = time.time() - start
                 provider = getattr(ai_summarizer, '_last_call_info', {}).get('provider', 'single')
                 logger.info(f"Batch AI single analysis: provider={provider}, duration={duration:.2f}s, tags={ai_tags}")
@@ -144,15 +164,15 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
                 
                 # 生成标题（限制32字符）
                 if config.ai.get('auto_generate_title', False):
-                    ai_title = await ai_summarizer.generate_title_from_text(merged_caption, max_length=32, language=lang_ctx.language)
+                    ai_title = await ai_summarizer.generate_title_from_text(cleaned_merged_caption, max_length=32, language=lang_ctx.language)
                     if ai_title:
                         shared_ai_result['title'] = ai_title
                         logger.info(f"Batch AI generated title: {shared_ai_result['title']}")
                 
                 # 生成摘要（检查内容长度是否达到阈值）
                 min_length = config.ai.get('min_content_length_for_summary', 150)
-                if config.ai.get('auto_summarize', False) and len(merged_caption) >= min_length:
-                    ai_summary_result = await ai_summarizer.summarize_content(merged_caption, language=lang_ctx.language)
+                if config.ai.get('auto_summarize', False) and len(cleaned_merged_caption) >= min_length:
+                    ai_summary_result = await ai_summarizer.summarize_content(cleaned_merged_caption, language=lang_ctx.language)
                     if ai_summary_result and ai_summary_result.get('success'):
                         summary_text = ai_summary_result.get('summary', '')
                         if summary_text:
@@ -195,18 +215,23 @@ async def _process_batch_messages(messages: List[Message], context: ContextTypes
         # 使用共享的AI标题（如果有），否则截取caption前32字符
         if shared_ai_result['title']:
             analysis['title'] = shared_ai_result['title']
-        elif merged_caption and not analysis.get('title'):
+        elif cleaned_merged_caption and not analysis.get('title'):
             # 截取caption前32字符作为标题
-            analysis['title'] = merged_caption[:32] + ('...' if len(merged_caption) > 32 else '')
+            analysis['title'] = cleaned_merged_caption[:32] + ('...' if len(cleaned_merged_caption) > 32 else '')
         
         # 第一条消息：如果有merged_caption且与原始content不同，添加批注标记
         # 注意：merged_caption通常就是caption本身，只在有用户额外评论时才不同
-        if i == 0 and merged_caption:
+        if i == 0 and cleaned_merged_caption:
             existing_content = analysis.get('content', '')
-            # 如果content中还没有包含merged_caption，才添加批注
-            # 或者，如果merged_caption是用户评论（不同于原始caption），也添加
-            if merged_caption not in existing_content:
-                analysis['content'] = f"{existing_content}\n📝 批注: {merged_caption}"
+            user_comment = extract_user_comment_from_merged(
+                cleaned_merged_caption,
+                analysis.get('content') or original_captions[i]
+            )
+            if user_comment:
+                if existing_content:
+                    analysis['content'] = f"{existing_content}\n📝 批注: {user_comment}"
+                else:
+                    analysis['content'] = f"📝 批注: {user_comment}"
     
     if progress_callback:
         await progress_callback(total, total, lang_ctx.t('batch_progress_applying_tags'))
@@ -268,6 +293,7 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
             
             # 静默模式：不发送进度消息
             processing_msg = None if should_silent else await message.reply_text(lang_ctx.t('archive_processing'))
+            msg_handled = False  # 跟踪进度消息是否已被处理
             
             try:
                 # 定义进度更新回调
@@ -294,6 +320,7 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                         logger.info(f"Silent archive: deleted forwarded message from {source_info.get('name')}")
                     except Exception as e:
                         logger.warning(f"Failed to delete forwarded message: {e}")
+                    msg_handled = True
                     return
                 
                 # 如果检测到重复文件，构建并发送重复提示消息
@@ -355,6 +382,7 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                             dup_msg += lang_ctx.t('archive_duplicate_file_tags', tags=tag_str)
                     
                     await processing_msg.edit_text(dup_msg, parse_mode='HTML')
+                    msg_handled = True
                     return
                 
                 # 如果归档成功且有archive_id，添加操作按钮（包含精炼笔记）
@@ -385,17 +413,38 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
                     
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await processing_msg.edit_text(result_msg, parse_mode='HTML', reply_markup=reply_markup)
+                    msg_handled = True
                 elif processing_msg:
                     # 使用HTML解析模式（因为result_msg可能包含HTML链接）
                     await processing_msg.edit_text(result_msg, parse_mode='HTML')
+                    msg_handled = True
                 
                 if success:
                     logger.info(f"Message archived: type={ContentAnalyzer.analyze(message).get('content_type')}")
             
+            except Exception as inner_e:
+                # 捕获处理流程中的异常
+                logger.error(f"Error in single message processing: {inner_e}", exc_info=True)
+                
+                # 尝试更新进度消息为错误状态
+                if processing_msg and not msg_handled:
+                    try:
+                        await processing_msg.edit_text(
+                            f"❌ {lang_ctx.t('archive_failed')}\n\n"
+                            f"错误: {str(inner_e)[:100]}"
+                        )
+                        msg_handled = True
+                    except Exception as edit_e:
+                        logger.debug(f"Failed to update error message: {edit_e}")
+            
             finally:
-                # 确保进度消息被删除（如果还存在且未被修改为最终消息）
-                # 这里只是兜底保护，正常情况下消息已在上面被edit为最终状态
-                pass
+                # 确保进度消息被清理（兜底保护）
+                if processing_msg and not msg_handled:
+                    try:
+                        await processing_msg.delete()
+                        logger.warning("Progress message cleanup: deleted unhandled message")
+                    except Exception as cleanup_e:
+                        logger.debug(f"Failed to cleanup progress message: {cleanup_e}")
         else:
             # 批量消息处理
             first_message = messages[0]
@@ -404,186 +453,214 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
             processing_msg = None if should_silent else await first_message.reply_text(
                 lang_ctx.t('batch_processing_start', total=len(messages))
             )
+            msg_handled = False  # 跟踪进度消息是否已被处理
             
-            # 定义进度更新回调
-            last_update_time = [0]  # 使用列表存储以便在闭包中修改
-            
-            async def update_progress(current, total, stage):
-                """更新进度消息"""
-                if should_silent or not processing_msg:
-                    return  # 静默模式不更新进度
-                    
-                nonlocal last_update_time
-                current_time = time.time()
+            try:
+                # 定义进度更新回调
+                last_update_time = [0]  # 使用列表存储以便在闭包中修改
                 
-                # 限制更新频率（每0.5秒最多更新一次）
-                if current_time - last_update_time[0] < 0.5 and current < total:
+                async def update_progress(current, total, stage):
+                    """更新进度消息"""
+                    if should_silent or not processing_msg:
+                        return  # 静默模式不更新进度
+                        
+                    nonlocal last_update_time
+                    current_time = time.time()
+                    
+                    # 限制更新频率（每0.5秒最多更新一次）
+                    if current_time - last_update_time[0] < 0.5 and current < total:
+                        return
+                    
+                    last_update_time[0] = current_time
+                    percentage = int((current / total) * 100) if total > 0 else 0
+                    
+                    try:
+                        await processing_msg.edit_text(
+                            f"📦 批量处理中\n"
+                            f"阶段: {stage}\n"
+                            f"进度: {current}/{total} ({percentage}%)"
+                        )
+                    except Exception as e:
+                        logger.debug(f"Progress update failed: {e}")
+                
+                # 调用批量处理（传递source_info和is_forwarded）
+                results = await _process_batch_messages(
+                    messages, 
+                    context, 
+                    merged_caption,
+                    source_info=source_info,
+                    is_forwarded=is_forwarded,
+                    progress_callback=update_progress
+                )
+                
+                # 为批量归档生成共享的笔记
+                # 批量消息应该共享一个笔记，关联到第一个成功的归档
+                if results:
+                    # 找到第一个成功的归档
+                    first_success_archive_id = None
+                    for success, msg, archive_id in results:
+                        if success and archive_id:
+                            first_success_archive_id = archive_id
+                            break
+                    
+                    if first_success_archive_id:
+                        # 从batch中提取用户评论和原始caption
+                        # 需要区分用户的评论文本和媒体消息自带的caption
+                        user_comment = None
+                        original_caption = None
+                        
+                        # 查找用户自己发送的文本消息（非转发，非媒体）
+                        for msg in messages:
+                            if msg.text and not msg.forward_origin and not any([
+                                msg.photo, msg.video, msg.document,
+                                msg.audio, msg.voice, msg.animation
+                            ]):
+                                user_comment = msg.text
+                                break
+                        
+                        # 查找媒体消息自带的caption
+                        for msg in messages:
+                            if msg.caption:
+                                original_caption = msg.caption
+                                break
+                        
+                        # 如果用户评论就是merged_caption且没有其他caption，则只保留用户评论
+                        if user_comment == merged_caption and not original_caption:
+                            pass  # 保持user_comment，不需要额外处理
+                        elif not user_comment and merged_caption:
+                            # merged_caption可能是用户评论
+                            user_comment = merged_caption
+                        
+                        # 为第一个归档生成共享笔记（包含AI生成+用户评论+原始caption）
+                        await _auto_generate_note(
+                            archive_id=first_success_archive_id,
+                            message=messages[0],
+                            analysis=ContentAnalyzer.analyze(messages[0]),
+                            context=context,
+                            user_comment=user_comment,
+                            original_caption=original_caption,
+                            source_info=source_info
+                        )
+                        logger.info(f"Generated shared note for batch, linked to archive {first_success_archive_id}")
+                
+                # 静默模式：处理完成后删除所有转发消息并返回
+                if should_silent:
+                    for msg in messages:
+                        try:
+                            await msg.delete()
+                        except Exception as e:
+                            logger.warning(f"Failed to delete forwarded message: {e}")
+                    logger.info(f"Silent archive: deleted {len(messages)} forwarded messages from {source_info.get('name')}")
+                    msg_handled = True
                     return
                 
-                last_update_time[0] = current_time
-                percentage = int((current / total) * 100) if total > 0 else 0
+                # 统计结果
+                success_count = sum(1 for success, _, _ in results if success)
+                fail_count = len(results) - success_count
                 
-                try:
-                    await processing_msg.edit_text(
-                        f"📦 批量处理中\n"
-                        f"阶段: {stage}\n"
-                        f"进度: {current}/{total} ({percentage}%)"
-                    )
-                except Exception as e:
-                    logger.debug(f"Progress update failed: {e}")
-            
-            # 调用批量处理（传递source_info和is_forwarded）
-            results = await _process_batch_messages(
-                messages, 
-                context, 
-                merged_caption,
-                source_info=source_info,
-                is_forwarded=is_forwarded,
-                progress_callback=update_progress
-            )
-            
-            # 为批量归档生成共享的笔记
-            # 批量消息应该共享一个笔记，关联到第一个成功的归档
-            if results:
-                # 找到第一个成功的归档
-                first_success_archive_id = None
-                for success, msg, archive_id in results:
-                    if success and archive_id:
-                        first_success_archive_id = archive_id
-                        break
+                # 收集归档ID和详细信息
+                archive_ids = [archive_id for success, _, archive_id in results if success and archive_id]
+                first_id = min(archive_ids) if archive_ids else 0
+                last_id = max(archive_ids) if archive_ids else 0
                 
-                if first_success_archive_id:
-                    # 从batch中提取用户评论和原始caption
-                    # 需要区分用户的评论文本和媒体消息自带的caption
-                    user_comment = None
-                    original_caption = None
-                    
-                    # 查找用户自己发送的文本消息（非转发，非媒体）
-                    for msg in messages:
-                        if msg.text and not msg.forward_origin and not any([
-                            msg.photo, msg.video, msg.document,
-                            msg.audio, msg.voice, msg.animation
-                        ]):
-                            user_comment = msg.text
-                            break
-                    
-                    # 查找媒体消息自带的caption
-                    for msg in messages:
-                        if msg.caption:
-                            original_caption = msg.caption
-                            break
-                    
-                    # 如果用户评论就是merged_caption且没有其他caption，则只保留用户评论
-                    if user_comment == merged_caption and not original_caption:
-                        pass  # 保持user_comment，不需要额外处理
-                    elif not user_comment and merged_caption:
-                        # merged_caption可能是用户评论
-                        user_comment = merged_caption
-                    
-                    # 为第一个归档生成共享笔记（包含AI生成+用户评论+原始caption）
-                    await _auto_generate_note(
-                        archive_id=first_success_archive_id,
-                        message=messages[0],
-                        analysis=ContentAnalyzer.analyze(messages[0]),
-                        context=context,
-                        user_comment=user_comment,
-                        original_caption=original_caption,
-                        source_info=source_info
-                    )
-                    logger.info(f"Generated shared note for batch, linked to archive {first_success_archive_id}")
+                # 统计内容类型
+                type_counts = {}
+                for i, (success, _, _) in enumerate(results):
+                    if success and i < len(messages):
+                        analysis = ContentAnalyzer.analyze(messages[i])
+                        content_type = analysis.get('content_type', 'unknown')
+                        type_name = lang_ctx.t(f'content_type_{content_type}', default=content_type)
+                        type_counts[type_name] = type_counts.get(type_name, 0) + 1
+                
+                # 格式化内容类型统计
+                types_str = '\n'.join([f"  • {t}: {c} 条" for t, c in type_counts.items()])
+                
+                # 获取标签（从第一个成功的归档）
+                tags_str = "无"
+                tag_manager = context.bot_data.get('tag_manager')
+                if tag_manager and archive_ids:
+                    tags = tag_manager.get_archive_tags(archive_ids[0])
+                    if tags:
+                        # 限制显示前5个标签
+                        display_tags = tags[:5]
+                        tags_str = ' '.join([f"#{tag}" for tag in display_tags])
+                        if len(tags) > 5:
+                            tags_str += f" (+{len(tags) - 5})"
+                
+                # 来源信息
+                source_str = ""
+                if source_info:
+                    source_str = lang_ctx.t('batch_source_from', source=source_info.get('name', '未知'))
+                else:
+                    source_str = lang_ctx.t('batch_source_direct')
+                
+                # AI分析结果（从第一个成功的归档获取）
+                ai_summary_str = ""
+                if archive_ids:
+                    db_storage = context.bot_data.get('db_storage')
+                    if db_storage:
+                        # 直接从数据库查询AI摘要
+                        try:
+                            result = db_storage.db.execute(
+                                "SELECT ai_summary FROM archives WHERE id = ? AND deleted = 0",
+                                (archive_ids[0],)
+                            ).fetchone()
+                            if result and result[0]:
+                                summary = result[0]
+                                # 限制摘要长度，避免消息过长
+                                max_len = 150
+                                if len(summary) > max_len:
+                                    summary = summary[:max_len] + '...'
+                                ai_summary_str = f"\n\n🤖 AI摘要:\n{summary}"
+                        except Exception as e:
+                            logger.debug(f"Failed to fetch AI summary: {e}")
+                
+                if fail_count > 0:
+                    summary_msg = lang_ctx.t('batch_processing_complete', 
+                                            success=success_count, 
+                                            fail=fail_count,
+                                            first_id=first_id,
+                                            last_id=last_id,
+                                            types=types_str,
+                                            tags=tags_str,
+                                            source=source_str) + ai_summary_str
+                else:
+                    summary_msg = lang_ctx.t('batch_processing_complete_no_fail', 
+                                            success=success_count,
+                                            first_id=first_id,
+                                            last_id=last_id,
+                                            types=types_str,
+                                            tags=tags_str,
+                                            source=source_str) + ai_summary_str
+                
+                if processing_msg:
+                    await processing_msg.edit_text(summary_msg)
+                    msg_handled = True
+                logger.info(f"Batch archived: {success_count}/{len(messages)} messages")
             
-            # 静默模式：处理完成后删除所有转发消息并返回
-            if should_silent:
-                for msg in messages:
+            except Exception as batch_e:
+                # 捕获批量处理中的异常
+                logger.error(f"Error in batch message processing: {batch_e}", exc_info=True)
+                
+                # 尝试更新进度消息为错误状态
+                if processing_msg and not msg_handled:
                     try:
-                        await msg.delete()
-                    except Exception as e:
-                        logger.warning(f"Failed to delete forwarded message: {e}")
-                logger.info(f"Silent archive: deleted {len(messages)} forwarded messages from {source_info.get('name')}")
-                return
+                        await processing_msg.edit_text(
+                            f"❌ 批量处理失败\n\n"
+                            f"错误: {str(batch_e)[:100]}"
+                        )
+                        msg_handled = True
+                    except Exception as edit_e:
+                        logger.debug(f"Failed to update batch error message: {edit_e}")
             
-            # 统计结果
-            success_count = sum(1 for success, _, _ in results if success)
-            fail_count = len(results) - success_count
-            
-            # 收集归档ID和详细信息
-            archive_ids = [archive_id for success, _, archive_id in results if success and archive_id]
-            first_id = min(archive_ids) if archive_ids else 0
-            last_id = max(archive_ids) if archive_ids else 0
-            
-            # 统计内容类型
-            type_counts = {}
-            for i, (success, _, _) in enumerate(results):
-                if success and i < len(messages):
-                    analysis = ContentAnalyzer.analyze(messages[i])
-                    content_type = analysis.get('content_type', 'unknown')
-                    type_name = lang_ctx.t(f'content_type_{content_type}', default=content_type)
-                    type_counts[type_name] = type_counts.get(type_name, 0) + 1
-            
-            # 格式化内容类型统计
-            types_str = '\n'.join([f"  • {t}: {c} 条" for t, c in type_counts.items()])
-            
-            # 获取标签（从第一个成功的归档）
-            tags_str = "无"
-            tag_manager = context.bot_data.get('tag_manager')
-            if tag_manager and archive_ids:
-                tags = tag_manager.get_archive_tags(archive_ids[0])
-                if tags:
-                    # 限制显示前5个标签
-                    display_tags = tags[:5]
-                    tags_str = ' '.join([f"#{tag}" for tag in display_tags])
-                    if len(tags) > 5:
-                        tags_str += f" (+{len(tags) - 5})"
-            
-            # 来源信息
-            source_str = ""
-            if source_info:
-                source_str = lang_ctx.t('batch_source_from', source=source_info.get('name', '未知'))
-            else:
-                source_str = lang_ctx.t('batch_source_direct')
-            
-            # AI分析结果（从第一个成功的归档获取）
-            ai_summary_str = ""
-            if archive_ids:
-                db_storage = context.bot_data.get('db_storage')
-                if db_storage:
-                    # 直接从数据库查询AI摘要
+            finally:
+                # 确保进度消息被清理（兜底保护）
+                if processing_msg and not msg_handled:
                     try:
-                        result = db_storage.db.execute(
-                            "SELECT ai_summary FROM archives WHERE id = ? AND deleted = 0",
-                            (archive_ids[0],)
-                        ).fetchone()
-                        if result and result[0]:
-                            summary = result[0]
-                            # 限制摘要长度，避免消息过长
-                            max_len = 150
-                            if len(summary) > max_len:
-                                summary = summary[:max_len] + '...'
-                            ai_summary_str = f"\n\n🤖 AI摘要:\n{summary}"
-                    except Exception as e:
-                        logger.debug(f"Failed to fetch AI summary: {e}")
-            
-            if fail_count > 0:
-                summary_msg = lang_ctx.t('batch_processing_complete', 
-                                        success=success_count, 
-                                        fail=fail_count,
-                                        first_id=first_id,
-                                        last_id=last_id,
-                                        types=types_str,
-                                        tags=tags_str,
-                                        source=source_str) + ai_summary_str
-            else:
-                summary_msg = lang_ctx.t('batch_processing_complete_no_fail', 
-                                        success=success_count,
-                                        first_id=first_id,
-                                        last_id=last_id,
-                                        types=types_str,
-                                        tags=tags_str,
-                                        source=source_str) + ai_summary_str
-            
-            if processing_msg:
-                await processing_msg.edit_text(summary_msg)
-            logger.info(f"Batch archived: {success_count}/{len(messages)} messages")
+                        await processing_msg.delete()
+                        logger.warning("Batch progress message cleanup: deleted unhandled message")
+                    except Exception as cleanup_e:
+                        logger.debug(f"Failed to cleanup batch progress message: {cleanup_e}")
             
     except Exception as e:
         logger.error(f"Error in batch callback: {e}", exc_info=True)

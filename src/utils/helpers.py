@@ -90,29 +90,11 @@ def format_source_header(message, source_info: Optional[dict] = None) -> str:
     forward_date = message.forward_origin.date
     date_str = forward_date.strftime("%Y-%m-%d %H:%M")
     
-    # 生成来源链接（仅频道和公开群组支持）
+    # 获取来源名称
     source_name = source_info.get('name', '未知')
-    source_id = source_info.get('id')
-    source_link = None
     
-    # 尝试生成链接
-    if isinstance(message.forward_origin, MessageOriginChannel):
-        # 频道链接格式: https://t.me/c/{channel_id}/{message_id}
-        if source_id:
-            channel_id_str = str(source_id).replace('-100', '')
-            message_id = message.forward_origin.message_id
-            source_link = f"https://t.me/c/{channel_id_str}/{message_id}"
-    elif isinstance(message.forward_origin, MessageOriginChat):
-        # 群组链接（如果有username）
-        sender_chat = message.forward_origin.sender_chat
-        if hasattr(sender_chat, 'username') and sender_chat.username:
-            source_link = f"https://t.me/{sender_chat.username}"
-    
-    # 格式化来源信息（使用HTML标签隐藏URL）
-    if source_link:
-        return f"来源 <a href='{source_link}'>{escape_html(source_name)}</a>  |  日期 {date_str}\n--------------------"
-    else:
-        return f"来源 {escape_html(source_name)}  |  日期 {date_str}\n--------------------"
+    # 格式化来源信息（纯文本，不使用链接）
+    return f"来源 {escape_html(source_name)}  |  日期 {date_str}\n--------------------"
 
 
 def extract_hashtags(text: str) -> List[str]:
@@ -222,6 +204,62 @@ def extract_urls(text: str) -> List[str]:
     urls = re.findall(url_pattern, text)
     
     return urls
+
+
+def remove_forward_signature(text: Optional[str], source_name: Optional[str]) -> Optional[str]:
+    """
+    移除转发消息中的来源签名行（如“频道名 + URL”尾部签名）
+    
+    仅在检测到尾部两行分别为来源名称和URL时移除。
+    """
+    if not text or not source_name:
+        return text
+    
+    lines = [line.rstrip() for line in str(text).splitlines()]
+    # 去掉尾部空行
+    while lines and not lines[-1].strip():
+        lines.pop()
+    
+    if len(lines) < 2:
+        return text
+    
+    last_line = lines[-1].strip()
+    prev_line = lines[-2].strip()
+    
+    if prev_line == source_name and is_url(last_line):
+        lines = lines[:-2]
+        while lines and not lines[-1].strip():
+            lines.pop()
+        return "\n".join(lines).strip() if lines else None
+    
+    return text
+
+
+def extract_user_comment_from_merged(
+    merged_caption: Optional[str],
+    original_caption: Optional[str]
+) -> Optional[str]:
+    """
+    从合并的caption中提取用户评论部分，避免与原始caption重复
+    """
+    if not merged_caption:
+        return None
+    
+    merged = str(merged_caption).strip()
+    if not merged:
+        return None
+    
+    original = str(original_caption).strip() if original_caption else ''
+    if original:
+        if merged == original:
+            return None
+        # 移除原始caption内容
+        pattern = re.escape(original)
+        cleaned = re.sub(rf"(?:^|\n+)({pattern})(?:\n+|$)", "\n", merged)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+        return cleaned or None
+    
+    return merged
 
 
 def truncate_text(text: str, max_length: int = 100, suffix: str = "...") -> str:

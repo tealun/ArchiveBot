@@ -236,7 +236,9 @@ Please respond in JSON format:
         r = await self.client.post(self.api_url,
             json={"model": self.model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 50, "temperature": self.temperature})
         tags_str = r.json()['choices'][0]['message']['content']
-        return [t.strip().replace('#', '') for t in tags_str.split(',') if t.strip()][:max_tags]
+        # 支持中文逗号（、）和英文逗号（,）的分割
+        tags = [t.strip().replace('#', '').replace('、', ',') for t in tags_str.replace('、', ',').split(',') if t.strip()][:max_tags]
+        return tags
     
     async def categorize(self, content, language='zh-CN'):
         if language.startswith('zh'):

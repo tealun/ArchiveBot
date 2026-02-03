@@ -4,7 +4,7 @@
 bot:
   token: BOT_TOKEN  # Obtenido de @BotFather (se recomienda usar la variable de entorno BOT_TOKEN)
   owner_id: OWNER_ID  # Su ID de Telegram, obtenido de @userinfobot (se recomienda usar la variable de entorno OWNER_ID)
-  language: "zh-CN"  # Idioma de la interfaz: en, zh-CN, zh-TW
+  language: "zh-CN"  # Idioma de la interfaz: en, zh-CN, zh-TW, ja, ko, es
   polling_interval: 1  # Intervalo de sondeo (segundos)
   feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # Enlace de comentarios del usuario
 
@@ -121,40 +121,7 @@ storage:
       voice: media         # Voz → Canal de medios
       contact: default     # Contacto → Canal por defecto
       location: default    # Ubicación → Canal por defecto
-# Configuración del Archivador Web Inteligente
-web_archiver:
-  enabled: true                # Habilitar archivado inteligente de enlaces
-  
-  # Estrategias de obtención
-  strategies:
-    http:
-      enabled: true              # Habilitar obtención HTTP
-      timeout: 30                # Tiempo de espera de obtención (segundos)
-      follow_redirects: true     # Seguir redirecciones
-      max_redirects: 5           # Número máximo de redirecciones
-    
-    telegram:
-      enabled: true              # Habilitar extracción de vista previa de Telegram (respaldo)
-  
-  # Configuración de extracción de contenido
-  content_extraction:
-    min_length: 200              # Longitud mínima del contenido
-    favor_recall: true           # Favorecer recuperación sobre precisión
-  
-  # Configuración de generación de PDF
-  pdf_generation:
-    enabled: true                # Generar archivos PDF
-    page_size: A4                # Tamaño de página (A4/Letter)
-    include_images: true         # Incluir imágenes en PDF
-  
-  # Umbrales de calidad (0-1)
-  # Reglas de puntuación: Longitud de contenido (0-0.5) + Completitud de metadatos (0-0.5)
-  # - Contenido: >3000 caracteres=0.5, >1500=0.4, >800=0.3, >400=0.2, >200=0.1
-  # - Metadatos: título+0.2, autor+0.15, fecha+0.15
-  # Ejemplo: artículo de 3000 caracteres + título = 0.5+0.2 = 0.7 puntos
-  quality:
-    min_score_for_pdf: 0.5       # Puntuación mínima de calidad para generación de PDF (0.5 recomendado para evitar contenido de baja calidad)
-    min_score_for_ai: 0.3        # Puntuación mínima de calidad para resumen de IA (0.3 recomendado para artículos cortos)    
+
     # Configuración de mapeo de fuente a canal (prioridad más alta que el mapeo de tipo)
     # Enrutar mensajes según la fuente de reenvío (canal/grupo/usuario)
     # 

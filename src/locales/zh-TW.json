@@ -235,7 +235,7 @@
   "setting_category_ai": "🤖 AI設定",
   "setting_category_storage": "💾 儲存設定",
   "setting_category_logging": "📝 記錄檔設定",
-  "setting_category_web_archiver": "🌐 網頁存檔",
+
   "setting_updated": "✅ 配置已更新\n\n<b>{name}</b>\n新值：<code>{value}</code>\n\n⚠️ 注意：部分配置需要重啟Bot才能生效",
   "setting_update_failed": "❌ 配置更新失敗\n\n{error}",
   "setting_invalid_value": "❌ 無效的值\n\n{error}",
@@ -253,6 +253,7 @@
   "content_type_animation": "動畫",
   "content_type_contact": "聯絡人",
   "content_type_location": "位置",
+  "content_type_ebook": "電子書",
   "content_type_mixed": "混合內容",
   "storage": "儲存",
   "source": "來源",
@@ -263,5 +264,8 @@
   "ai_summary": "💭 摘要",
   "ai_key_points": "🔑 關鍵點",
   "batch_source_from": "📌 來源: {source}",
-  "batch_source_direct": "📌 來源: 直接發送"
+  "batch_source_direct": "📌 來源: 直接發送",
+  "restart_initiated": "🔄 <b>系統重啟已啟動</b>\n\n⚠️ Bot正在重啟中...\n\n請稍等片刻，Bot將很快重新上線。\n\n💡 注意：需要Bot運行在進程管理器下（systemd、Docker等）",
+  "restart_failed": "❌ <b>重啟失敗</b>\n\n錯誤：{error}\n\n請手動重啟Bot或檢查系統日誌。",
+  "restart_complete": "✅ <b>系統重啟完成</b>\n\n🤖 Bot已成功重啟並恢復在線。\n\n📊 所有服務運行正常。\n⏰ 重啟完成時間：{time}"
 }

@@ -42,13 +42,16 @@ async def handle_short_text_intent_callback(update: Update, context: ContextType
             if note_manager:
                 note_id = note_manager.add_note(None, text)
                 if note_id:
+                    # 提取标题：使用文本的前 50 个字符
+                    note_title = text[:50] if text else None
+                    
                     # 转发笔记到Telegram频道（使用统一的公共函数）
                     from ...utils.note_storage_helper import forward_note_to_channel
                     storage_path = await forward_note_to_channel(
                         context=context,
                         note_id=note_id,
                         note_content=text,
-                        note_title=None,
+                        note_title=note_title,
                         note_manager=note_manager
                     )
                     
@@ -297,6 +300,9 @@ async def handle_long_text_intent_callback(update: Update, context: ContextTypes
         
         elif action == 'longtxt_chat':
             # 用户选择继续对话
+            progress_msg = None
+            msg_handled = False
+            
             try:
                 # 删除选择提示
                 await query.message.delete()
@@ -319,6 +325,7 @@ async def handle_long_text_intent_callback(update: Update, context: ContextTypes
                 
                 # 编辑消息为最终回复
                 await progress_msg.edit_text(f"🤖 {ai_response}")
+                msg_handled = True
                 
                 # 更新会话
                 session_manager.update_session(user_id, session.get('context', {}))
@@ -327,8 +334,28 @@ async def handle_long_text_intent_callback(update: Update, context: ContextTypes
                 
             except Exception as e:
                 logger.error(f"AI chat error for long text: {e}", exc_info=True)
-                await query.message.reply_text(lang_ctx.t('ai_chat_error_session_end') if hasattr(lang_ctx, 't') else "AI处理失败，会话已结束")
+                
+                # 尝试更新进度消息为错误状态
+                if progress_msg and not msg_handled:
+                    try:
+                        await progress_msg.edit_text(
+                            f"❌ {lang_ctx.t('ai_chat_error_session_end') if hasattr(lang_ctx, 't') else 'AI处理失败'}\n\n"
+                            f"错误: {str(e)[:100]}"
+                        )
+                        msg_handled = True
+                    except Exception as edit_e:
+                        logger.debug(f"Failed to update error message: {edit_e}")
+                
                 session_manager.clear_session(user_id)
+            
+            finally:
+                # 确保进度消息被清理（兜底保护）
+                if progress_msg and not msg_handled:
+                    try:
+                        await progress_msg.delete()
+                        logger.warning("Long text chat progress message cleanup: deleted unhandled message")
+                    except Exception as cleanup_e:
+                        logger.debug(f"Failed to cleanup long text progress message: {cleanup_e}")
         
         # 清除待处理文本
         if message_id in pending_texts:

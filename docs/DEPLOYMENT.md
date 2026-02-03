@@ -359,7 +359,7 @@ cd /opt
 git clone https://github.com/tealun/ArchiveBot.git
 cd ArchiveBot
 
-# 安装依赖
+# 安装 Python 依赖
 pip3 install -r requirements.txt
 
 # 配置Bot

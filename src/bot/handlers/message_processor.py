@@ -10,7 +10,13 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 from ...utils.language_context import get_language_context
-from ...utils.helpers import format_file_size, truncate_text, extract_hashtags
+from ...utils.helpers import (
+    format_file_size,
+    truncate_text,
+    extract_hashtags,
+    remove_forward_signature,
+    extract_user_comment_from_merged
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,41 +57,84 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         # 先做基础分析
         analysis = ContentAnalyzer.analyze(message)
         
-        # 如果是link类型，使用异步深度分析（WebArchiver）
+        # 如果是link类型，尝试异步提取 Telegram 预览
         if analysis.get('content_type') == 'link':
             try:
-                logger.info("Link detected, attempting WebArchiver analysis...")
+                logger.info("Link detected, attempting Telegram preview extraction...")
                 analysis = await ContentAnalyzer.analyze_async(message)
-                logger.info(f"Async analyze completed: has_pdf={analysis.get('web_archive_pdf') is not None}, has_summary={analysis.get('web_archive_summary') is not None}")
+                has_preview = analysis.get('telegram_preview') is not None
+                logger.info(f"Async analyze completed: has_telegram_preview={has_preview}")
             except Exception as e:
                 logger.error(f"Async analyze failed: {e}", exc_info=True)
-                # Fallback到旧的link_extractor
-                if analysis.get('_needs_metadata_extraction'):
-                    try:
-                        from ...utils.link_extractor import extract_link_metadata
-                        url = analysis.get('url')
-                        metadata = await extract_link_metadata(url)
-                        analysis['title'] = metadata.get('title') or url
-                        analysis['link_metadata'] = metadata
-                        if metadata.get('description'):
-                            analysis['content'] = f"{analysis.get('content', '')}\n\n📄 {metadata['description']}"
-                        logger.info(f"Fallback: extracted link metadata: {metadata.get('title')}")
-                    except Exception as e2:
-                        logger.warning(f"Fallback link metadata extraction also failed: {e2}")
     
+        # 提取消息来源信息（提前获取用于清理caption）
+        source_info = None
+        is_direct_send = True  # 默认是直接发送
+        
+        if message.forward_origin:
+            from telegram import MessageOriginChannel, MessageOriginUser, MessageOriginChat, MessageOriginHiddenUser
+            
+            is_direct_send = False
+            if isinstance(message.forward_origin, MessageOriginChannel):
+                source_info = {
+                    'name': message.forward_origin.chat.title,
+                    'id': message.forward_origin.chat.id,
+                    'type': message.forward_origin.chat.type
+                }
+                logger.info(f"Message forwarded from channel: {source_info['name']} (ID: {source_info['id']})")
+            elif isinstance(message.forward_origin, MessageOriginChat):
+                source_info = {
+                    'name': message.forward_origin.sender_chat.title,
+                    'id': message.forward_origin.sender_chat.id,
+                    'type': message.forward_origin.sender_chat.type
+                }
+                logger.info(f"Message forwarded from chat: {source_info['name']} (ID: {source_info['id']})")
+            elif isinstance(message.forward_origin, MessageOriginUser):
+                user = message.forward_origin.sender_user
+                source_info = {
+                    'name': user.username or user.first_name,
+                    'id': user.id,
+                    'type': 'bot' if user.is_bot else 'user'
+                }
+                logger.info(f"Message forwarded from {'bot' if user.is_bot else 'user'}: {source_info['name']} (ID: {source_info['id']})")
+            elif isinstance(message.forward_origin, MessageOriginHiddenUser):
+                source_info = {
+                    'name': message.forward_origin.sender_user_name,
+                    'id': None,
+                    'type': 'hidden_user'
+                }
+                logger.info(f"Message forwarded from hidden user: {source_info['name']}")
+        else:
+            logger.info("Message sent directly by user (not forwarded)")
+        
+        # 清理转发消息尾部签名（来源名 + URL）
+        source_name = source_info.get('name') if source_info else None
+        original_caption = analysis.get('content') or message.caption
+        cleaned_caption = remove_forward_signature(original_caption, source_name)
+        if cleaned_caption != original_caption:
+            analysis['content'] = cleaned_caption
+            if analysis.get('title') == original_caption:
+                analysis['title'] = cleaned_caption or None
+        
         # 如果有合并的caption，添加到分析结果
         if merged_caption:
+            cleaned_merged_caption = remove_forward_signature(merged_caption, source_name)
             # 提取hashtags
-            caption_hashtags = extract_hashtags(merged_caption)
+            caption_hashtags = extract_hashtags(cleaned_merged_caption or '')
             if caption_hashtags:
                 existing_hashtags = analysis.get('hashtags', [])
                 analysis['hashtags'] = list(set(existing_hashtags + caption_hashtags))
         
-            # 添加到content或作为备注
-            if analysis.get('content'):
-                analysis['content'] = f"{analysis['content']}\n\n📝 {merged_caption}"
-            else:
-                analysis['content'] = merged_caption
+            # 仅添加用户评论，避免与原caption重复
+            user_comment = extract_user_comment_from_merged(
+                cleaned_merged_caption,
+                analysis.get('content') or original_caption
+            )
+            if user_comment:
+                if analysis.get('content'):
+                    analysis['content'] = f"{analysis['content']}\n\n📝 {user_comment}"
+                else:
+                    analysis['content'] = user_comment
         
         # 文件去重检测（仅对有文件的内容）
         if progress_callback:
@@ -355,29 +404,10 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                 should_generate_title = is_forwarded or (content and len(content) >= 250)
                 
                 if should_generate_title and content:
-                    # 提取转发来源
-                    source_prefix = ""
-                    if is_forwarded:
-                        origin = message.forward_origin
-                        if hasattr(origin, 'sender_user') and origin.sender_user:
-                            # 从用户转发
-                            user = origin.sender_user
-                            username = user.username or user.first_name or "用户"
-                            source_prefix = f"来自[{username}] "
-                        elif hasattr(origin, 'chat') and origin.chat:
-                            # 从频道/群组转发
-                            chat = origin.chat
-                            source_prefix = f"来自[{chat.title}] "
-                        elif hasattr(origin, 'sender_user_name'):
-                            # 隐藏用户名的转发
-                            source_prefix = f"来自[{origin.sender_user_name}] "
-                    
+                    # 生成标题（来源信息已在content开头显示，不需要在标题中重复）
                     user_language = lang_ctx.language
-                    # 计算标题可用长度（32 - 来源前缀长度）
-                    max_title_length = 32 - len(source_prefix)
-                    if max_title_length < 10:  # 如果来源太长，限制来源长度
-                        source_prefix = source_prefix[:10] + ".. "
-                        max_title_length = 32 - len(source_prefix)
+                    # 标题长度限制为32字符
+                    max_title_length = 32
                     
                     ai_title = await ai_summarizer.generate_title_from_text(
                         content, 
@@ -385,20 +415,15 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                         language=user_language
                     )
                     if ai_title:
-                        analysis['title'] = source_prefix + ai_title
-                        analysis['ai_title'] = source_prefix + ai_title  # 保存AI标题供formatter使用
+                        analysis['title'] = ai_title
+                        analysis['ai_title'] = ai_title
                         logger.info(f"AI generated title: {analysis['title']}")
                         if progress_callback:
                             await progress_callback(lang_ctx.t('progress_title_complete'), 0.65)
             except Exception as e:
                 logger.warning(f"AI title generation failed: {e}")
         
-        # 保存caption到analysis供formatter使用
-        if message.caption:
-            analysis['caption'] = message.caption
-        elif merged_caption:
-            analysis['caption'] = merged_caption
-        
+
         # Get storage manager
         if progress_callback:
             await progress_callback(lang_ctx.t('progress_saving_archive'), 0.7)
@@ -407,52 +432,6 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         
         if not storage_manager:
             return False, "Storage manager not initialized"
-        
-        # 提取消息来源信息
-        source_info = None
-        is_direct_send = True  # 默认是直接发送
-        
-        # 检查是否为转发消息
-        if message.forward_origin:
-            from telegram import MessageOriginChannel, MessageOriginUser, MessageOriginChat, MessageOriginHiddenUser
-            
-            is_direct_send = False
-            if isinstance(message.forward_origin, MessageOriginChannel):
-                # 来自频道的转发
-                source_info = {
-                    'name': message.forward_origin.chat.title,
-                    'id': message.forward_origin.chat.id,
-                    'type': message.forward_origin.chat.type
-                }
-                logger.info(f"Message forwarded from channel: {source_info['name']} (ID: {source_info['id']})")
-            elif isinstance(message.forward_origin, MessageOriginChat):
-                # 来自群组的转发
-                source_info = {
-                    'name': message.forward_origin.sender_chat.title,
-                    'id': message.forward_origin.sender_chat.id,
-                    'type': message.forward_origin.sender_chat.type
-                }
-                logger.info(f"Message forwarded from chat: {source_info['name']} (ID: {source_info['id']})")
-            elif isinstance(message.forward_origin, MessageOriginUser):
-                # 来自用户的转发（包括个人用户和机器人）
-                user = message.forward_origin.sender_user
-                source_info = {
-                    'name': user.username or user.first_name,
-                    'id': user.id,
-                    'type': 'bot' if user.is_bot else 'user'
-                }
-                logger.info(f"Message forwarded from {'bot' if user.is_bot else 'user'}: {source_info['name']} (ID: {source_info['id']})")
-            elif isinstance(message.forward_origin, MessageOriginHiddenUser):
-                # 来自隐藏用户的转发（用户设置了"转发消息时隐藏我的账号"）
-                source_info = {
-                    'name': message.forward_origin.sender_user_name,  # 显示名称（如"Deleted Account"）
-                    'id': None,  # 无法获取用户ID
-                    'type': 'hidden_user'
-                }
-                logger.info(f"Message forwarded from hidden user: {source_info['name']}")
-        else:
-            # 个人直接发送
-            logger.info("Message sent directly by user (not forwarded)")
         
         # 添加来源信息头部到content
         from ...utils.helpers import format_source_header, escape_html
@@ -466,7 +445,7 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
         else:
             analysis['content'] = source_header
         
-        # Archive content (传递来源信息和直发标识)
+        # Archive content
         success, result_msg, archive_id = await storage_manager.archive_content(
             message, 
             analysis,
@@ -584,38 +563,29 @@ async def _auto_generate_note(
                 lang_ctx = get_language_context(temp_update, context)
                 language = lang_ctx.language
                 
-                # 优先使用WebArchiver的摘要
-                web_archive_summary = analysis.get('web_archive_summary')
-                if web_archive_summary:
-                    # WebArchiver已经生成了摘要，直接使用
-                    note_content = f"[自动] {web_archive_summary}"
-                    logger.info(f"Using WebArchiver summary for note (archive {archive_id})")
-                else:
-                    # Fallback：使用旧逻辑生成笔记
-                    # 构建链接信息用于生成笔记
-                    link_info = f"""链接标题：{analysis.get('title', '未知')}
+                # 构建链接信息用于生成笔记
+                link_info = f"""链接标题：{analysis.get('title', '未知')}
 URL：{analysis.get('url', '')}
 """
-                    # 如果有提取的元数据，添加描述
-                    link_metadata = analysis.get('link_metadata', {})
-                    if link_metadata and link_metadata.get('description'):
-                        link_info += f"描述：{link_metadata.get('description')}\n"
-                    
-                    # 如果有页面内容，使用页面内容
-                    page_content = link_metadata.get('content', '')
-                    if page_content:
-                        link_info += f"\n页面内容节选：\n{page_content[:1000]}"
-                    
-                    note_content = await ai_summarizer.generate_note_from_content(
-                        content=link_info,
-                        content_type='link',
-                        max_length=250,
-                        language=language
-                    )
-                    
-                    if note_content:
-                        note_content = f"[自动] {note_content}"
-                        logger.info(f"Auto-generated note for link archive {archive_id}")
+                # 如果有 Telegram 预览数据
+                telegram_preview = analysis.get('telegram_preview', {})
+                if telegram_preview and telegram_preview.get('description'):
+                    link_info += f"描述：{telegram_preview.get('description')}\n"
+                
+                # 使用内容
+                if analysis.get('content'):
+                    link_info += f"\n内容：\n{analysis.get('content')[:1000]}"
+                
+                note_content = await ai_summarizer.generate_note_from_content(
+                    content=link_info,
+                    content_type='link',
+                    max_length=250,
+                    language=language
+                )
+                
+                if note_content:
+                    note_content = f"[自动] {note_content}"
+                    logger.info(f"Auto-generated note for link archive {archive_id}")
 
         
         # 3. 文档：如果有AI分析结果，整理完整笔记
@@ -685,6 +655,18 @@ URL：{analysis.get('url', '')}
             # 合并所有部分
             final_note_content = "\n".join(final_note_parts)
             
+            # 提取笔记标题：优先使用AI分析的标题或文件名
+            note_title = None
+            
+            # 统一的标题提取逻辑：优先使用 analysis.title，其次 file_name，最后原始caption
+            if analysis.get('title'):
+                note_title = analysis.get('title')
+            elif analysis.get('file_name'):
+                note_title = analysis.get('file_name')
+            elif original_caption:
+                # 文本类型或其他没有标题的内容，尝试从caption获取
+                note_title = original_caption[:50]
+            
             # 保存笔记
             note_id = note_manager.add_note(archive_id, final_note_content)
             if note_id:
@@ -696,7 +678,7 @@ URL：{analysis.get('url', '')}
                     context=context,
                     note_id=note_id,
                     note_content=final_note_content,
-                    note_title=None,  # 自动生成的笔记暂不设置标题
+                    note_title=note_title,
                     note_manager=note_manager
                 )
                 

@@ -6,6 +6,7 @@ import re
 from typing import Dict, List, Any, Optional
 from urllib.parse import urlparse
 import logging
+from .operations.message_helper import is_traditional_chinese
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +251,7 @@ class AIFallbackAnalyzer:
         """
         try:
             # 1. 生成分类（默认文本类）
-            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            is_traditional = is_traditional_chinese(language)
             if language.startswith('zh'):
                 category = '文字' if is_traditional else '文本'
             else:
@@ -380,7 +381,7 @@ class AIFallbackAnalyzer:
         """生成文件摘要"""
         size_str = AIFallbackAnalyzer._format_file_size(file_size)
         
-        is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+        is_traditional = is_traditional_chinese(language)
         
         if language.startswith('zh'):
             if is_traditional:

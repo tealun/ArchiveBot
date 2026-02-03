@@ -4,10 +4,131 @@ Note Storage Helper
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 from telegram.ext import ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 logger = logging.getLogger(__name__)
+
+
+def _select_note_channel_id(config) -> Optional[int]:
+    """
+    选择笔记存储频道ID
+    优先级：NOTE频道 → TEXT频道 → 默认频道 → 旧配置兼容
+    
+    Args:
+        config: 配置对象
+        
+    Returns:
+        频道ID或None
+    """
+    # 优先直接获取NOTE频道
+    note_channel_id = config.get('storage.telegram.channels.note', 0)
+    
+    # 如果NOTE频道未配置，降级到TEXT频道
+    if not note_channel_id:
+        note_channel_id = config.get('storage.telegram.channels.text', 0)
+    
+    # 如果TEXT频道也未配置，使用默认频道
+    if not note_channel_id:
+        note_channel_id = config.get('storage.telegram.channels.default', 0)
+        if not note_channel_id:
+            # 兼容旧配置
+            note_channel_id = config.get('storage.telegram.channel_id', 0)
+    
+    return note_channel_id if note_channel_id else None
+
+
+def _build_note_buttons(note_id: int, archive_id: Optional[int], is_favorite: bool) -> InlineKeyboardMarkup:
+    """
+    构建笔记按钮
+    
+    Args:
+        note_id: 笔记ID
+        archive_id: 关联的存档ID（可选）
+        is_favorite: 是否精选
+        
+    Returns:
+        按钮markup
+    """
+    keyboard = []
+    fav_icon = "❤️" if is_favorite else "🤍"
+    
+    # 如果有关联存档，添加查看存档按钮
+    if archive_id:
+        keyboard.append([
+            InlineKeyboardButton("📄 查看存档", callback_data=f"ch_archive:{archive_id}"),
+            InlineKeyboardButton(fav_icon, callback_data=f"note_fav:{note_id}"),
+            InlineKeyboardButton("🗑️ 删除", callback_data=f"ch_del_note:{note_id}")
+        ])
+    else:
+        # 独立笔记（没有关联存档）
+        keyboard.append([
+            InlineKeyboardButton(fav_icon, callback_data=f"note_fav:{note_id}"),
+            InlineKeyboardButton("🗑️ 删除", callback_data=f"ch_del_note:{note_id}")
+        ])
+    
+    return InlineKeyboardMarkup(keyboard)
+
+
+def _generate_storage_path(channel_id: int, message_id: int) -> str:
+    """
+    生成Telegram频道消息链接
+    
+    Args:
+        channel_id: 频道ID（格式：-100XXXXXXXXXX）
+        message_id: 消息ID
+        
+    Returns:
+        storage_path链接（格式：https://t.me/c/XXXXXXXXXX/message_id）
+    """
+    channel_id_str = str(channel_id)
+    if channel_id_str.startswith('-100'):
+        # 移除-100前缀
+        channel_id_numeric = channel_id_str[4:]
+    else:
+        # 处理其他格式（理论上不应该出现）
+        channel_id_numeric = channel_id_str.lstrip('-')
+    
+    return f"https://t.me/c/{channel_id_numeric}/{message_id}"
+
+
+def _get_note_info(note_id: int, note_manager) -> Tuple[Optional[int], bool]:
+    """
+    获取笔记关联信息
+    
+    Args:
+        note_id: 笔记ID
+        note_manager: 笔记管理器
+        
+    Returns:
+        (archive_id, is_favorite) 元组
+    """
+    archive_id = None
+    is_favorite = False
+    
+    if not note_manager:
+        return archive_id, is_favorite
+    
+    try:
+        # 获取archive_id
+        note_data = note_manager.db.execute(
+            "SELECT archive_id FROM notes WHERE id = ?",
+            (note_id,)
+        ).fetchone()
+        if note_data:
+            archive_id = note_data['archive_id']
+        
+        # 查询精选状态
+        fav_result = note_manager.db.execute(
+            "SELECT favorite FROM notes WHERE id = ?",
+            (note_id,)
+        ).fetchone()
+        is_favorite = fav_result['favorite'] == 1 if fav_result else False
+    except Exception as e:
+        logger.warning(f"Failed to get note info: {e}")
+    
+    return archive_id, is_favorite
 
 
 async def update_archive_message_buttons(
@@ -118,21 +239,8 @@ async def forward_note_to_channel(
         from .config import get_config
         config = get_config()
         
-        # 获取笔记频道ID：NOTE -> TEXT -> default
-        # 优先直接获取NOTE频道
-        note_channel_id = config.get('storage.telegram.channels.note', 0)
-        
-        # 如果NOTE频道未配置，降级到TEXT频道
-        if not note_channel_id:
-            note_channel_id = config.get('storage.telegram.channels.text', 0)
-        
-        # 如果TEXT频道也未配置，使用默认频道
-        if not note_channel_id:
-            note_channel_id = config.get('storage.telegram.channels.default', 0)
-            if not note_channel_id:
-                # 兼容旧配置
-                note_channel_id = config.get('storage.telegram.channel_id', 0)
-        
+        # 选择笔记频道ID
+        note_channel_id = _select_note_channel_id(config)
         if not note_channel_id:
             logger.warning("No Telegram channel configured for notes")
             return None
@@ -145,55 +253,16 @@ async def forward_note_to_channel(
         from .helpers import split_long_message
         message_parts = split_long_message(forward_content, max_length=4096, preserve_newlines=True)
         
+        # 获取笔记关联信息
+        if not note_manager:
+            note_manager = context.bot_data.get('note_manager')
+        
+        archive_id, is_favorite = _get_note_info(note_id, note_manager)
+        
         # 生成按钮（笔记专用按钮）
         reply_markup = None
         try:
-            # 获取笔记关联的archive_id
-            if not note_manager:
-                note_manager = context.bot_data.get('note_manager')
-            
-            archive_id = None
-            if note_manager:
-                note_data = note_manager.db.execute(
-                    "SELECT archive_id FROM notes WHERE id = ?",
-                    (note_id,)
-                ).fetchone()
-                if note_data:
-                    archive_id = note_data['archive_id']
-            
-            # 创建笔记按钮
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = []
-            
-            # 查询笔记的精选状态
-            is_favorite = False
-            if note_manager:
-                try:
-                    fav_result = note_manager.db.execute(
-                        "SELECT favorite FROM notes WHERE id = ?",
-                        (note_id,)
-                    ).fetchone()
-                    is_favorite = fav_result['favorite'] == 1 if fav_result else False
-                except Exception as e:
-                    logger.warning(f"Failed to check note favorite status: {e}")
-            
-            fav_icon = "❤️" if is_favorite else "🤍"
-            
-            # 如果有关联存档，添加查看存档按钮
-            if archive_id:
-                keyboard.append([
-                    InlineKeyboardButton("📄 查看存档", callback_data=f"ch_archive:{archive_id}"),
-                    InlineKeyboardButton(fav_icon, callback_data=f"note_fav:{note_id}"),
-                    InlineKeyboardButton("🗑️ 删除", callback_data=f"ch_del_note:{note_id}")
-                ])
-            else:
-                # 独立笔记（没有关联存档）
-                keyboard.append([
-                    InlineKeyboardButton(fav_icon, callback_data=f"note_fav:{note_id}"),
-                    InlineKeyboardButton("🗑️ 删除", callback_data=f"ch_del_note:{note_id}")
-                ])
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = _build_note_buttons(note_id, archive_id, is_favorite)
         except Exception as e:
             logger.warning(f"Failed to create buttons for note #{note_id}: {e}")
         
@@ -217,19 +286,9 @@ async def forward_note_to_channel(
             logger.info(f"Note #{note_id} split into {len(message_parts)} messages for channel")
         
         # 生成频道消息链接（使用第一条消息）
-        # Telegram频道ID格式：-100XXXXXXXXXX
-        # 转换为链接格式：https://t.me/c/XXXXXXXXXX/message_id
-        channel_id_str = str(note_channel_id)
-        if channel_id_str.startswith('-100'):
-            # 移除-100前缀
-            channel_id_numeric = channel_id_str[4:]
-        else:
-            # 处理其他格式（理论上不应该出现）
-            channel_id_numeric = channel_id_str.lstrip('-')
+        storage_path = _generate_storage_path(note_channel_id, first_msg.message_id)
         
-        storage_path = f"https://t.me/c/{channel_id_numeric}/{first_msg.message_id}"
-        
-        # 更新笔记的storage_path（note_manager已在前面获取）
+        # 更新笔记的storage_path
         if note_manager:
             note_manager.db.execute(
                 "UPDATE notes SET storage_path = ? WHERE id = ?",

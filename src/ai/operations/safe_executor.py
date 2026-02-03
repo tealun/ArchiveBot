@@ -8,6 +8,10 @@ Phase 1: Search, stats, tags, notes, review (read-only operations)
 import logging
 from typing import Dict, Any, Optional, Tuple
 from telegram.ext import ContextTypes
+from .message_helper import (
+    get_query_success_message,
+    get_query_error_message
+)
 
 logger = logging.getLogger(__name__)
 
@@ -323,114 +327,6 @@ async def _execute_review(
         return False, _get_error_message('execution_error', language, str(e)), None
 
 
-def _get_success_message(msg_type: str, language: str, *args) -> str:
-    """Get success message"""
-    is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
-    
-    # Determine language key
-    lang_key = 'zh' if language.startswith('zh') else language[:2]
-    
-    # Define messages by type (lazy evaluation to avoid index errors)
-    if msg_type == 'search_no_results':
-        messages = {
-            'zh': f"🔍 未找到包含「{args[0]}」的归档" if not is_traditional else f"🔍 未找到包含「{args[0]}」的歸檔",
-            'en': f"🔍 No archives found containing '{args[0]}'",
-            'ja': f"🔍 「{args[0]}」を含むアーカイブが見つかりませんでした",
-            'ko': f"🔍 '{args[0]}'을 포함하는 아카이브를 찾을 수 없습니다",
-            'es': f"🔍 No se encontraron archivos que contengan '{args[0]}'"
-        }
-    elif msg_type == 'search_results':
-        messages = {
-            'zh': f"🔍 找到 {args[0]} 个相关归档（关键词：{args[1]}）" if not is_traditional else f"🔍 找到 {args[0]} 個相關歸檔（關鍵詞：{args[1]}）",
-            'en': f"🔍 Found {args[0]} related archives (keyword: {args[1]})",
-            'ja': f"🔍 {args[0]} 件の関連アーカイブが見つかりました（キーワード：{args[1]}）",
-            'ko': f"🔍 {args[0]}개의 관련 아카이브를 찾았습니다 (키워드: {args[1]})",
-            'es': f"🔍 Se encontraron {args[0]} archivos relacionados (palabra clave: {args[1]})"
-        }
-    elif msg_type == 'stats':
-        messages = {
-            'zh': "📊 系统统计信息已获取" if not is_traditional else "📊 系統統計資訊已獲取",
-            'en': "📊 System statistics retrieved",
-            'ja': "📊 システム統計情報を取得しました",
-            'ko': "📊 시스템 통계 정보를 가져왔습니다",
-            'es': "📊 Estadísticas del sistema obtenidas"
-        }
-    elif msg_type == 'tags_empty':
-        messages = {
-            'zh': "🏷️ 暂无标签" if not is_traditional else "🏷️ 暫無標籤",
-            'en': "🏷️ No tags yet",
-            'ja': "🏷️ タグはまだありません",
-            'ko': "🏷️ 아직 태그가 없습니다",
-            'es': "🏷️ Aún no hay etiquetas"
-        }
-    elif msg_type == 'tags_list':
-        messages = {
-            'zh': f"🏷️ 共有 {args[0]} 个标签" if not is_traditional else f"🏷️ 共有 {args[0]} 個標籤",
-            'en': f"🏷️ Total {args[0]} tags",
-            'ja': f"🏷️ 合計 {args[0]} 個のタグ",
-            'ko': f"🏷️ 총 {args[0]}개의 태그",
-            'es': f"🏷️ Total {args[0]} etiquetas"
-        }
-    else:
-        # Fallback for unknown message types
-        return f"✅ Operation {msg_type} completed"
-    
-    return messages.get(lang_key, messages.get('en', '✅ Operation completed'))
-
-
-def _get_error_message(error_type: str, language: str, *args) -> str:
-    """Get error message"""
-    is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
-    
-    if error_type == 'missing_keyword':
-        if language.startswith('zh'):
-            return "❌ 缺少搜索关键词" if not is_traditional else "❌ 缺少搜尋關鍵詞"
-        elif language == 'ja':
-            return "❌ 検索キーワードがありません"
-        elif language == 'ko':
-            return "❌ 검색 키워드가 없습니다"
-        elif language == 'es':
-            return "❌ Falta palabra clave de búsqueda"
-        else:
-            return "❌ Missing search keyword"
-    
-    elif error_type == 'manager_not_found':
-        manager_name = args[0] if args else 'unknown'
-        if language.startswith('zh'):
-            return f"❌ 系统模块未初始化：{manager_name}" if not is_traditional else f"❌ 系統模組未初始化：{manager_name}"
-        elif language == 'ja':
-            return f"❌ システムモジュールが初期化されていません：{manager_name}"
-        elif language == 'ko':
-            return f"❌ 시스템 모듈이 초기화되지 않았습니다: {manager_name}"
-        elif language == 'es':
-            return f"❌ Módulo del sistema no inicializado: {manager_name}"
-        else:
-            return f"❌ System module not initialized: {manager_name}"
-    
-    elif error_type == 'execution_error':
-        error_msg = args[0] if args else 'unknown error'
-        if language.startswith('zh'):
-            return f"❌ 执行错误：{error_msg}" if not is_traditional else f"❌ 執行錯誤：{error_msg}"
-        elif language == 'ja':
-            return f"❌ 実行エラー：{error_msg}"
-        elif language == 'ko':
-            return f"❌ 실행 오류: {error_msg}"
-        elif language == 'es':
-            return f"❌ Error de ejecución: {error_msg}"
-        else:
-            return f"❌ Execution error: {error_msg}"
-    
-    elif error_type == 'unknown_operation':
-        op_type = args[0] if args else 'unknown'
-        if language.startswith('zh'):
-            return f"❌ 未知的操作类型：{op_type}" if not is_traditional else f"❌ 未知的操作類型：{op_type}"
-        elif language == 'ja':
-            return f"❌ 不明な操作タイプ：{op_type}"
-        elif language == 'ko':
-            return f"❌ 알 수 없는 작업 유형: {op_type}"
-        elif language == 'es':
-            return f"❌ Tipo de operación desconocido: {op_type}"
-        else:
-            return f"❌ Unknown operation type: {op_type}"
-    
-    return "❌ Error"
+# Message helper functions now imported from message_helper module
+_get_success_message = get_query_success_message
+_get_error_message = get_query_error_message

@@ -3,8 +3,8 @@
 
 bot:
   token: BOT_TOKEN  # @BotFather에서 획득 (환경 변수 BOT_TOKEN 사용 권장)
-  owner_id: OWNER_ID  # 당신의 Telegram ID, @userinfobot에서 획득 (환경 변수 OWNER_ID 사용 권장)
-  language: "zh-CN"  # 인터페이스 언어: en, zh-CN, zh-TW
+  owner_id: OWNER_ID  # 당신의 Telegram ID, @userinfobot에서 획듍 (환경 변수 OWNER_ID 사용 권장)
+  language: "zh-CN"  # 인터페이스 언어: en, zh-CN, zh-TW, ja, ko, es
   polling_interval: 1  # 폴링 간격 (초)
   feedback_url: "https://github.com/tealun/ArchiveBot/issues"  # 사용자 피드백 링크
 
@@ -121,40 +121,7 @@ storage:
       voice: media         # 음성 → 미디어 채널
       contact: default     # 연락처 → 기본 채널
       location: default    # 위치 → 기본 채널
-# 스마트 웹 아카이버 설정
-web_archiver:
-  enabled: true                # 스마트 링크 아카이빙 기능 활성화
-  
-  # 가져오기 전략 설정
-  strategies:
-    http:
-      enabled: true              # HTTP 가져오기 활성화
-      timeout: 30                # 가져오기 시간 제한(초)
-      follow_redirects: true     # 리디렉션 따르기
-      max_redirects: 5           # 최대 리디렉션 횟수
-    
-    telegram:
-      enabled: true              # Telegram 미리보기 추출 활성화(대체 방법)
-  
-  # 콘텐츠 추출 설정
-  content_extraction:
-    min_length: 200              # 최소 콘텐츠 길이
-    favor_recall: true           # 정밀도보다 재현율 우선
-  
-  # PDF 생성 설정
-  pdf_generation:
-    enabled: true                # PDF 아카이브 생성
-    page_size: A4                # 페이지 크기(A4/Letter)
-    include_images: true         # PDF에 이미지 포함
-  
-  # 품질 임계값(0-1)
-  # 품질 점수 규칙: 콘텐츠 길이(0-0.5점) + 메타데이터 완성도(0-0.5점)
-  # - 콘텐츠: >3000자=0.5, >1500=0.4, >800=0.3, >400=0.2, >200=0.1
-  # - 메타데이터: 제목+0.2, 저자+0.15, 날짜+0.15
-  # 예시: 3000자 기사+제목 = 0.5+0.2 = 0.7점
-  quality:
-    min_score_for_pdf: 0.5       # PDF 생성을 위한 최소 품질 점수 (저품질 콘텐츠 방지를 위해 0.5 권장)
-    min_score_for_ai: 0.3        # AI 요약을 위한 최소 품질 점수 (짧은 글도 요약하기 위해 0.3 권장)    
+
     # 소스에서 채널로의 매핑 구성 (유형 매핑보다 우선)
     # 전달 소스(채널/그룹/사용자)에 따라 메시지 라우팅
     # 

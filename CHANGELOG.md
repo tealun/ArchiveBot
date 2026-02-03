@@ -62,9 +62,8 @@ ArchiveBot v1.0 正式发布！这是第一个生产就绪版本，包含完整�
 
 #### 网页存档 / Web Archiving
 - 🌐 智能网页提取：自动识别 URL，提取标题、描述、作者、发布日期
-- 📄 PDF 生成：高质量网页转 PDF（WeasyPrint + ReportLab 双引擎）
 - 🎨 内容优化：移除广告和导航栏，保留核心内容
-- 📊 质量评分：评估网页质量，决定是否生成 PDF 或 AI 摘要
+- 📊 元数据提取：网页标题、描述、关键信息智能分析
 
 ---
 
@@ -107,8 +106,6 @@ ArchiveBot v1.0 正式发布！这是第一个生产就绪版本，包含完整�
 - lxml==6.0.2 (XML/HTML 处理)
 - trafilatura==2.0.0 (网页内容提取)
 - readability-lxml==0.8.4.1 (可读性优化)
-- weasyprint==61.2 (PDF 生成)
-- reportlab==4.2.5 (备用 PDF 生成)
 
 ---
 

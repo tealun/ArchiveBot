@@ -3,6 +3,7 @@ AI Chat Prompt Templates
 Handles prompts for AI interactive chat mode with Function Calling
 Supports Simplified Chinese, Traditional Chinese, and English
 """
+from ..operations.message_helper import is_traditional_chinese
 
 
 class ChatPrompts:
@@ -20,7 +21,7 @@ class ChatPrompts:
             System prompt string
         """
         if language.startswith('zh'):
-            is_traditional = language in ['zh-TW', 'zh-HK', 'zh-MO']
+            is_traditional = is_traditional_chinese(language)
             if is_traditional:
                 return """你是歸檔助手，幫用戶管理和分析歸檔內容。
 

@@ -275,6 +275,7 @@ def main():
         application.add_handler(CommandHandler("backup", owner_only(commands.backup_command)))
         application.add_handler(CommandHandler("review", owner_only(commands.review_command)))
         application.add_handler(CommandHandler(["rand", "r"], owner_only(commands.rand_command)))
+        application.add_handler(CommandHandler("restart", owner_only(commands.restart_command)))
         
         # Register callback handlers (统一处理)
         application.add_handler(CallbackQueryHandler(
@@ -415,6 +416,7 @@ def main():
                         BotCommand("backup", "Backup management"),
                         BotCommand("ai", "AI status"),
                         BotCommand("language", "Change language (/la)"),
+                        BotCommand("restart", "Restart system"),
                     ],
                     "zh": [  # 简体中文 (Telegram使用 'zh' 作为中文语言代码)
                         BotCommand("start", "开始使用"),
@@ -431,6 +433,7 @@ def main():
                         BotCommand("backup", "备份管理"),
                         BotCommand("ai", "AI状态"),
                         BotCommand("language", "切换语言 (简写: /la)"),
+                        BotCommand("restart", "重启系统"),
                     ],
                     "en": [  # 英语
                         BotCommand("start", "Start bot"),
@@ -447,6 +450,7 @@ def main():
                         BotCommand("backup", "Backup management"),
                         BotCommand("ai", "AI status"),
                         BotCommand("language", "Change language (/la)"),
+                        BotCommand("restart", "Restart system"),
                     ],
                     "ja": [  # 日语
                         BotCommand("start", "ボット初期化"),
@@ -463,6 +467,7 @@ def main():
                         BotCommand("backup", "バックアップ管理"),
                         BotCommand("ai", "AIステータス"),
                         BotCommand("language", "言語変更 (/la)"),
+                        BotCommand("restart", "システム再起動"),
                     ],
                     "ko": [  # 韩语
                         BotCommand("start", "봇 초기화"),
@@ -479,6 +484,7 @@ def main():
                         BotCommand("backup", "백업 관리"),
                         BotCommand("ai", "AI 상태"),
                         BotCommand("language", "언어 변경 (/la)"),
+                        BotCommand("restart", "시스템 재시작"),
                     ],
                     "es": [  # 西班牙语
                         BotCommand("start", "Inicializar bot"),
@@ -495,6 +501,7 @@ def main():
                         BotCommand("backup", "Gestión de copias"),
                         BotCommand("ai", "Estado de IA"),
                         BotCommand("language", "Cambiar idioma (/la)"),
+                        BotCommand("restart", "Reiniciar sistema"),
                     ],
                 }
                 
@@ -502,10 +509,16 @@ def main():
                 success_count = 0
                 for language_code, commands in commands_config.items():
                     try:
-                        await context.bot.set_my_commands(
-                            commands=commands,
-                            language_code=language_code
-                        )
+                        # 根据 language_code 是否为 None 决定调用方式
+                        if language_code is None:
+                            # 默认语言：不传 language_code 参数
+                            await context.bot.set_my_commands(commands=commands)
+                        else:
+                            # 特定语言：传递 language_code 参数
+                            await context.bot.set_my_commands(
+                                commands=commands,
+                                language_code=language_code
+                            )
                         lang_name = language_code if language_code else "default"
                         logger.info(f"✓ Commands set for language: {lang_name} ({len(commands)} commands)")
                         success_count += 1
@@ -514,8 +527,74 @@ def main():
                         logger.error(f"Failed to set commands for {lang_name}: {e}")
                 
                 logger.info(f"✓ Bot commands menu configured for {success_count}/{len(commands_config)} languages")
+                
+                # 为 owner 用户设置个人命令菜单（基于配置的语言）
+                try:
+                    owner_id = context.bot_data.get('owner_id')
+                    bot_language = config.get('bot.language', 'zh-CN')
+                    
+                    if owner_id:
+                        from telegram import BotCommandScopeChat
+                        
+                        # 根据配置语言选择命令
+                        lang_map = {
+                            'zh-CN': 'zh',
+                            'zh-TW': 'zh',
+                            'en': 'en',
+                            'ja': 'ja',
+                            'ko': 'ko',
+                            'es': 'es',
+                        }
+                        telegram_lang = lang_map.get(bot_language, 'zh')
+                        owner_commands = commands_config.get(telegram_lang, commands_config.get('zh'))
+                        
+                        scope = BotCommandScopeChat(chat_id=owner_id)
+                        await context.bot.set_my_commands(
+                            commands=owner_commands,
+                            scope=scope,
+                            language_code=telegram_lang
+                        )
+                        logger.info(f"✓ Owner ({owner_id}) commands set to {telegram_lang}")
+                except Exception as owner_error:
+                    logger.warning(f"Failed to set owner commands: {owner_error}")
+                
             except Exception as e:
                 logger.error(f"Failed to set bot commands: {e}")
+        
+        # 检查并发送重启完成通知
+        async def check_restart_notification(context: ContextTypes.DEFAULT_TYPE):
+            """检查是否需要发送重启完成通知"""
+            try:
+                from src.bot.commands.restart import load_restart_state, clear_restart_state
+                from src.utils.i18n import get_i18n
+                from datetime import datetime
+                from telegram.constants import ParseMode
+                
+                state = load_restart_state()
+                if state:
+                    chat_id = state.get('chat_id')
+                    language = state.get('language', 'en')
+                    
+                    # 获取 i18n 实例
+                    i18n = get_i18n(language)
+                    
+                    # 获取当前时间
+                    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    restart_complete_msg = i18n.t('restart_complete', time=current_time)
+                    
+                    # 发送重启完成消息
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=restart_complete_msg,
+                        parse_mode=ParseMode.HTML
+                    )
+                    
+                    logger.info(f"✓ Restart complete notification sent to chat {chat_id}")
+                    
+                    # 清除重启状态文件
+                    clear_restart_state()
+            except Exception as e:
+                logger.error(f"Failed to send restart notification: {e}", exc_info=True)
         
         # 使用 post_init 在 bot 初始化后设置命令菜单
         async def post_init_callback(app: Application) -> None:
@@ -524,6 +603,10 @@ def main():
             if app.job_queue:
                 app.job_queue.run_once(set_bot_commands_job, when=5)
                 logger.info("✓ Bot commands setup scheduled (will execute in 5 seconds)")
+                
+                # 检查是否需要发送重启完成通知
+                app.job_queue.run_once(check_restart_notification, when=3)
+                logger.info("✓ Restart notification check scheduled")
         
         application.post_init = post_init_callback
         

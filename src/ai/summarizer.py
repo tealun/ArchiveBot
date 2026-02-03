@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 
 from .providers import AIProvider, OpenAIProvider, detect_content_language, is_formal_content
 from .prompts import PromptManager
+from .request_queue import AIRequestQueue, RequestPriority
 from ..core.ai_cache import AICache, content_hash
 from .operations import (
     summarize_operation,
@@ -28,6 +29,7 @@ class AISummarizer:
         self.config, self.provider = config, None
         self.cache = None
         self._last_call_info = {}
+        self.request_queue = None  # 请求队列
         if not config.get('enabled'):
             return
 
@@ -83,6 +85,18 @@ class AISummarizer:
         self._rate_count = 0
         self._rate_window_start = int(time.time())
         
+        # 初始化请求队列（延迟启动，避免事件循环未运行问题）
+        try:
+            if self.rate_limit > 0:
+                self.request_queue = AIRequestQueue(
+                    rate_limit_per_minute=self.rate_limit,
+                    max_queue_size=50
+                )
+                # 不在这里启动，而是在第一次使用时启动（懒加载）
+                logger.info(f"AI request queue created with {self.rate_limit} calls/min (will start on first use)")
+        except Exception as e:
+            logger.warning(f"Failed to create AI request queue: {e}")
+        
         # 日志和重试配置
         try:
             self.log_calls = bool(config.get('log_calls', False))
@@ -94,6 +108,16 @@ class AISummarizer:
             self.log_calls = False
             self.retry_on_failure = 1
 
+    def _ensure_queue_started(self):
+        """确保请求队列已启动（懒加载）"""
+        if self.request_queue and not self.request_queue.is_running:
+            try:
+                self.request_queue.start()
+                logger.info("AI request queue started")
+            except Exception as e:
+                logger.error(f"Failed to start AI request queue: {e}")
+                self.request_queue = None  # 禁用队列，降级到直接调用
+    
     def _allow_call(self) -> bool:
         """简单的每分钟速率限制（非分布式）"""
         if not self.rate_limit or self.rate_limit <= 0:
@@ -117,8 +141,31 @@ class AISummarizer:
         if not self.is_available():
             return {'success': False, 'error': 'AI不可用'}
         
-        # 速率检测
-        if not self._allow_call():
+        # 确保队列已启动
+        self._ensure_queue_started()
+        
+        # 使用请求队列处理（如果启用），否则直接调用
+        if self.request_queue:
+            result = await self.request_queue.submit(
+                self._execute_summarize,
+                content,
+                url=url,
+                language=language,
+                context=context,
+                priority=RequestPriority.SUMMARY,
+                max_retries=self.retry_on_failure
+            )
+            if result is None:
+                return {'success': False, 'error': 'AI queue failed to process request'}
+            return result
+        else:
+            # 降级到直接调用（没有队列管理）
+            return await self._execute_summarize(content, url=url, language=language, context=context)
+    
+    async def _execute_summarize(self, content, url=None, language='zh-CN', context: Optional[Dict[str, Any]] = None):
+        """实际执行摘要生成"""
+        # 速率检测（仅当未使用请求队列时）
+        if not self.request_queue and not self._allow_call():
             logger.warning("AI rate limit reached")
             return {'success': False, 'error': 'AI rate limit exceeded'}
         
@@ -147,8 +194,29 @@ class AISummarizer:
         if not self.is_available():
             return []
         
-        # 速率检测
-        if not self._allow_call():
+        # 确保队列已启动
+        self._ensure_queue_started()
+        
+        # 使用请求队列处理（如果启用），否则直接调用
+        if self.request_queue:
+            tags = await self.request_queue.submit(
+                self._execute_generate_tags,
+                content,
+                max_tags=max_tags,
+                language=language,
+                priority=RequestPriority.TAGS,  # 标签优先级最高
+                max_retries=self.retry_on_failure
+            )
+            if tags is None:
+                return []
+            return tags
+        else:
+            return await self._execute_generate_tags(content, max_tags=max_tags, language=language)
+    
+    async def _execute_generate_tags(self, content, max_tags=5, language='zh-CN'):
+        """实际执行标签生成"""
+        # 速率检测（仅当未使用请求队列时）
+        if not self.request_queue and not self._allow_call():
             logger.warning("AI rate limit reached")
             self._last_call_info = {'provider': 'RATE_LIMIT', 'duration': 0}
             return []
@@ -296,12 +364,34 @@ class AISummarizer:
                 fallback = fallback[:max_length-3] + "..."
             return fallback
         
-        return await generate_title_from_text_operation(
-            self.provider,
-            content,
-            max_length,
-            language
-        )
+        # 确保队列已启动
+        self._ensure_queue_started()
+        
+        # 使用请求队列处理（如果启用），否则直接调用
+        if self.request_queue:
+            title = await self.request_queue.submit(
+                generate_title_from_text_operation,
+                self.provider,
+                content,
+                max_length,
+                language,
+                priority=RequestPriority.TITLE,
+                max_retries=self.retry_on_failure
+            )
+            if title is None:
+                # 队列失败，降级处理
+                fallback = content[:max_length].strip()
+                if len(content) > max_length:
+                    fallback = fallback[:max_length-3] + "..."
+                return fallback
+            return title
+        else:
+            return await generate_title_from_text_operation(
+                self.provider,
+                content,
+                max_length,
+                language
+            )
 
 _summarizer = None
 

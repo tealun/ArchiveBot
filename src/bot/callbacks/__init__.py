@@ -82,7 +82,9 @@ from .setting import (
     handle_setting_item_callback,
     handle_setting_set_callback,
     handle_setting_back_callback,
-    handle_setting_input
+    handle_setting_input,
+    handle_auto_install_callback,
+    handle_manual_install_callback,
 )
 
 __all__ = [
@@ -138,4 +140,6 @@ __all__ = [
     'handle_setting_set_callback',
     'handle_setting_back_callback',
     'handle_setting_input',
+    'handle_auto_install_callback',
+    'handle_manual_install_callback',
 ]

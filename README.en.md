@@ -38,8 +38,8 @@ ArchiveBot is an open-source Telegram Bot that helps you intelligently categoriz
 - 🤖 **AI Enhancement**: Grok-4 intelligent analysis (summary/key points/classification/tags)
 - 💬 **AI Chat**: Natural language interaction with automatic intent and language detection
 - 💬 **Smart Resource Reply**: Intelligently identifies intent and directly returns resource files (no fabricated URLs)
-- 🌏 **Multi-language**: English/Simplified Chinese/Traditional Chinese (with regional terms)
-- 🔗 **Smart Links**: Automatic extraction of webpage titles, descriptions, and metadata
+- 🌏 **Multi-language Support**: 6 languages (English/Simplified Chinese/Traditional Chinese/Japanese/Korean/Spanish)
+- 🔗 **Smart Link Extraction**: Automatically extracts webpage titles, descriptions, authors, and key metadata for easier searching and management
 - 💾 **Simplified Storage**: Local storage for small data → Channel storage for large files → Reference-only for huge files (three-tier strategy)
 - 🔒 **Privacy Protection**: Completely private data, single-user mode
 - 🛡️ **Security & Reliability**: SQL injection protection, sensitive info filtering, thread-safe
@@ -195,8 +195,7 @@ ArchiveBot uses a simplified three-tier storage strategy, fully leveraging Teleg
 | `/export` | - | Export archived data |
 | `/backup` | - | Create database backup |
 | `/ai` | - | View AI feature status |
-| `/language` | `/la` | Switch interface language |
-| `/cancel` | - | Cancel current operation |
+| `/language` | `/la` | Switch interface language || `/restart` | - | Restart system || `/cancel` | - | Cancel current operation |
 
 ### Archive Content
 
@@ -256,11 +255,15 @@ ArchiveBot/
 ├── main.py                      # Entry point
 ├── src/
 │   ├── bot/                     # Bot layer
-│   │   ├── commands.py          # Command handlers
-│   │   ├── handlers.py          # Message handlers
-│   │   ├── callbacks.py         # Callback handlers
+│   │   ├── commands.py          # Legacy command handlers
+│   │   ├── handlers.py          # Legacy message handlers
+│   │   ├── message_handlers.py  # Main message handlers
 │   │   ├── message_aggregator.py # Message aggregator
-│   │   └── unknown_command.py   # Unknown command handler
+│   │   ├── callback_router.py   # Callback router
+│   │   ├── unknown_command.py   # Unknown command handler
+│   │   ├── commands/            # Command modules
+│   │   ├── handlers/            # Handler modules
+│   │   └── callbacks/           # Callback handlers
 │   ├── core/                    # Core business
 │   │   ├── analyzer.py          # Content analyzer
 │   │   ├── tag_manager.py       # Tag manager
@@ -278,11 +281,13 @@ ArchiveBot/
 │   │   ├── summarizer.py        # AI summary generator
 │   │   ├── chat_router.py       # Smart chat router
 │   │   ├── fallback.py          # AI fallback strategy
-│   │   └── prompts/             # Prompt templates
-│   │       ├── chat.py
-│   │       ├── note.py
-│   │       ├── summarize.py
-│   │       └── title.py
+│   │   ├── knowledge_base.py    # Knowledge base
+│   │   ├── request_queue.py     # Request queue
+│   │   ├── response_optimizer.py # Response optimizer
+│   │   ├── prompts/             # Prompt templates
+│   │   ├── functions/           # Function calling
+│   │   ├── operations/          # AI operations
+│   │   └── providers/           # AI provider configs
 │   ├── storage/                 # Storage layer
 │   │   ├── base.py              # Storage base
 │   │   ├── database.py          # Database storage
@@ -300,11 +305,17 @@ ArchiveBot/
 │   │   ├── constants.py         # Constants
 │   │   ├── file_handler.py      # File handler
 │   │   ├── link_extractor.py    # Link metadata extractor
-│   │   └── db_maintenance.py    # Database maintenance
+│   │   ├── note_storage_helper.py # Note storage helper
+│   │   ├── auto_installer.py    # Auto installer
+│   │   ├── db_maintenance.py    # Database maintenance
+│   │   └── formatters/          # Message formatters
 │   └── locales/                 # Language files
-│       ├── en.json
-│       ├── zh-CN.json
-│       └── zh-TW.json
+│       ├── en.json              # English
+│       ├── zh-CN.json           # Simplified Chinese
+│       ├── zh-TW.json           # Traditional Chinese
+│       ├── ja.json              # Japanese
+│       ├── ko.json              # Korean
+│       └── es.json              # Spanish
 └── config/
     └── config.yaml              # Config file
 ```

@@ -48,9 +48,19 @@ def validate_tag_name(tag_name: str) -> bool:
     if len(tag_name) > 50:
         return False
     
-    # Allow letters (including unicode), numbers, underscore, hyphen
-    pattern = r'^[\w\u4e00-\u9fa5\-]+$'
-    return bool(re.match(pattern, tag_name))
+    # Allow letters (including unicode), numbers, underscore, hyphen, space, and dot
+    # Pattern: alphanumeric + Chinese characters + space + underscore + hyphen + dot
+    pattern = r'^[\w\u4e00-\u9fa5\s\.\-]+$'
+    
+    # Check pattern match
+    if not re.match(pattern, tag_name):
+        return False
+    
+    # Additional check: tag should not be only spaces
+    if tag_name.strip() == '':
+        return False
+    
+    return True
 
 
 def sanitize_tag_name(tag_name: str) -> Optional[str]:

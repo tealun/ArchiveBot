@@ -131,53 +131,6 @@ CONFIG_CATEGORIES = {
                 'default': 3
             }
         }
-    },
-    'web_archiver': {
-        'name': '网页存档',
-        'icon': '🌐',
-        'items': {
-            'web_archiver.enabled': {
-                'name': '智能链接存档',
-                'type': 'bool',
-                'description': '启用智能网页抓取、正文提取和PDF生成'
-            },
-            'web_archiver.strategies.http.enabled': {
-                'name': 'HTTP抓取',
-                'type': 'bool',
-                'description': '启用HTTP直接抓取（快速但可能被反爬）'
-            },
-            'web_archiver.strategies.http.timeout': {
-                'name': 'HTTP超时时间',
-                'type': 'int',
-                'description': 'HTTP抓取超时时间（秒）',
-                'min': 10,
-                'max': 120,
-                'default': 30
-            },
-            'web_archiver.pdf_generation.enabled': {
-                'name': 'PDF生成',
-                'type': 'bool',
-                'description': '将网页内容生成PDF存档'
-            },
-            'web_archiver.quality.min_score_for_pdf': {
-                'name': 'PDF质量阈值',
-                'type': 'float',
-                'description': '只有质量分数达到此值才生成PDF（0.0-1.0）',
-                'min': 0.1,
-                'max': 1.0,
-                'default': 0.5,
-                'step': 0.1
-            },
-            'web_archiver.quality.min_score_for_ai': {
-                'name': 'AI摘要阈值',
-                'type': 'float',
-                'description': '只有质量分数达到此值才进行AI摘要（0.0-1.0）',
-                'min': 0.1,
-                'max': 1.0,
-                'default': 0.3,
-                'step': 0.1
-            }
-        }
     }
 }
 
@@ -296,6 +249,19 @@ def validate_config_value(config_key: str, value: str) -> tuple[bool, any, str]:
             
             return True, int_value, ""
         
+        elif value_type == 'float':
+            # 浮点数值：检查范围
+            float_value = float(value)
+            min_val = item_info.get('min')
+            max_val = item_info.get('max')
+            
+            if min_val is not None and float_value < min_val:
+                return False, None, f"值不能小于 {min_val}"
+            if max_val is not None and float_value > max_val:
+                return False, None, f"值不能大于 {max_val}"
+            
+            return True, float_value, ""
+        
         elif value_type == 'string':
             # 字符串值：去除首尾空格
             str_value = value.strip()
@@ -306,11 +272,12 @@ def validate_config_value(config_key: str, value: str) -> tuple[bool, any, str]:
         elif value_type == 'choice':
             # 选择值：必须在choices列表中
             choices = item_info.get('choices', [])
-            value_upper = value.upper().strip()
-            if value_upper in choices:
-                return True, value_upper, ""
-            else:
-                return False, None, f"请选择：{', '.join(choices)}"
+            value_lower = value.lower().strip()
+            # 不区分大小写匹配
+            for choice in choices:
+                if choice.lower() == value_lower:
+                    return True, choice, ""
+            return False, None, f"请选择：{', '.join(choices)}"
         
         else:
             return False, None, f"不支持的配置类型：{value_type}"
@@ -319,3 +286,68 @@ def validate_config_value(config_key: str, value: str) -> tuple[bool, any, str]:
         return False, None, f"值格式错误：{str(e)}"
     except Exception as e:
         return False, None, f"验证失败：{str(e)}"
+
+
+def check_dependency_available(dependency: str) -> tuple[bool, str]:
+    """
+    检查依赖是否已安装
+    
+    Args:
+        dependency: 依赖名称（如 'playwright'）
+        
+    Returns:
+        (是否可用, 状态消息)
+    """
+    if dependency == 'playwright':
+        try:
+            import playwright
+            # 检查浏览器是否已安装
+            try:
+                from playwright.sync_api import sync_playwright
+                with sync_playwright() as p:
+                    # 尝试获取浏览器，如果失败说明浏览器未安装
+                    try:
+                        p.chromium.executable_path
+                        return True, "Playwright 已安装且浏览器可用"
+                    except Exception:
+                        return False, "Playwright 已安装但浏览器未安装，请运行: python -m playwright install chromium"
+            except Exception:
+                return False, "Playwright 已安装但无法使用，请重新安装"
+        except ImportError:
+            return False, "Playwright 未安装，请运行: pip install -r requirements-browser.txt"
+    
+    return True, ""
+
+
+def get_dependency_install_hint(config_key: str) -> str:
+    """
+    获取配置项的依赖安装提示
+    
+    Args:
+        config_key: 配置键
+        
+    Returns:
+        安装提示文本，如果不需要依赖则返回空字符串
+    """
+    item_info = get_config_item_info(config_key)
+    if not item_info:
+        return ""
+    
+    requires_dependency = item_info.get('requires_dependency')
+    if not requires_dependency:
+        return ""
+    
+    # 检查依赖是否可用
+    is_available, status_msg = check_dependency_available(requires_dependency)
+    
+    if is_available:
+        return ""  # 依赖已安装，不需要提示
+    
+    # 依赖未安装，返回安装提示
+    install_hint = item_info.get('install_hint', '')
+    
+    hint_text = f"\n\n⚠️ <b>依赖检查</b>\n{status_msg}"
+    if install_hint:
+        hint_text += f"\n\n<b>安装命令：</b>\n<code>{install_hint}</code>"
+    
+    return hint_text

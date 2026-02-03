@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import logging
 import yaml
+import os
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -118,33 +120,51 @@ async def handle_setting_set_callback(update: Update, context: ContextTypes.DEFA
         config_key = parts[1]
         value_str = parts[2]
         
-        # 验证并设置配置
-        success, message = await _set_config_value(config_key, value_str)
+        # 验证并设置配置（传递 update 和 context 以支持自动安装）
+        success, message = await _set_config_value(config_key, value_str, update, context)
         
         if success:
-            # 返回到分类视图并显示成功消息
-            category_key = _get_category_key(config_key)
-            item_info = get_config_item_info(config_key)
-            item_name = item_info['name']
-            
-            await query.edit_message_text(
-                f"✅ 配置已更新\n\n"
-                f"<b>{item_name}</b>\n"
-                f"新值：<code>{value_str}</code>\n\n"
-                f"{message}",
-                parse_mode=ParseMode.HTML
-            )
-            
-            # 2秒后自动返回分类视图
-            import asyncio
-            await asyncio.sleep(2)
-            
-            # 重新显示分类视图
-            callback_data = f"setting_cat:{category_key}"
-            context.user_data['_temp_callback'] = callback_data
-            
-            # 调用分类回调来显示更新后的分类页面
-            await handle_setting_category_callback(update, context)
+            # 检查是否需要显示安装选项
+            if "立即自动安装" in message or "查看手动安装说明" in message:
+                # 显示自动安装选项
+                keyboard = []
+                if "立即自动安装" in message:
+                    keyboard.append([
+                        InlineKeyboardButton("🚀 立即自动安装", callback_data=f"auto_install:playwright:{config_key}")
+                    ])
+                    keyboard.append([
+                        InlineKeyboardButton("📋 查看手动安装说明", callback_data=f"manual_install:playwright:{config_key}")
+                    ])
+                keyboard.append([
+                    InlineKeyboardButton("⬅️ 返回配置", callback_data="setting_menu")
+                ])
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup
+                )
+            else:
+                # 正常的配置更新
+                category_key = _get_category_key(config_key)
+                item_info = get_config_item_info(config_key)
+                item_name = item_info['name']
+                
+                # 添加返回按钮
+                keyboard = [[
+                    InlineKeyboardButton("⬅️ 返回配置", callback_data=f"setting_cat:{category_key}")
+                ]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    f"✅ 配置已更新\n\n"
+                    f"<b>{item_name}</b>\n"
+                    f"新值：<code>{value_str}</code>\n\n"
+                    f"{message}",
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup
+                )
         else:
             await query.edit_message_text(
                 f"❌ 配置更新失败\n\n{message}",
@@ -174,8 +194,8 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         config_key = context.user_data['waiting_setting_input']
         value_str = update.message.text.strip()
         
-        # 验证并设置配置
-        success, message = await _set_config_value(config_key, value_str)
+        # 验证并设置配置（传递 update 和 context 以支持自动安装）
+        success, message = await _set_config_value(config_key, value_str, update, context)
         
         item_info = get_config_item_info(config_key)
         item_name = item_info['name']
@@ -188,6 +208,16 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if success:
+            # 检查是否需要显示安装选项
+            if "立即自动安装" in message or "查看手动安装说明" in message:
+                # 添加自动安装按钮
+                keyboard = [
+                    [InlineKeyboardButton("🚀 立即自动安装", callback_data=f"auto_install:playwright:{config_key}")],
+                    [InlineKeyboardButton("📋 查看手动安装说明", callback_data=f"manual_install:playwright:{config_key}")],
+                    [InlineKeyboardButton("⬅️ 返回配置分类", callback_data=f"setting_cat:{category_key}")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+            
             await update.message.reply_text(
                 f"✅ 配置已更新\n\n"
                 f"<b>{item_name}</b>\n"
@@ -269,26 +299,38 @@ def _get_category_key(config_key: str) -> str:
     return 'basic'
 
 
-async def _set_config_value(config_key: str, value_str: str) -> tuple[bool, str]:
+def _check_owner_permission(update: Update) -> bool:
     """
-    设置配置值并写入文件
+    检查用户是否是 Bot owner
+    
+    Args:
+        update: Telegram update
+        
+    Returns:
+        是否是 owner
+    """
+    config = get_config()
+    owner_id = config.get('bot.owner_id')
+    user_id = update.effective_user.id if update.effective_user else None
+    return user_id == owner_id
+
+
+def _save_config_to_file(config_key: str, converted_value) -> bool:
+    """
+    保存配置值到文件
     
     Args:
         config_key: 配置键
-        value_str: 值字符串
+        converted_value: 转换后的值
         
     Returns:
-        (是否成功, 消息)
+        是否成功
     """
     try:
-        # 验证值
-        is_valid, converted_value, error_msg = validate_config_value(config_key, value_str)
-        if not is_valid:
-            return False, error_msg
-        
-        # 读取配置文件
-        import os
-        config_path = os.path.join(os.path.dirname(__file__), '../../../config/config.yaml')
+        # 使用绝对路径获取配置文件
+        from pathlib import Path
+        project_root = Path(__file__).parent.parent.parent.parent
+        config_path = project_root / "config" / "config.yaml"
         
         with open(config_path, 'r', encoding='utf-8') as f:
             config_data = yaml.safe_load(f)
@@ -309,9 +351,186 @@ async def _set_config_value(config_key: str, value_str: str) -> tuple[bool, str]
             yaml.safe_dump(config_data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
         
         logger.info(f"Configuration updated: {config_key} = {converted_value}")
+        return True
         
+    except Exception as e:
+        logger.error(f"Error saving config to file: {e}", exc_info=True)
+        return False
+
+
+async def _set_config_value(config_key: str, value_str: str, update: Update = None, context: ContextTypes.DEFAULT_TYPE = None) -> tuple[bool, str]:
+    """
+    设置配置值并写入文件
+    
+    Args:
+        config_key: 配置键
+        value_str: 值字符串
+        update: Telegram update (用于自动安装)
+        context: Bot context (用于自动安装)
+        
+    Returns:
+        (是否成功, 消息)
+    """
+    try:
+        # 验证值
+        is_valid, converted_value, error_msg = validate_config_value(config_key, value_str)
+        if not is_valid:
+            return False, error_msg
+        
+        # 保存配置
+        if not _save_config_to_file(config_key, converted_value):
+            return False, "保存配置失败"
+        
+        # 构建返回消息
         return True, "⚠️ 注意：部分配置需要重启Bot才能生效"
     
     except Exception as e:
         logger.error(f"Error setting config value: {e}", exc_info=True)
         return False, f"写入配置文件失败：{str(e)}"
+
+
+async def _handle_auto_install_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE, config_key: str) -> tuple[bool, str]:
+    """
+    处理自动安装提示
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+        config_key: 配置键
+        
+    Returns:
+        (是否成功, 消息)
+    """
+    message_text = (
+        "✅ <b>配置已保存</b>\n\n"
+        "⚠️ <b>检测到依赖未安装</b>\n\n"
+        "系统检测到 Playwright 依赖尚未安装。\n\n"
+        "<b>您可以选择：</b>\n"
+        "• 立即自动安装（约需 2-5 分钟）\n"
+        "• 查看手动安装说明\n\n"
+        "💡 自动安装将执行：\n"
+        "1. 安装 playwright 包\n"
+        "2. 下载 Chromium 浏览器\n"
+        "3. 验证安装结果"
+    )
+    
+    return True, message_text
+
+
+async def handle_auto_install_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    处理自动安装回调
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        # 权限检查：仅 Bot owner 可以执行安装
+        if not _check_owner_permission(update):
+            await query.edit_message_text(
+                "❌ 权限不足\n\n"
+                "只有 Bot 所有者可以执行自动安装操作。",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        # 解析 callback_data: auto_install:playwright:config_key
+        parts = query.data.split(':', 2)
+        dependency = parts[1]
+        
+        if dependency != 'playwright':
+            await query.edit_message_text("❌ 不支持的依赖类型")
+            return
+        
+        # 开始安装
+        await query.edit_message_text(
+            "🔄 <b>开始自动安装 Playwright...</b>\n\n"
+            "请稍候，这可能需要几分钟时间。",
+            parse_mode=ParseMode.HTML
+        )
+        
+        # 执行安装
+        from ...utils.auto_installer import auto_install_playwright
+        
+        # 定义进度回调
+        async def progress_callback(step: int, message: str):
+            try:
+                progress_text = (
+                    f"🔄 <b>正在安装 Playwright...</b>\n\n"
+                    f"{'✓' if step > 1 else '🔄'} 步骤 1: 安装 playwright 包\n"
+                    f"{'✓' if step > 2 else '🔄' if step == 2 else '⏳'} 步骤 2: 下载 Chromium 浏览器\n"
+                    f"{'✓' if step > 3 else '🔄' if step == 3 else '⏳'} 步骤 3: 验证安装\n\n"
+                    f"<i>{message}</i>"
+                )
+                await query.edit_message_text(progress_text, parse_mode=ParseMode.HTML)
+            except Exception as e:
+                # 记录但不中断安装过程
+                logger.warning(f"Failed to update progress message: {e}")
+        
+        success, result_msg = await auto_install_playwright(progress_callback)
+        
+        if success:
+            # 安装成功
+            keyboard = [[
+                InlineKeyboardButton("⬅️ 返回配置", callback_data="setting_menu")
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"✅ <b>安装成功！</b>\n\n{result_msg}",
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup
+            )
+        else:
+            # 安装失败，显示手动安装说明
+            from ...utils.auto_installer import get_manual_install_instructions
+            
+            keyboard = [[
+                InlineKeyboardButton("⬅️ 返回配置", callback_data="setting_menu")
+            ]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"❌ <b>自动安装失败</b>\n\n{result_msg}\n\n"
+                f"{get_manual_install_instructions()}",
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup
+            )
+    
+    except Exception as e:
+        logger.error(f"Error in handle_auto_install_callback: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ 安装过程发生错误：{str(e)}")
+
+
+async def handle_manual_install_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    处理手动安装说明回调
+    
+    Args:
+        update: Telegram update
+        context: Bot context
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        from ...utils.auto_installer import get_manual_install_instructions
+        
+        keyboard = [[
+            InlineKeyboardButton("⬅️ 返回配置", callback_data="setting_menu")
+        ]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            get_manual_install_instructions(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in handle_manual_install_callback: {e}", exc_info=True)
+        await query.edit_message_text(f"❌ 发生错误：{str(e)}")

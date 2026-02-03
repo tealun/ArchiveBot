@@ -237,7 +237,7 @@
   "setting_category_ai": "🤖 AI设置",
   "setting_category_storage": "💾 存储设置",
   "setting_category_logging": "📝 日志设置",
-  "setting_category_web_archiver": "🌐 网页存档",
+
   "setting_updated": "✅ 配置已更新\n\n<b>{name}</b>\n新值：<code>{value}</code>\n\n⚠️ 注意：部分配置需要重启Bot才能生效",
   "setting_update_failed": "❌ 配置更新失败\n\n{error}",
   "setting_invalid_value": "❌ 无效的值\n\n{error}",
@@ -255,6 +255,7 @@
   "content_type_animation": "动画",
   "content_type_contact": "联系人",
   "content_type_location": "位置",
+  "content_type_ebook": "电子书",
   "content_type_mixed": "混合内容",
   "storage": "存储",
   "source": "来源",
@@ -263,5 +264,8 @@
   "ai_analysis": "🤖 AI分析",
   "ai_category": "📁 分类",
   "ai_summary": "💭 摘要",
-  "ai_key_points": "🔑 关键点"
+  "ai_key_points": "🔑 关键点",
+  "restart_initiated": "🔄 <b>系统重启已启动</b>\n\n⚠️ Bot正在重启中...\n\n请稍等片刻，Bot将很快重新上线。\n\n💡 注意：需要Bot运行在进程管理器下（systemd、Docker等）",
+  "restart_failed": "❌ <b>重启失败</b>\n\n错误：{error}\n\n请手动重启Bot或检查系统日志。",
+  "restart_complete": "✅ <b>系统重启完成</b>\n\n🤖 Bot已成功重启并恢复在线。\n\n📊 所有服务运行正常。\n⏰ 重启完成时间：{time}"
 }

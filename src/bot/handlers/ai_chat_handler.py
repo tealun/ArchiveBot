@@ -154,6 +154,7 @@ async def _process_ai_message(
         
         # 发送AI处理进度提示
         progress_msg = await message.reply_text(f"🤖 {lang_ctx.t('ai_chat_understanding')}")
+        msg_handled = False  # 跟踪消息是否已被处理
         
         # 进度更新回调
         async def update_ai_progress(stage: str):
@@ -162,107 +163,141 @@ async def _process_ai_message(
             except Exception:
                 pass
         
-        # 调用统一的AI处理流程
-        success, ai_response = await process_ai_chat(
-            message, session, context, lang_ctx, update_ai_progress
-        )
+        try:
+            # 调用统一的AI处理流程
+            success, ai_response = await process_ai_chat(
+                message, session, context, lang_ctx, update_ai_progress
+            )
+            
+            # AI搜索完成后，第二阶段等待：检查5000ms内是否有批次消息
+            logger.debug(f"[Stage2] AI processing complete, checking for forward messages in 5s window")
+            
+            # 检查是否在第二阶段时间窗口内，且检测到转发
+            if detector.is_within_stage2_window(str(user_id)):
+                forward_status = detector.get_forward_status(str(user_id))
+                if forward_status and forward_status.get('forwarded_detected'):
+                    # 检测到转发消息，取消AI模式
+                    logger.info(f"[Stage2] Forward detected during AI processing for user {user_id}, cancelling AI mode")
+                    
+                    # 删除所有AI进度提示消息
+                    try:
+                        await progress_msg.delete()
+                        msg_handled = True
+                    except Exception as e:
+                        logger.debug(f"Failed to delete progress message: {e}")
+                    
+                    # 清除AI会话
+                    session_manager.clear_session(user_id)
+                    detector.cancel_wait(str(user_id))
+                    
+                    # 结束AI处理，让转发流程接管
+                    return False
+            
+            # 清理等待期标记（如果还存在）
+            detector.cancel_wait(str(user_id))
+            
+            if not success:
+                await message.reply_text(lang_ctx.t('ai_chat_error_session_end'))
+                session_manager.clear_session(user_id)
+                msg_handled = True
+                return False
         
-        # AI搜索完成后，第二阶段等待：检查5000ms内是否有批次消息
-        logger.debug(f"[Stage2] AI processing complete, checking for forward messages in 5s window")
-        
-        # 检查是否在第二阶段时间窗口内，且检测到转发
-        if detector.is_within_stage2_window(str(user_id)):
-            forward_status = detector.get_forward_status(str(user_id))
-            if forward_status and forward_status.get('forwarded_detected'):
-                # 检测到转发消息，取消AI模式
-                logger.info(f"[Stage2] Forward detected during AI processing for user {user_id}, cancelling AI mode")
-                
-                # 删除所有AI进度提示消息
+            # Check if resource was sent directly (special marker)
+            if ai_response == "__RESOURCE_SENT__":
+                # Resource file was already sent, just delete progress message
                 try:
                     await progress_msg.delete()
+                    msg_handled = True
                 except Exception as e:
                     logger.debug(f"Failed to delete progress message: {e}")
                 
-                # 清除AI会话
-                session_manager.clear_session(user_id)
-                detector.cancel_wait(str(user_id))
+                # Update session
+                session_manager.update_session(user_id, session.get('context', {}))
+                logger.info(f"AI sent resource file to user {user_id}")
+                return True
+            
+            # 检测是否为资源回复（JSON格式）
+            if await _handle_resource_response(
+                ai_response, message, context, lang_ctx, 
+                progress_msg, session_manager, user_id, session
+            ):
+                msg_handled = True
+                return True
+            
+            # 检测是否有待确认的写操作（Phase 2）
+            if 'pending_confirmation_message' in context.user_data and 'pending_confirmation_id' in context.user_data:
+                confirmation_msg = context.user_data.pop('pending_confirmation_message')
+                confirmation_id = context.user_data.pop('pending_confirmation_id')
                 
-                # 结束AI处理，让转发流程接管
-                return False
+                # 显示确认对话框
+                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            "✅ 确认执行" if lang_ctx.language.startswith('zh') else "✅ Confirm",
+                            callback_data=f"ai_confirm:{confirmation_id}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "❌ 取消" if lang_ctx.language.startswith('zh') else "❌ Cancel",
+                            callback_data=f"ai_cancel:{confirmation_id}"
+                        )
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                # 删除进度消息，发送确认消息
+                try:
+                    await progress_msg.delete()
+                    msg_handled = True
+                except Exception as e:
+                    logger.debug(f"Failed to delete progress message: {e}")
+                
+                await message.reply_text(confirmation_msg, reply_markup=reply_markup)
+                logger.info(f"Write operation confirmation sent for {confirmation_id}")
+                return True
+            
+            # 编辑消息为最终回复（正常文本）
+            # 检测消息中是否包含HTML标签，如果有则使用HTML模式
+            if '<a href=' in ai_response or '<b>' in ai_response or '<i>' in ai_response:
+                await progress_msg.edit_text(f"🤖 {ai_response}", parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+            else:
+                await progress_msg.edit_text(f"🤖 {ai_response}")
+            msg_handled = True
+            
+            # 更新会话（保存上下文）
+            session_manager.update_session(user_id, session.get('context', {}))
+            
+            logger.info(f"AI chat response sent to user {user_id}")
+            return True
         
-        # 清理等待期标记（如果还存在）
-        detector.cancel_wait(str(user_id))
-        
-        if not success:
-            await message.reply_text(lang_ctx.t('ai_chat_error_session_end'))
+        except Exception as inner_e:
+            # 捕获AI处理流程中的异常
+            logger.error(f"Error in AI chat processing: {inner_e}", exc_info=True)
+            
+            # 尝试更新进度消息为错误状态
+            if not msg_handled:
+                try:
+                    await progress_msg.edit_text(
+                        f"❌ {lang_ctx.t('ai_chat_error_session_end')}\n\n"
+                        f"错误: {str(inner_e)[:100]}"
+                    )
+                    msg_handled = True
+                except Exception as edit_e:
+                    logger.debug(f"Failed to update error message: {edit_e}")
+            
             session_manager.clear_session(user_id)
             return False
         
-        # Check if resource was sent directly (special marker)
-        if ai_response == "__RESOURCE_SENT__":
-            # Resource file was already sent, just delete progress message
-            try:
-                await progress_msg.delete()
-            except Exception as e:
-                logger.debug(f"Failed to delete progress message: {e}")
-            
-            # Update session
-            session_manager.update_session(user_id, session.get('context', {}))
-            logger.info(f"AI sent resource file to user {user_id}")
-            return True
-        
-        # 检测是否为资源回复（JSON格式）
-        if await _handle_resource_response(
-            ai_response, message, context, lang_ctx, 
-            progress_msg, session_manager, user_id, session
-        ):
-            return True
-        
-        # 检测是否有待确认的写操作（Phase 2）
-        if 'pending_confirmation_message' in context.user_data and 'pending_confirmation_id' in context.user_data:
-            confirmation_msg = context.user_data.pop('pending_confirmation_message')
-            confirmation_id = context.user_data.pop('pending_confirmation_id')
-            
-            # 显示确认对话框
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [
-                    InlineKeyboardButton(
-                        "✅ 确认执行" if lang_ctx.language.startswith('zh') else "✅ Confirm",
-                        callback_data=f"ai_confirm:{confirmation_id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "❌ 取消" if lang_ctx.language.startswith('zh') else "❌ Cancel",
-                        callback_data=f"ai_cancel:{confirmation_id}"
-                    )
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            # 删除进度消息，发送确认消息
-            try:
-                await progress_msg.delete()
-            except Exception as e:
-                logger.debug(f"Failed to delete progress message: {e}")
-            
-            await message.reply_text(confirmation_msg, reply_markup=reply_markup)
-            logger.info(f"Write operation confirmation sent for {confirmation_id}")
-            return True
-        
-        # 编辑消息为最终回复（正常文本）
-        # 检测消息中是否包含HTML标签，如果有则使用HTML模式
-        if '<a href=' in ai_response or '<b>' in ai_response or '<i>' in ai_response:
-            await progress_msg.edit_text(f"🤖 {ai_response}", parse_mode=ParseMode.HTML, disable_web_page_preview=True)
-        else:
-            await progress_msg.edit_text(f"🤖 {ai_response}")
-        
-        # 更新会话（保存上下文）
-        session_manager.update_session(user_id, session.get('context', {}))
-        
-        logger.info(f"AI chat response sent to user {user_id}")
-        return True
+        finally:
+            # 确保进度消息被清理（兜底保护）
+            if not msg_handled:
+                try:
+                    await progress_msg.delete()
+                    logger.warning(f"AI chat progress message cleanup: deleted unhandled message for user {user_id}")
+                except Exception as cleanup_e:
+                    logger.debug(f"Failed to cleanup AI progress message: {cleanup_e}")
         
     except Exception as e:
         logger.error(f"AI chat error: {e}", exc_info=True)
@@ -463,13 +498,16 @@ async def _handle_short_text(message, context, lang_ctx, text) -> bool:
     if note_manager:
         note_id = note_manager.add_note(None, text)
         if note_id:
+            # 提取标题：使用文本的前 50 个字符
+            note_title = text[:50] if text else None
+            
             # 转发笔记到Telegram频道（使用统一的公共函数）
             from ...utils.note_storage_helper import forward_note_to_channel
             storage_path = await forward_note_to_channel(
                 context=context,
                 note_id=note_id,
                 note_content=text,
-                note_title=None,
+                note_title=note_title,
                 note_manager=note_manager
             )
             

@@ -37,8 +37,8 @@ ArchiveBot 是一个开源的 Telegram Bot，帮助你将 Telegram 中的各类�
 - 🔄 **自动备份**：定期自动备份数据库，保障数据安全
 - 🤖 **AI智能增强**：Grok-4智能分析（摘要/关键点/分类/标签）
 - 💬 **AI智能对话**：自然语言交互，智能识别意图并直接返回资源文件
-- 🌏 **多语言优化**：英语/简体中文/繁体中文（含区域术语）
-- 🔗 **链接智能**：自动提取网页标题、描述等元数据
+- 🌏 **多语言支持**：6种语言（英语/简体中文/繁体中文/日语/韩语/西班牙语）
+- 🔗 **链接智能提取**：自动提取网页标题、描述、作者、关键信息等元数据，便于后续搜索和管理
 - 💾 **简化存储**：本地存储小数据 → 频道存储大文件 → 仅引用超大文件（三级策略）
 - 🔒 **隐私保护**：数据完全私有，单用户模式
 - 🛡️ **安全可靠**：SQL 注入防护、敏感信息过滤、线程安全
@@ -198,6 +198,7 @@ ArchiveBot 采用简化的三级存储策略，充分利用 Telegram 的免费�
 | `/backup` | - | 创建数据库备份 |
 | `/ai` | - | 查看AI功能状态 |
 | `/language` | `/la` | 切换界面语言 |
+| `/restart` | - | 重启系统 |
 | `/cancel` | - | 取消当前操作 |
 
 ### 归档内容
@@ -258,11 +259,15 @@ ArchiveBot/
 ├── main.py                      # 入口文件
 ├── src/
 │   ├── bot/                     # Bot 层
-│   │   ├── commands.py          # 命令处理
-│   │   ├── handlers.py          # 消息处理
-│   │   ├── callbacks.py         # 回调处理
+│   │   ├── commands.py          # 旧命令处理
+│   │   ├── handlers.py          # 旧消息处理
+│   │   ├── message_handlers.py  # 主消息处理
 │   │   ├── message_aggregator.py # 消息聚合器
-│   │   └── unknown_command.py   # 未知命令处理
+│   │   ├── callback_router.py   # 回调路由
+│   │   ├── unknown_command.py   # 未知命令处理
+│   │   ├── commands/            # 命令模块
+│   │   ├── handlers/            # 处理器模块
+│   │   └── callbacks/           # 回调处理器
 │   ├── core/                    # 核心业务
 │   │   ├── analyzer.py          # 内容分析
 │   │   ├── tag_manager.py       # 标签管理
@@ -280,11 +285,13 @@ ArchiveBot/
 │   │   ├── summarizer.py        # AI摘要生成
 │   │   ├── chat_router.py       # 智能对话路由
 │   │   ├── fallback.py          # AI降级策略
-│   │   └── prompts/             # 提示词模板
-│   │       ├── chat.py
-│   │       ├── note.py
-│   │       ├── summarize.py
-│   │       └── title.py
+│   │   ├── knowledge_base.py    # 知识库
+│   │   ├── request_queue.py     # 请求队列
+│   │   ├── response_optimizer.py # 响应优化器
+│   │   ├── prompts/             # 提示词模板
+│   │   ├── functions/           # 函数调用
+│   │   ├── operations/          # AI操作
+│   │   └── providers/           # AI提供商配置
 │   ├── storage/                 # 存储层
 │   │   ├── base.py              # 存储基类
 │   │   ├── database.py          # 数据库存储
@@ -302,11 +309,17 @@ ArchiveBot/
 │   │   ├── constants.py         # 常量定义
 │   │   ├── file_handler.py      # 文件处理
 │   │   ├── link_extractor.py    # 链接元数据提取
-│   │   └── db_maintenance.py    # 数据库维护
+│   │   ├── note_storage_helper.py # 笔记存储助手
+│   │   ├── auto_installer.py    # 自动安装器
+│   │   ├── db_maintenance.py    # 数据库维护
+│   │   └── formatters/          # 消息格式化器
 │   └── locales/                 # 语言文件
-│       ├── en.json
-│       ├── zh-CN.json
-│       └── zh-TW.json
+│       ├── en.json              # 英语
+│       ├── zh-CN.json           # 简体中文
+│       ├── zh-TW.json           # 繁体中文
+│       ├── ja.json              # 日语
+│       ├── ko.json              # 韩语
+│       └── es.json              # 西班牙语
 └── config/
     └── config.yaml              # 配置文件
 ```
@@ -472,6 +485,9 @@ python main.py
 
 - 📖 [快速开始](docs/QUICKSTART.md) - 5分钟快速上手
 - 🚀 [部署指南](docs/DEPLOYMENT.md) - 生产环境部署
+- 🤖 [如何应用 AI PR](docs/HOW_TO_APPLY_AI_PR.md) - AI 助手 Pull Request 应用指南
+- 🛠️ [开发指南](docs/DEVELOPMENT.md) - 开发环境配置和贡献指南
+- 📐 [架构说明](docs/ARCHITECTURE.md) - 系统架构和设计理念
 
 ## 🔒 安全特性
 
