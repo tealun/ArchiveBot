@@ -392,25 +392,40 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
             except Exception as e:
                 logger.warning(f"Fallback analysis failed: {e}")
         
-        # 如果是文本内容且需要AI标题，生成标题
-        if analysis.get('_needs_ai_title') and ai_available:
+        # 生成标题（针对文本内容和电子书/文档）
+        content_type = analysis.get('content_type', '')
+        file_name = analysis.get('file_name', '')
+        is_ebook_or_document = content_type in ['ebook', 'document'] and file_name
+        
+        if ai_available and (analysis.get('_needs_ai_title') or is_ebook_or_document):
             if progress_callback:
                 await progress_callback(lang_ctx.t('progress_ai_generating_title'), 0.62)
             try:
                 content = analysis.get('content', '')
                 is_forwarded = bool(message.forward_origin)
                 
-                # 转发消息无需长度判断，直接发送的消息需要>=250字符
-                should_generate_title = is_forwarded or (content and len(content) >= 250)
+                # 确定用于生成标题的内容源
+                title_content = ''
+                if is_ebook_or_document and not content:
+                    # 对于电子书/文档，如果没有内容，使用文件名和AI摘要生成标题
+                    title_content = file_name
+                    if analysis.get('ai_summary'):
+                        title_content = f"{file_name}\n\n{analysis['ai_summary']}"
+                else:
+                    title_content = content
                 
-                if should_generate_title and content:
+                # 转发消息无需长度判断，直接发送的消息需要>=250字符
+                # 对于电子书/文档，只要有文件名就生成标题
+                should_generate_title = is_ebook_or_document or is_forwarded or (title_content and len(title_content) >= 250)
+                
+                if should_generate_title and title_content:
                     # 生成标题（来源信息已在content开头显示，不需要在标题中重复）
                     user_language = lang_ctx.language
                     # 标题长度限制为32字符
                     max_title_length = 32
                     
                     ai_title = await ai_summarizer.generate_title_from_text(
-                        content, 
+                        title_content, 
                         max_length=max_title_length, 
                         language=user_language
                     )
@@ -420,8 +435,18 @@ async def _process_single_message(message: Message, context: ContextTypes.DEFAUL
                         logger.info(f"AI generated title: {analysis['title']}")
                         if progress_callback:
                             await progress_callback(lang_ctx.t('progress_title_complete'), 0.65)
+                elif is_ebook_or_document and file_name and not analysis.get('title'):
+                    # 降级：使用文件名作为标题（去除扩展名）
+                    base_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
+                    analysis['title'] = base_name[:50]  # 限制长度
+                    logger.info(f"Using file name as title: {analysis['title']}")
             except Exception as e:
                 logger.warning(f"AI title generation failed: {e}")
+                # 降级：对于电子书/文档，使用文件名作为标题
+                if is_ebook_or_document and file_name and not analysis.get('title'):
+                    base_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
+                    analysis['title'] = base_name[:50]
+                    logger.info(f"Fallback to file name as title: {analysis['title']}")
         
 
         # Get storage manager

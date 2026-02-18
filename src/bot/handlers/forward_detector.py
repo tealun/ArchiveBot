@@ -86,6 +86,13 @@ class ForwardDetector:
         """
         wait_data = self._pending_texts.get(user_id)
         if wait_data and wait_data.get('waiting'):
+            # 检查等待期是否已过期（超过60秒的旧数据视为无效）
+            elapsed = (datetime.now() - wait_data['timestamp']).total_seconds()
+            if elapsed > 60:  # 60秒超时
+                logger.warning(f"Wait data expired for user {user_id} ({elapsed:.1f}s), cleaning up")
+                self._pending_texts.pop(user_id, None)
+                return None
+            
             logger.info(f"Forward message detected for user {user_id} during wait period, user comment: '{wait_data['text'][:50]}...'")
             # 标记为已检测到转发
             wait_data['forwarded_detected'] = True
@@ -169,7 +176,8 @@ class ForwardDetector:
         """获取统计信息"""
         return {
             'pending_count': len(self._pending_texts),
-            'wait_period_ms': self.wait_period_ms
+            'stage1_wait_ms': self.stage1_wait_ms,
+            'stage2_wait_ms': self.stage2_wait_ms
         }
 
 

@@ -664,3 +664,14 @@ async def _batch_callback(messages: List[Message], merged_caption: Optional[str]
             
     except Exception as e:
         logger.error(f"Error in batch callback: {e}", exc_info=True)
+    
+    finally:
+        # 清理转发检测器的等待状态（兜底保护，防止残留状态影响后续消息）
+        try:
+            from .forward_detector import get_forward_detector
+            detector = get_forward_detector()
+            user_id = str(update.effective_user.id) if update.effective_user else None
+            if user_id:
+                detector.cancel_wait(user_id)
+        except Exception as cleanup_e:
+            logger.debug(f"Failed to cleanup forward detector state: {cleanup_e}")

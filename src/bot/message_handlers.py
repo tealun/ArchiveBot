@@ -88,6 +88,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 return
             
             logger.debug(f"[Stage1] No forward detected after 1000ms, continuing to stage 2 for user {user_id}")
+            # 没有检测到转发，取消等待期（正常文本归档，不是"转发前评论"场景）
+            detector.cancel_wait(user_id)
         # ========================================================================
             
             logger.debug(f"No forward detected after delay, continuing text processing for user {user_id}")

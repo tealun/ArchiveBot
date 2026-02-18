@@ -146,8 +146,8 @@ async def _forward_to_featured_channel(context: ContextTypes.DEFAULT_TYPE, archi
     """
     try:
         config = get_config()
-        telegram_config = config.storage.get('telegram', {})
-        channels = telegram_config.get('channels', {})
+        # 使用 config.get() 方法或 telegram_channels 属性获取频道配置
+        channels = config.telegram_channels
         featured_channel_id = channels.get('featured')
         
         if not featured_channel_id:
