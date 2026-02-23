@@ -66,7 +66,6 @@ reset_*.py
 
 # Internal tools (not for public repo)
 sync_to_public.py
-verify_docker.py
 
 # Internal documentation (not for public repo)
 docs/DEVELOPMENT.md
